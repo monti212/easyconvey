@@ -1,0 +1,700 @@
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, ArrowRight, Upload, CheckCircle, AlertCircle, Share2, FileText, Eye, X, AlertTriangle, FileType } from 'lucide-react';
+
+interface Step6Props {
+  requiredDocuments: string[];
+  uploadedDocuments: string[];
+  otherPartyDocuments: string[];
+  documentUploaded: boolean;
+  documentValid: boolean;
+  skippedDeedUpload: boolean;
+  transactionType: string;
+  originalTransactionId?: string;
+  isSharedTransaction?: boolean;
+  currentTransactionData?: any; // Current transaction data for sharing
+  onUpdate: (data: { uploadedDocuments?: string[]; otherPartyDocuments?: string[] }) => void;
+  onNext: () => void;
+  onPrevious: () => void;
+  onSharedLink?: (transactionId: string, transactionType: string, sharedPricing?: any) => void;
+}
+
+const Step6DocumentUpload: React.FC<Step6Props> = ({
+  requiredDocuments,
+  uploadedDocuments,
+  otherPartyDocuments,
+  documentUploaded,
+  documentValid,
+  skippedDeedUpload,
+  transactionType,
+  originalTransactionId,
+  isSharedTransaction,
+  currentTransactionData,
+  onUpdate,
+  onNext,
+  onPrevious,
+  onSharedLink
+}) => {
+  const [isUploading, setIsUploading] = useState(false);
+  const [showImportantNote, setShowImportantNote] = useState(true);
+  const [documentQuality, setDocumentQuality] = useState<Record<string, string>>({});
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [partnerEmail, setPartnerEmail] = useState('');
+  const [sharedLink, setSharedLink] = useState('');
+  const [fullRequiredDocuments, setFullRequiredDocuments] = useState<string[]>([]);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle');
+
+  // Check if Title Deed needs to be added to required documents
+  useEffect(() => {
+    let updatedDocs = [...requiredDocuments];
+    
+    // Add Title Deed to required documents if it wasn't uploaded in Step 2
+    if (skippedDeedUpload || (!documentUploaded && !documentValid)) {
+      if (!updatedDocs.includes('Title Deed')) {
+        updatedDocs = ['Title Deed', ...updatedDocs];
+      }
+    }
+    
+    // Add Sale Agreement to required documents if not already included
+    if (!updatedDocs.includes('Sale Agreement or Offer to Sell/Purchase')) {
+      updatedDocs.push('Sale Agreement or Offer to Sell/Purchase');
+    }
+    
+    setFullRequiredDocuments(updatedDocs);
+  }, [requiredDocuments, documentUploaded, documentValid, skippedDeedUpload]);
+
+  const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true);
+    
+    // Simulate AI processing
+    setTimeout(() => {
+      setIsUploading(false);
+      
+      // In a real app, we'd process the files and match them to required documents
+      // For this demo, we'll simulate uploads with quality feedback - many will be rejected
+      const newUploads = Array.from(files).map(file => file.name);
+      onUpdate({ uploadedDocuments: [...uploadedDocuments, ...newUploads] });
+      
+      // Simulate AI quality analysis for each document - mostly poor quality
+      const newQuality: Record<string, string> = { ...documentQuality };
+      newUploads.forEach(doc => {
+        const quality = Math.random();
+        if (quality > 0.8) {
+          newQuality[doc] = 'good';
+        } else if (quality > 0.6) {
+          newQuality[doc] = 'medium';
+        } else {
+          newQuality[doc] = 'poor';
+        }
+      });
+      setDocumentQuality(newQuality);
+    }, 3000); // Slightly longer processing time to show analysis
+  };
+
+  const handleSingleUpload = (docType: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Generate a modified filename that includes the document type
+    const fileExtension = file.name.split('.').pop();
+    const newFileName = `${docType.replace(/\s+/g, '_')}.${fileExtension}`;
+    
+    setIsUploading(true);
+    
+    // Simulate upload delay
+    setTimeout(() => {
+      setIsUploading(false);
+      const newUploads = [...uploadedDocuments, newFileName];
+      onUpdate({ uploadedDocuments: newUploads });
+      
+      // Simulate AI quality analysis - mostly poor quality for single uploads too
+      const quality = Math.random();
+      const newQuality = { ...documentQuality };
+      if (quality > 0.8) {
+        newQuality[newFileName] = 'good';
+      } else if (quality > 0.6) {
+        newQuality[newFileName] = 'medium';
+      } else {
+        newQuality[newFileName] = 'poor';
+      }
+      setDocumentQuality(newQuality);
+    }, 2500); // Longer processing to show thorough analysis
+  };
+
+  const handleShare = () => {
+    if (!partnerEmail) return;
+    
+    // Use the original transaction ID if this is a shared transaction, otherwise generate a new one
+    const transactionId = originalTransactionId || Math.random().toString(36).substring(2, 10).toUpperCase();
+    const otherPartyType = transactionType === 'buying' ? 'selling' : 'buying';
+    
+    // Prepare pricing data to share if available
+    const sharedPricing = currentTransactionData && currentTransactionData.sellingPrice ? {
+      sellingPrice: currentTransactionData.sellingPrice,
+      valuationAmount: currentTransactionData.valuationAmount || '',
+      valuationDocument: currentTransactionData.valuationDocument || ''
+    } : null;
+    
+    // Encode the shared data
+    const encodedData = sharedPricing ? encodeURIComponent(JSON.stringify(sharedPricing)) : '';
+    const link = `${window.location.origin}?transaction=${transactionId}&type=${otherPartyType}${encodedData ? `&data=${encodedData}` : ''}`;
+    
+    setSharedLink(link);
+    
+    // Simulate sending email notification
+    setTimeout(() => {
+      alert(`Share link sent to ${partnerEmail}!\n\nThey will start the complete ${otherPartyType} process from the beginning${sharedPricing ? ' with your pricing information pre-filled' : ''}.`);
+    }, 1000);
+  };
+
+  const handleTestSharedLink = () => {
+    if (onSharedLink && sharedLink) {
+      const url = new URL(sharedLink);
+      const transactionId = url.searchParams.get('transaction') || '';
+      const transactionType = url.searchParams.get('type') || 'buying';
+      const sharedData = url.searchParams.get('data');
+      
+      let parsedData = null;
+      if (sharedData) {
+        try {
+          parsedData = JSON.parse(decodeURIComponent(sharedData));
+        } catch (e) {
+          console.warn('Failed to parse shared data:', e);
+        }
+      }
+      
+      onSharedLink(transactionId, transactionType, parsedData);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!sharedLink) return;
+    
+    setCopyStatus('copying');
+    
+    try {
+      await navigator.clipboard.writeText(sharedLink);
+      setCopyStatus('copied');
+      
+      // Reset status after 2 seconds
+      setTimeout(() => {
+        setCopyStatus('idle');
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+      setCopyStatus('error');
+      
+      // Try fallback method for older browsers
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = sharedLink;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        setCopyStatus('copied');
+        setTimeout(() => {
+          setCopyStatus('idle');
+        }, 2000);
+      } catch (fallbackErr) {
+        console.error('Fallback copy failed:', fallbackErr);
+        // Reset status after showing error
+        setTimeout(() => {
+          setCopyStatus('idle');
+        }, 2000);
+      }
+    }
+  };
+
+  const getCopyButtonText = () => {
+    switch (copyStatus) {
+      case 'copying':
+        return 'Copying...';
+      case 'copied':
+        return 'Copied!';
+      case 'error':
+        return 'Failed';
+      default:
+        return 'Copy';
+    }
+  };
+
+  const getCopyButtonClass = () => {
+    const baseClass = "text-xs px-2 py-1 rounded transition-colors";
+    switch (copyStatus) {
+      case 'copying':
+        return `${baseClass} text-gray-600 cursor-wait`;
+      case 'copied':
+        return `${baseClass} text-green-600 bg-green-100`;
+      case 'error':
+        return `${baseClass} text-red-600 bg-red-100`;
+      default:
+        return `${baseClass} text-blue-600 hover:text-blue-800 hover:bg-blue-50 cursor-pointer`;
+    }
+  };
+
+  const getMissingDocuments = () => {
+    return fullRequiredDocuments.filter(doc => 
+      !uploadedDocuments.some(uploaded => 
+        uploaded.toLowerCase().includes(doc.toLowerCase().replace(/\s+/g, '_'))
+      )
+    );
+  };
+
+  const isDocumentUploaded = (docType: string) => {
+    return uploadedDocuments.some(doc => 
+      doc.toLowerCase().includes(docType.toLowerCase().replace(/\s+/g, '_'))
+    );
+  };
+
+  const getDocumentName = (docType: string) => {
+    return uploadedDocuments.find(doc => 
+      doc.toLowerCase().includes(docType.toLowerCase().replace(/\s+/g, '_'))
+    ) || '';
+  };
+
+  const getQualityFeedback = (doc: string) => {
+    const quality = documentQuality[doc];
+    if (quality === 'good') {
+      return { text: 'Excellent quality ✓', color: 'text-green-600', bg: 'bg-green-100' };
+    } else if (quality === 'medium') {
+      return { text: 'Acceptable - could be clearer', color: 'text-amber-600', bg: 'bg-amber-100' };
+    } else if (quality === 'poor') {
+      return { text: 'Too blurry - please re-scan', color: 'text-red-600', bg: 'bg-red-100' };
+    }
+    return { text: 'Analyzing quality...', color: 'text-gray-600', bg: 'bg-gray-100' };
+  };
+
+  const canProceed = uploadedDocuments.length > 0;
+  const missingDocuments = getMissingDocuments();
+  const hasSharedPricing = currentTransactionData?.sellingPrice && parseInt(currentTransactionData.sellingPrice) > 0;
+
+  return (
+    <div className="py-4 md:py-8 max-w-4xl mx-auto px-4">
+      <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 md:mb-4 text-center">
+        Document Upload
+      </h2>
+      <p className="text-sm md:text-lg text-gray-600 mb-6 md:mb-8 text-center max-w-2xl mx-auto">
+        Please upload all required documents for your transaction. Our AI will analyze them for compliance.
+        {isSharedTransaction && (
+          <span className="block mt-2 text-primary font-medium">
+            This is for transaction: {originalTransactionId}
+          </span>
+        )}
+      </p>
+
+      {/* Important Note Modal */}
+      {showImportantNote && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-10 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-5 md:p-8 m-4 relative overflow-hidden">
+            <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-red-400 opacity-20 blur-xl"></div>
+            <div className="relative">
+              <h3 className="text-lg md:text-xl font-bold text-red-600 mb-3 md:mb-4">IMPORTANT NOTICE</h3>
+              <div className="text-gray-700 space-y-3 md:space-y-4 mb-5 md:mb-6">
+                <p className="text-sm md:text-base">Please note that the following documents are also required:</p>
+                <ul className="list-disc pl-5 md:pl-6 space-y-1 md:space-y-2">
+                  <li className="text-sm md:text-base">Tax clearance from relevant authorities</li>
+                  <li className="text-sm md:text-base">Rates clearance certificate from local municipality</li>
+                  <li className="text-sm md:text-base">Letter of Compliance (where applicable)</li>
+                </ul>
+                <p className="text-sm md:text-base font-medium">These steps are essential to complete your transaction successfully.</p>
+              </div>
+              <button
+                onClick={() => setShowImportantNote(false)}
+                className="w-full py-2.5 md:py-3 px-4 border-2 border-transparent text-sm md:text-base font-medium rounded-xl shadow-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+              >
+                I Understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Share Link Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-10 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-5 md:p-8 m-4 relative">
+            <button 
+              onClick={() => setShowShareModal(false)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3 md:mb-4">Share with Other Party</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Share this transaction with the other party ({transactionType === 'buying' ? 'seller' : 'buyer'}) to allow them to start their complete transaction process from the beginning{hasSharedPricing ? ' with your pricing information pre-filled' : ''}.
+            </p>
+            
+            {hasSharedPricing && (
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-800 font-medium">Pricing Information Will Be Shared</p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Your pricing details (P {parseInt(currentTransactionData.sellingPrice).toLocaleString()}) will be pre-filled for the other party to confirm.
+                </p>
+              </div>
+            )}
+            
+            <div className="mb-4">
+              <label htmlFor="partnerEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                Email Address
+              </label>
+              <input
+                type="email"
+                id="partnerEmail"
+                value={partnerEmail}
+                onChange={(e) => setPartnerEmail(e.target.value)}
+                className="focus:ring-blue-500 focus:border-blue-500 block w-full py-2 px-3 text-sm border-gray-300 rounded-lg"
+                placeholder="partner@example.com"
+              />
+            </div>
+            
+            {sharedLink ? (
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 mb-4">
+                <p className="text-sm text-blue-800 font-medium mb-2">Share link generated!</p>
+                <div className="flex items-center justify-between bg-white p-2 rounded border border-blue-100 mb-2">
+                  <span className="text-xs text-gray-600 truncate mr-2 flex-1">{sharedLink}</span>
+                  <button 
+                    onClick={handleCopyLink}
+                    disabled={copyStatus === 'copying'}
+                    className={getCopyButtonClass()}
+                  >
+                    {getCopyButtonText()}
+                  </button>
+                </div>
+                <p className="text-xs text-blue-600 mb-3">
+                  The other party will start their complete {transactionType === 'buying' ? 'selling' : 'buying'} process from the beginning when they click this link{hasSharedPricing ? ' with your pricing pre-filled' : ''}.
+                </p>
+                <button
+                  onClick={handleTestSharedLink}
+                  className="w-full py-2 px-3 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Test Shared Link (Demo)
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleShare}
+                disabled={!partnerEmail}
+                className={`w-full py-2 px-4 rounded-lg text-sm font-medium ${
+                  partnerEmail ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                } transition-colors`}
+              >
+                Generate Share Link
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 mb-6 md:mb-8">
+        {/* Left side - Checklist */}
+        <div className="md:col-span-2 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-5 md:p-8 shadow-lg">
+          <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-4 md:mb-6 flex items-center">
+            <FileText className="h-4 w-4 md:h-5 md:w-5 text-blue-600 mr-2" />
+            Required Documents Checklist
+          </h3>
+          
+          {/* Document format notification */}
+          <div className="mb-4 p-3 bg-blue-100 rounded-lg border border-blue-200">
+            <div className="flex items-start">
+              <AlertCircle className="h-4 w-4 text-blue-700 mt-0.5 flex-shrink-0" />
+              <div className="ml-2">
+                <p className="text-xs text-blue-700 font-medium">
+                  Important: All documents must be clear, legible, and in PDF format
+                </p>
+                <p className="text-xs text-blue-700 mt-1">
+                  Our AI analyzes document quality - blurry, dark, or poor quality scans will be rejected. Use good lighting and hold camera steady.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <ul className="space-y-3 md:space-y-4">
+            {fullRequiredDocuments.map((doc, index) => {
+              const isUploaded = isDocumentUploaded(doc);
+              const docName = getDocumentName(doc);
+              const quality = docName ? getQualityFeedback(docName) : null;
+              
+              return (
+                <li key={index} className={`p-2 md:p-3 rounded-lg ${isUploaded ? 'bg-green-50 border border-green-200' : 'bg-white border border-gray-200'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      {isUploaded ? (
+                        <div className="h-6 w-6 md:h-8 md:w-8 rounded-full bg-green-100 flex items-center justify-center mr-2 md:mr-3">
+                          <CheckCircle className="h-4 w-4 md:h-5 md:w-5 text-green-600" />
+                        </div>
+                      ) : (
+                        <div className="h-6 w-6 md:h-8 md:w-8 flex-shrink-0 mr-2 md:mr-3">
+                          <input
+                            type="file"
+                            id={`doc-${index}`}
+                            className="hidden"
+                            onChange={handleSingleUpload(doc)}
+                            accept=".pdf"
+                          />
+                          <label
+                            htmlFor={`doc-${index}`}
+                            className="h-full w-full rounded-full border-2 border-gray-300 hover:border-blue-400 flex items-center justify-center cursor-pointer transition-colors"
+                          >
+                            <Upload className="h-3 w-3 md:h-4 md:w-4 text-gray-500 hover:text-blue-500" />
+                          </label>
+                        </div>
+                      )}
+                      <span className={`text-sm md:text-base ${isUploaded ? 'text-green-700 font-medium' : 'text-gray-700'}`}>
+                        {doc}
+                        {doc === 'Title Deed' && skippedDeedUpload && (
+                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                            Required
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    
+                    {isUploaded && quality && (
+                      <div className={`px-2 py-1 rounded-full text-xs ${quality.color} ${quality.bg}`}>
+                        {quality.text}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {isUploaded && (
+                    <div className="mt-2 ml-8 text-xs text-gray-500 flex items-center">
+                      <span className="truncate mr-2">{docName}</span>
+                      <button className="text-blue-600 hover:text-blue-800 flex items-center">
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
+                      </button>
+                      <button 
+                        className="text-red-600 hover:text-red-800 flex items-center ml-2"
+                        onClick={() => {
+                          const newDocs = uploadedDocuments.filter(d => d !== docName);
+                          onUpdate({ uploadedDocuments: newDocs });
+                          
+                          // Remove quality info
+                          const newQuality = { ...documentQuality };
+                          delete newQuality[docName];
+                          setDocumentQuality(newQuality);
+                        }}
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          
+          {uploadedDocuments.length > 0 && (
+            <div className="mt-6 md:mt-8 bg-white rounded-xl p-4 md:p-5 border border-blue-200">
+              <h4 className="text-sm md:text-base font-medium text-gray-900 mb-3 md:mb-4 flex items-center">
+                <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                Uploaded Documents
+              </h4>
+              <div className="relative w-full h-4 bg-gray-200 rounded-full mb-2">
+                <div 
+                  className="absolute top-0 left-0 h-full bg-green-500 rounded-full"
+                  style={{ 
+                    width: `${Math.min(100, (uploadedDocuments.length / fullRequiredDocuments.length) * 100)}%` 
+                  }}
+                ></div>
+              </div>
+              <p className="text-xs text-gray-600">
+                <span className="font-medium">{uploadedDocuments.length}</span> of <span className="font-medium">{fullRequiredDocuments.length}</span> documents uploaded
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Right side - Upload area */}
+        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-lg border border-gray-200 flex flex-col h-full">
+          <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-3 md:mb-4 flex items-center">
+            <Upload className="h-4 w-4 md:h-5 md:w-5 text-blue-600 mr-2" />
+            Bulk Upload
+          </h3>
+          {isUploading ? (
+            <div className="flex-1 flex flex-col items-center justify-center bg-blue-50 rounded-xl p-4 md:p-6">
+              <div className="animate-pulse flex flex-col items-center">
+                <div className="rounded-full bg-blue-400 h-10 w-10 md:h-14 md:w-14 mb-4 md:mb-5"></div>
+                <div className="h-4 md:h-5 bg-blue-400 rounded w-3/4 mb-2 md:mb-3"></div>
+                <div className="h-4 md:h-5 bg-blue-400 rounded w-1/2"></div>
+              </div>
+              <p className="mt-4 md:mt-5 text-sm md:text-base text-blue-700 font-medium">Processing your documents...</p>
+              <p className="text-xs md:text-sm text-blue-600 mt-1 md:mt-2">Our AI is analyzing your files for compliance and quality</p>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col">
+              <div className="border-2 border-dashed border-blue-300 rounded-xl bg-blue-50 p-4 md:p-8 flex-1 flex flex-col items-center justify-center text-center transition-all hover:bg-blue-100">
+                <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-white flex items-center justify-center mb-3 md:mb-4 shadow-md">
+                  <Upload className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
+                </div>
+                <p className="text-sm md:text-base text-blue-800 font-medium mb-1 md:mb-2">
+                  Tap to upload multiple documents
+                </p>
+                <p className="text-xs md:text-sm text-blue-600 mb-4 md:mb-6">
+                  Ensure documents are clear and well-lit before uploading
+                </p>
+                <input
+                  type="file"
+                  id="file-upload"
+                  className="hidden"
+                  onChange={handleBulkUpload}
+                  multiple
+                  accept=".pdf"
+                />
+                <label
+                  htmlFor="file-upload"
+                  className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-transparent text-sm md:text-base font-medium rounded-lg shadow-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                >
+                  Upload Files
+                </label>
+                
+                <div className="mt-3 text-xs text-blue-500">
+                  <AlertTriangle className="h-3 w-3 inline-block mr-1" />
+                  Poor quality documents will be automatically rejected
+                </div>
+              </div>
+              
+              {/* Only show share button if this is not already a shared transaction */}
+              {!isSharedTransaction && (
+                <div className="mt-4 md:mt-6">
+                  <button
+                    onClick={() => setShowShareModal(true)}
+                    className="w-full flex items-center justify-center px-4 py-2 md:px-5 md:py-3 border-2 border-gray-300 text-xs md:text-base font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                  >
+                    <Share2 className="mr-1 md:mr-2 h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+                    Share Link with Other Party
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Transaction Progress Area */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-md mb-6 md:mb-8 p-4 md:p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Transaction Progress</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <div className="bg-blue-50 rounded-lg p-3 md:p-4 border border-blue-100">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm md:text-base font-medium text-blue-800">Your Documents</h4>
+              <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full">
+                {Math.round((uploadedDocuments.length / fullRequiredDocuments.length) * 100)}% Complete
+              </span>
+            </div>
+            <div className="relative w-full h-2 bg-blue-200 rounded-full">
+              <div
+                className="absolute top-0 left-0 h-full bg-blue-600 rounded-full"
+                style={{
+                  width: `${Math.min(100, (uploadedDocuments.length / fullRequiredDocuments.length) * 100)}%`
+                }}
+              ></div>
+            </div>
+          </div>
+          
+          <div className={`rounded-lg p-3 md:p-4 border ${otherPartyDocuments.length > 0 ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-200'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className={`text-sm md:text-base font-medium ${otherPartyDocuments.length > 0 ? 'text-green-800' : 'text-gray-700'}`}>
+                Other Party's Documents
+              </h4>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                otherPartyDocuments.length > 0 
+                  ? 'bg-green-200 text-green-800' 
+                  : 'bg-gray-200 text-gray-700'
+              }`}>
+                {otherPartyDocuments.length > 0 ? `${otherPartyDocuments.length} Uploaded` : 'Awaiting Upload'}
+              </span>
+            </div>
+            <div className="relative w-full h-2 bg-gray-200 rounded-full">
+              <div
+                className={`absolute top-0 left-0 h-full rounded-full ${
+                  otherPartyDocuments.length > 0 ? 'bg-green-500' : 'bg-gray-400'
+                }`}
+                style={{
+                  width: otherPartyDocuments.length > 0 ? '100%' : '0%'
+                }}
+              ></div>
+            </div>
+            
+            {!isSharedTransaction && (
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
+              >
+                Share link to start their process
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Important note permanent reminder */}
+      <div className="bg-gradient-to-r from-amber-50 to-amber-100 rounded-xl border-l-4 border-amber-400 p-4 md:p-6 mb-6 md:mb-8 shadow-md">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <AlertCircle className="h-5 w-5 md:h-6 md:w-6 text-amber-500" />
+          </div>
+          <div className="ml-3 md:ml-4">
+            <p className="text-xs md:text-base text-amber-800">
+              <strong className="font-semibold">Important:</strong> After submission, you'll need to obtain tax clearance, 
+              letter of compliance (where necessary), and pay rates clearance to complete your transaction.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Missing documents warning */}
+      {missingDocuments.length > 0 && (
+        <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl border border-orange-200 p-4 md:p-6 mb-6 md:mb-8 shadow-md">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <AlertCircle className="h-5 w-5 md:h-6 md:w-6 text-orange-500" />
+            </div>
+            <div className="ml-3 md:ml-4">
+              <h3 className="text-base md:text-lg font-semibold text-orange-800">Missing Documents</h3>
+              <div className="mt-1 md:mt-2 text-sm md:text-base text-orange-700">
+                <p className="mb-1 md:mb-2">The following documents are still required:</p>
+                <ul className="list-disc space-y-0.5 md:space-y-1 pl-4 md:pl-5">
+                  {missingDocuments.map((doc, index) => (
+                    <li key={index} className="text-xs md:text-sm">{doc}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-8 md:mt-12 flex justify-between">
+        <button
+          onClick={onPrevious}
+          className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-gray-300 rounded-lg text-sm md:text-base font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors"
+        >
+          <ArrowLeft className="mr-1 md:mr-2 h-4 w-4" />
+          Back
+        </button>
+        
+        <button
+          onClick={onNext}
+          disabled={!canProceed}
+          className={`inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-transparent rounded-lg text-sm md:text-base font-medium shadow-md text-white ${
+            canProceed ? 'bg-blue-600 hover:bg-blue-700 transition-colors' : 'bg-gray-400 cursor-not-allowed'
+          }`}
+        >
+          Submit Documents
+          <ArrowRight className="ml-1 md:ml-2 h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default Step6DocumentUpload;
