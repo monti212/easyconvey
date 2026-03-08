@@ -27,7 +27,7 @@ export default function OrganizationSelector() {
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
           <p className="font-serif text-xl font-semibold text-primary tracking-tight mb-4">
-            EasyConvey<span className="text-secondary">.</span>
+            Minchin & Kelly<span className="text-secondary">.</span>
           </p>
           <h1 className="text-2xl font-serif font-bold text-primary mb-2">Choose your organization</h1>
           <p className="text-gray-500 text-sm">You belong to multiple organizations. Choose one to continue.</p>

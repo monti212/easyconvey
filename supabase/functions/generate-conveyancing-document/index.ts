@@ -1,10 +1,19 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.98.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+// Image extensions that OpenAI vision API can process
+const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+
+function isImageFile(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  return IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -28,9 +37,46 @@ serve(async (req: Request) => {
       sellerDetails,
       buyerName,
       sellerName,
+      documentPaths,
       stream: wantStream,
     } = await req.json();
 
+    // ─── Fetch document URLs from Supabase Storage ───────────────────
+    const imageUrls: string[] = [];
+    const pdfDocNames: string[] = [];
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (supabaseUrl && supabaseServiceKey && documentPaths && documentPaths.length > 0) {
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      for (const docPath of documentPaths) {
+        const path: string = docPath.path || docPath;
+        const bucket: string = docPath.bucket || "documents";
+
+        try {
+          // Generate a signed URL (valid for 1 hour)
+          const { data, error } = await supabase.storage
+            .from(bucket)
+            .createSignedUrl(path, 3600);
+
+          if (error || !data?.signedUrl) continue;
+
+          if (isImageFile(path)) {
+            imageUrls.push(data.signedUrl);
+          } else {
+            // Track PDF/other docs by name
+            const filename = path.split("/").pop() || path;
+            pdfDocNames.push(filename);
+          }
+        } catch {
+          // Skip files that can't be accessed
+        }
+      }
+    }
+
+    // ─── Build the instructions ──────────────────────────────────────
     const instructions = `You are an expert Botswana property conveyancing attorney generating a legally binding Deed of Sale and Transfer Agreement.
 
 CRITICAL INSTRUCTIONS:
@@ -41,9 +87,10 @@ CRITICAL INSTRUCTIONS:
 - Format using Markdown: use # for title, ## for parts, ### for sections, **bold** for defined terms, numbered lists for clauses
 - The document should be at minimum 3000 words covering every aspect of the transaction
 - Use the actual party details provided — do NOT use placeholder names
-- Reference the Deeds Registry Act (Cap 33:02), Transfer Duty Act (Cap 53:01), and Tribal Land Act where applicable`;
+- Reference the Deeds Registry Act (Cap 33:02), Transfer Duty Act (Cap 53:01), and Tribal Land Act where applicable
+- If document images are attached, extract and incorporate relevant information (property descriptions, ID numbers, addresses, lot numbers, etc.) from those documents into the agreement`;
 
-    const input = `Generate a complete Deed of Sale and Transfer Agreement for the following Botswana property transaction:
+    const textPrompt = `Generate a complete Deed of Sale and Transfer Agreement for the following Botswana property transaction:
 
 TRANSACTION REFERENCE: ${transactionId}
 
@@ -88,6 +135,8 @@ Valuation Amount: ${buyerDetails?.valuationAmount ? `P ${parseInt(buyerDetails.v
 DOCUMENTS ON FILE:
 Buyer Documents: ${buyerDetails?.uploadedDocuments?.join(", ") || "Pending"}
 Seller Documents: ${sellerDetails?.uploadedDocuments?.join(", ") || "Pending"}
+${pdfDocNames.length > 0 ? `PDF Documents Available: ${pdfDocNames.join(", ")}` : ""}
+${imageUrls.length > 0 ? `\nATTACHED DOCUMENT IMAGES: ${imageUrls.length} document image(s) are attached below. Please analyze them and extract any relevant property details, ID numbers, addresses, lot numbers, or other transaction-relevant information to incorporate into the agreement.` : ""}
 
 ═══════════════════════════════════════
 REQUIRED AGREEMENT STRUCTURE:
@@ -145,7 +194,35 @@ Generate the FULL agreement with these parts:
 
 Generate the COMPLETE text for every single clause with proper legal language. This is NOT a template — fill in all actual details from the transaction data provided.`;
 
-    // If streaming is requested, use SSE
+    // ─── Build the OpenAI Responses API input ────────────────────────
+    // Use multi-content format when we have images (vision API)
+    let inputPayload: any;
+
+    if (imageUrls.length > 0) {
+      // Build content array with text + images (OpenAI Responses API vision format)
+      const contentBlocks: any[] = [
+        { type: "input_text", text: textPrompt },
+      ];
+
+      for (const url of imageUrls) {
+        contentBlocks.push({
+          type: "input_image",
+          image_url: url,
+        });
+      }
+
+      inputPayload = [
+        {
+          role: "user",
+          content: contentBlocks,
+        },
+      ];
+    } else {
+      // Plain text input (no images)
+      inputPayload = textPrompt;
+    }
+
+    // ─── Call OpenAI ─────────────────────────────────────────────────
     if (wantStream) {
       const response = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
@@ -156,7 +233,7 @@ Generate the COMPLETE text for every single clause with proper legal language. T
         body: JSON.stringify({
           model,
           instructions,
-          input,
+          input: inputPayload,
           temperature: 0.15,
           stream: true,
         }),
@@ -191,7 +268,7 @@ Generate the COMPLETE text for every single clause with proper legal language. T
       body: JSON.stringify({
         model,
         instructions,
-        input,
+        input: inputPayload,
         temperature: 0.15,
       }),
     });

@@ -336,18 +336,17 @@ function App() {
         );
       }
 
-      if (showConveyancerOverview) {
-        return (
-          <TransactionContext.Provider value={transactionContextValue}>
-            <ConveyancerOverview
-              user={orgUser}
-              onLogout={handlePortalLogout}
-              onViewTransaction={handleConveyancerDashboard}
-              onBack={() => setShowConveyancerOverview(false)}
-            />
-          </TransactionContext.Provider>
-        );
-      }
+      // Default to overview for conveyancer users
+      return (
+        <TransactionContext.Provider value={transactionContextValue}>
+          <ConveyancerOverview
+            user={orgUser}
+            onLogout={handlePortalLogout}
+            onViewTransaction={handleConveyancerDashboard}
+            onBack={() => setShowConveyancerOverview(false)}
+          />
+        </TransactionContext.Provider>
+      );
     }
   }
 
@@ -379,7 +378,7 @@ function App() {
             <div className="flex justify-between items-center py-4 md:py-5">
               <div className="flex items-center">
                 <span className="text-lg md:text-xl font-serif font-semibold text-primary tracking-tight">
-                  EasyConvey<span className="text-secondary">.</span>
+                  Minchin & Kelly<span className="text-secondary">.</span>
                 </span>
                 {started && sharedTransactionData.isSharedLink && (
                   <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
@@ -467,7 +466,7 @@ function App() {
               </div>
               <div className="section-divider mb-4" />
               <p className="text-center text-xs text-gray-400">
-                &copy; {new Date().getFullYear()} EasyConvey. All rights reserved.
+                &copy; {new Date().getFullYear()} Minchin & Kelly. All rights reserved.
               </p>
             </div>
           </div>

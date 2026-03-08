@@ -45,7 +45,7 @@ const Step1TransactionType: React.FC<Step1Props> = ({
   return (
     <div className="py-6 md:py-12">
       <h2 className="text-2xl md:text-3xl font-bold text-primary mb-4 md:mb-6 text-center font-serif">
-        Welcome to Easy Convey
+        Welcome to Minchin & Kelly
       </h2>
       <p className="text-base md:text-xl text-gray-600 mb-8 md:mb-12 text-center max-w-2xl mx-auto px-4">
         Our AI-powered platform will guide you through every step of your property transaction.

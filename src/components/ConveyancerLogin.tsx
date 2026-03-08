@@ -164,7 +164,7 @@ const ConveyancerLogin: React.FC<ConveyancerLoginProps> = ({ onBack }) => {
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
             <p className="font-serif text-xl font-semibold text-primary tracking-tight mb-5">
-              EasyConvey<span className="text-secondary">.</span>
+              Minchin & Kelly<span className="text-secondary">.</span>
             </p>
             <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4 ring-2 ring-secondary/20">
               {selectedOrgInfo ? (
@@ -177,7 +177,7 @@ const ConveyancerLogin: React.FC<ConveyancerLoginProps> = ({ onBack }) => {
               {isSignUp ? 'Create your account' : 'Sign in to your account'}
             </h1>
             <p className="text-gray-500 text-sm">
-              {isSignUp ? 'Get started with EasyConvey' : (
+              {isSignUp ? 'Get started with Minchin & Kelly' : (
                 selectedOrgInfo
                   ? `Access your ${selectedOrgInfo.label.toLowerCase()} dashboard`
                   : 'Access your professional dashboard'

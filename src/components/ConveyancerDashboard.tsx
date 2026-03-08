@@ -32,6 +32,7 @@ import { useAuth } from '../hooks/useAuth';
 import { pdf } from '@react-pdf/renderer';
 import DeedOfSalePDF from '../lib/pdf/deedOfSale';
 import * as casesService from '../services/cases.service';
+import type { CaseDocument } from '../services/cases.service';
 import type { CaseShareToken } from '../types/database';
 import DocumentStreamViewer from './DocumentStreamViewer';
 
@@ -61,6 +62,7 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
   const [copiedToken, setCopiedToken] = useState<'buyer' | 'seller' | null>(null);
   const [buyerStatus, setBuyerStatus] = useState<string>('pending');
   const [sellerStatus, setSellerStatus] = useState<string>('pending');
+  const [caseDocuments, setCaseDocuments] = useState<CaseDocument[]>([]);
 
   // Use real user from auth context for logging
   const currentUser = orgUser ? {
@@ -111,6 +113,14 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         setShareTokens(tokens);
       } catch {
         // Tokens may not exist
+      }
+
+      // Fetch case documents for AI generation
+      try {
+        const docs = await casesService.getCaseDocuments(transactionId);
+        setCaseDocuments(docs);
+      } catch {
+        // Documents may not exist yet
       }
 
       // Build transaction display data
@@ -204,6 +214,7 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
           sellerDetails: currentTransaction?.sellerDetails || null,
           buyerName: currentTransaction?.buyerName || 'Not specified',
           sellerName: currentTransaction?.sellerName || 'Not specified',
+          documentPaths: caseDocuments.map(d => ({ path: d.file_path, bucket: 'documents', name: d.document_name, type: d.document_type })),
           stream: true,
         }),
       });
@@ -295,7 +306,7 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
     } finally {
       setIsGeneratingDocument(false);
     }
-  }, [transactionId, currentTransaction, currentUser]);
+  }, [transactionId, currentTransaction, currentUser, caseDocuments]);
 
   const downloadDocument = async () => {
     if (!generatedDocument) return;

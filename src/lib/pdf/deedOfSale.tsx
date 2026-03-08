@@ -131,7 +131,7 @@ export default function DeedOfSalePDF(props: DeedOfSaleProps) {
         </View>
 
         <Text style={styles.footer}>
-          Prepared by Easy Convey | Powered by OrionX | This document requires proper legal review before execution
+          Prepared by Minchin & Kelly | Powered by OrionX | This document requires proper legal review before execution
         </Text>
       </Page>
     </Document>

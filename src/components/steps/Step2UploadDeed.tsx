@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Upload, CheckCircle, AlertCircle, ArrowLeft, ArrowRight, FileText, Database, Shield, Eye, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import * as storageService from '../../services/storage.service';
+import { convertToPdf } from '../../lib/convertToPdf';
 
 interface Step2Props {
   documentUploaded: boolean;
@@ -51,12 +52,15 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
       setErrorMessage('');
 
       try {
+        // Auto-convert images to PDF
+        const pdfFile = await convertToPdf(file);
+
         // Upload to Supabase Storage
         let uploadPath = '';
         try {
           const orgId = 'public'; // Unauthenticated users use public folder
           const caseId = 'deeds';
-          const result = await storageService.uploadFile(file, orgId, caseId, 'title-deed', 'deeds');
+          const result = await storageService.uploadFile(pdfFile, orgId, caseId, 'title-deed', 'deeds');
           uploadPath = result.path;
         } catch {
           // Storage upload may fail for unauthenticated users — continue with AI analysis
@@ -144,13 +148,15 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
   const handleBondDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Auto-convert images to PDF
+      const pdfFile = await convertToPdf(file);
       // Upload bond document to Supabase Storage
       try {
-        await storageService.uploadFile(file, 'public', 'deeds', 'bond-cancellation', 'documents');
+        await storageService.uploadFile(pdfFile, 'public', 'deeds', 'bond-cancellation', 'documents');
       } catch {
         // Storage may not be available for unauthenticated users
       }
-      setBondDocument(file.name);
+      setBondDocument(pdfFile.name);
       onUpdate({
         documentUploaded: true,
         documentValid: true,

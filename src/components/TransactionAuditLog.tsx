@@ -195,7 +195,7 @@ const TransactionAuditLog: React.FC<TransactionAuditLogProps> = ({ isOpen, trans
         },
         organization_id: 'org-0',
         organization: {
-          name: 'EasyConvey System',
+          name: 'Minchin & Kelly System',
           type: 'system'
         },
         action: 'STATUS_UPDATE',

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, Upload, CheckCircle, AlertCircle, Share2, FileText, Eye, X, AlertTriangle, FileType } from 'lucide-react';
 import * as storageService from '../../services/storage.service';
+import { convertToPdf } from '../../lib/convertToPdf';
 
 interface Step6Props {
   requiredDocuments: string[];
@@ -72,7 +73,9 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
     const newUploads: string[] = [];
     const newQuality: Record<string, string> = { ...documentQuality };
 
-    for (const file of Array.from(files)) {
+    for (const originalFile of Array.from(files)) {
+      // Auto-convert images to PDF
+      const file = await convertToPdf(originalFile);
       try {
         // Try to upload to Supabase Storage
         try {
@@ -111,11 +114,12 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
   };
 
   const handleSingleUpload = (docType: string) => async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const originalFile = e.target.files?.[0];
+    if (!originalFile) return;
 
-    const fileExtension = file.name.split('.').pop();
-    const newFileName = `${docType.replace(/\s+/g, '_')}.${fileExtension}`;
+    // Auto-convert images to PDF
+    const file = await convertToPdf(originalFile);
+    const newFileName = `${docType.replace(/\s+/g, '_')}.pdf`;
 
     setIsUploading(true);
 
@@ -486,7 +490,7 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
                             id={`doc-${index}`}
                             className="hidden"
                             onChange={handleSingleUpload(doc)}
-                            accept=".pdf"
+                            accept=".pdf,.jpg,.jpeg,.png"
                           />
                           <label
                             htmlFor={`doc-${index}`}
@@ -597,7 +601,7 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
                   className="hidden"
                   onChange={handleBulkUpload}
                   multiple
-                  accept=".pdf"
+                  accept=".pdf,.jpg,.jpeg,.png"
                 />
                 <label
                   htmlFor="file-upload"

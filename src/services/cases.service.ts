@@ -72,6 +72,26 @@ export async function getCaseStats(organizationId: string) {
   };
 }
 
+// --- Case documents ---
+
+export interface CaseDocument {
+  id: string;
+  case_id: string;
+  document_name: string;
+  document_type: string;
+  file_path: string;
+  mime_type: string;
+}
+
+export async function getCaseDocuments(caseId: string): Promise<CaseDocument[]> {
+  const { data, error } = await supabase
+    .from('case_documents')
+    .select('id, case_id, document_name, document_type, file_path, mime_type')
+    .eq('case_id', caseId);
+  if (error) throw error;
+  return (data || []) as CaseDocument[];
+}
+
 // --- Share token functions ---
 
 function generateToken(): string {

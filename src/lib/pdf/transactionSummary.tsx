@@ -51,7 +51,7 @@ export default function TransactionSummaryPDF(props: TransactionSummaryProps) {
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <Text style={styles.title}>Transaction Summary Report</Text>
-          <Text style={styles.subtitle}>Easy Convey - Botswana Property Conveyancing</Text>
+          <Text style={styles.subtitle}>Minchin & Kelly - Botswana Property Conveyancing</Text>
           <Text style={{ fontSize: 9, color: '#999', marginTop: 4 }}>
             Generated: {new Date(generatedAt).toLocaleString()}
           </Text>
@@ -97,7 +97,7 @@ export default function TransactionSummaryPDF(props: TransactionSummaryProps) {
         </Text>
 
         <Text style={styles.footer}>
-          Easy Convey - Powered by OrionX | All rights reserved {new Date().getFullYear()}
+          Minchin & Kelly - Powered by OrionX | All rights reserved {new Date().getFullYear()}
         </Text>
       </Page>
     </Document>

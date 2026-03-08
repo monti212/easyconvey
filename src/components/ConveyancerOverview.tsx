@@ -185,7 +185,7 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
               </button>
               <div>
                 <h1 className="font-serif text-xl font-semibold text-primary tracking-tight">
-                  EasyConvey<span className="text-secondary">.</span>
+                  Minchin & Kelly<span className="text-secondary">.</span>
                 </h1>
                 <p className="text-sm text-gray-500">{authOrg?.name || 'Practice'} — Practice Management</p>
               </div>

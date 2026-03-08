@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as storageService from '../../services/storage.service';
+import { convertToPdf } from '../../lib/convertToPdf';
 import { useDebounce } from '../../hooks/useDebounce';
 import {
   ArrowLeft,
@@ -230,12 +231,14 @@ const Step3SellingPrice: React.FC<Step3Props> = ({
     if (!file) return;
     setIsUploading(true);
     try {
+      // Auto-convert images to PDF
+      const pdfFile = await convertToPdf(file);
       try {
-        await storageService.uploadFile(file, 'public', 'valuations', 'valuation', 'valuations');
+        await storageService.uploadFile(pdfFile, 'public', 'valuations', 'valuation', 'valuations');
       } catch {
         // Storage may not be available for unauthenticated users — file name still recorded
       }
-      onUpdate({ valuationDocument: file.name });
+      onUpdate({ valuationDocument: pdfFile.name });
     } catch {
       onUpdate({ valuationDocument: file.name });
     } finally {
