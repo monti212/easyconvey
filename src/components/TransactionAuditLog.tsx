@@ -34,16 +34,35 @@ const TransactionAuditLog: React.FC<TransactionAuditLogProps> = ({ isOpen, trans
 
   useEffect(() => {
     if (isOpen) {
-      // In a real application, this would fetch from the API/database
-      // For this demo, we'll create mock data
       setIsLoading(true);
-      
-      // Simulate API call delay
-      setTimeout(() => {
-        const mockLogs: TransactionAuditLogEntry[] = generateMockLogs(transactionId);
-        setLogs(mockLogs);
-        setIsLoading(false);
-      }, 800);
+      // Fetch from Supabase audit logs, fall back to localStorage
+      import('../services/audit.service').then(async (auditService) => {
+        try {
+          const supabaseLogs = await auditService.getAuditLogs(transactionId);
+          if (supabaseLogs.length > 0) {
+            setLogs(supabaseLogs.map(l => ({
+              id: l.id,
+              transaction_id: l.transaction_id,
+              user_id: '',
+              organization_id: '',
+              action: l.action,
+              description: l.details?.description || l.action,
+              details: l.details || {},
+              created_at: l.created_at,
+            })));
+            setIsLoading(false);
+            return;
+          }
+        } catch {
+          // Fall through to localStorage
+        }
+        // Fallback: read from localStorage via TransactionLogger
+        import('./TransactionLogger').then(({ default: TL }) => {
+          const localLogs = TL.getTransactionLogs(transactionId);
+          setLogs(localLogs.map((l, i) => ({ id: String(i), ...l })));
+          setIsLoading(false);
+        });
+      });
     }
   }, [isOpen, transactionId]);
 

@@ -49,7 +49,7 @@ const AgentEntitySelection: React.FC<AgentEntitySelectionProps> = ({
         Please identify which type of entity you are representing in this transaction.
       </p>
 
-      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8">
+      <div className="bg-background rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8">
         <legend className="text-base md:text-lg font-medium text-primary mb-4 md:mb-6 font-serif">
           Please identify yourself as:
         </legend>

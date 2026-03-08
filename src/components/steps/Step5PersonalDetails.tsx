@@ -105,7 +105,7 @@ const Step5PersonalDetails: React.FC<Step5Props> = ({
         Please provide your personal information for the transaction. This helps us determine the required documentation.
       </p>
 
-      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8 space-y-6 md:space-y-8">
+      <div className="bg-background rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8 space-y-6 md:space-y-8">
         {/* Gender selection */}
         <div>
           <label className="block text-base md:text-lg font-medium text-primary mb-3 md:mb-4 font-serif">

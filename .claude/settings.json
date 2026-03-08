@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install express cors dotenv concurrently)",
+      "Bash(timeout 5 node server/api.js)",
+      "Bash(node -e \"require\\(''dotenv''\\).config\\({path:''.env.local''}\\); console.log\\(''OPENAI_API_KEY loaded:'', !!process.env.OPENAI_API_KEY, ''| Key starts with:'', process.env.OPENAI_API_KEY?.substring\\(0,10\\)+''...''\\)\")",
+      "Bash(node -e 'require\\(\"\"dotenv\"\"\\).config\\({path:\"\".env.local\"\"}\\); console.log\\(\"\"KEY loaded:\"\", process.env.OPENAI_API_KEY ? \"\"yes\"\" : \"\"no\"\"\\)')",
+      "Bash(npm install @supabase/supabase-js zod @react-pdf/renderer pdf-parse)",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npm run build)",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(npm install multer)",
+      "Bash(timeout 10 npm run dev)",
+      "mcp__claude_ai_Supabase__deploy_edge_function"
+    ]
+  }
+}

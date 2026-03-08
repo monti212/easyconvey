@@ -30,6 +30,10 @@ import {
 import { Property, Case, Organization, OrganizationUser } from '../../types/database';
 import TransactionSubmissionForm from './TransactionSubmissionForm';
 import CommissionTracker from './CommissionTracker';
+import { useProperties } from '../../hooks/useProperties';
+import { useCases } from '../../hooks/useCases';
+import LoadingSpinner from '../ui/LoadingSpinner';
+import EmptyState from '../ui/EmptyState';
 
 interface EstateAgentDashboardProps {
   user: OrganizationUser;
@@ -72,166 +76,40 @@ const EstateAgentDashboard: React.FC<EstateAgentDashboardProps> = ({
   organization,
   onLogout
 }) => {
+  const { properties, loading: propsLoading } = useProperties(organization.id);
+  const { cases, loading: casesLoading } = useCases(organization.id);
+
   const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'properties' | 'commissions' | 'team'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [showCommissionTracker, setShowCommissionTracker] = useState(false);
 
-  // Mock data - in real app, this would come from the database
-  const [properties] = useState<Property[]>([
-    {
-      id: '1',
-      organization_id: organization.id,
-      agent_id: user.id,
-      title: 'Modern 3BR House in Gaborone',
-      description: 'Beautiful modern house with garden',
-      property_type: 'House',
-      price: 2500000,
-      address: 'Block 8, Gaborone',
-      bedrooms: 3,
-      bathrooms: 2,
-      size_sqm: 250,
-      status: 'available',
-      images: ['https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400'],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    },
-    {
-      id: '2',
-      organization_id: organization.id,
-      agent_id: user.id,
-      title: 'Luxury Apartment in CBD',
-      description: 'Premium apartment with city views',
-      property_type: 'Apartment',
-      price: 1800000,
-      address: 'CBD, Gaborone',
-      bedrooms: 2,
-      bathrooms: 1,
-      size_sqm: 120,
-      status: 'under_offer',
-      images: ['https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400'],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-  ]);
-
-  // Mock estate transactions
-  const [estateTransactions, setEstateTransactions] = useState<EstateTransaction[]>([
-    {
-      id: '1',
-      transaction_number: 'TXN-2025-001',
-      property_title: 'Modern 3BR House in Gaborone',
-      property_address: 'Block 8, Plot 123, Gaborone',
-      selling_price: 2500000,
-      buyer_name: 'John Doe',
-      seller_name: 'Jane Smith',
-      buyer_contact: '+267 7X XXX XXX',
-      seller_contact: '+267 7Y YYY YYY',
-      agent_commission_rate: 5,
-      agent_commission_type: 'percentage',
-      conveyancer_firm: 'OrionX Legal Services',
-      status: 'kyc_complete',
-      progress: 40,
-      uploaded_documents: ['Sale Agreement', 'Buyer ID', 'Seller ID', 'Title Deed'],
-      special_instructions: 'First time buyer, please expedite processing',
-      submitted_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date().toISOString(),
-      commission_amount: 125000,
-      commission_status: 'pending',
-      timeline_events: [
-        {
-          event: 'Transaction Submitted',
-          description: 'Transaction submitted to conveyancer',
-          timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'completed'
-        },
-        {
-          event: 'Documents Received',
-          description: 'All required documents received and verified',
-          timestamp: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(),
-          status: 'completed'
-        },
-        {
-          event: 'KYC Complete',
-          description: 'Buyer and seller identity verification completed',
-          timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-          status: 'completed'
-        },
-        {
-          event: 'Documents in Draft',
-          description: 'Legal documents being prepared',
-          timestamp: new Date().toISOString(),
-          status: 'current'
-        },
-        {
-          event: 'Lodged at Deeds Office',
-          description: 'Documents submitted to deeds office',
-          timestamp: '',
-          status: 'pending'
-        },
-        {
-          event: 'Registered',
-          description: 'Property transfer registered',
-          timestamp: '',
-          status: 'pending'
-        }
-      ]
-    },
-    {
-      id: '2',
-      transaction_number: 'TXN-2025-002',
-      property_title: 'Luxury Apartment in CBD',
-      property_address: 'CBD, Block 3, Gaborone',
-      selling_price: 1800000,
-      buyer_name: 'Mike Johnson',
-      seller_name: 'Sarah Wilson',
-      buyer_contact: '+267 7A AAA AAA',
-      seller_contact: '+267 7B BBB BBB',
-      agent_commission_rate: 4.5,
-      agent_commission_type: 'percentage',
-      conveyancer_firm: 'Botswana Law Chambers',
-      status: 'registered',
-      progress: 100,
-      uploaded_documents: ['Sale Agreement', 'FICA Documents', 'Property Valuation'],
-      special_instructions: '',
-      submitted_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      commission_amount: 81000,
-      commission_status: 'approved',
-      timeline_events: [
-        {
-          event: 'Transaction Submitted',
-          description: 'Transaction submitted to conveyancer',
-          timestamp: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'completed'
-        },
-        {
-          event: 'KYC Complete',
-          description: 'Identity verification completed',
-          timestamp: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'completed'
-        },
-        {
-          event: 'Documents in Draft',
-          description: 'Legal documents prepared',
-          timestamp: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'completed'
-        },
-        {
-          event: 'Lodged at Deeds Office',
-          description: 'Documents submitted to deeds office',
-          timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'completed'
-        },
-        {
-          event: 'Registered',
-          description: 'Property transfer registered - Commission Ready!',
-          timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'completed'
-        }
-      ]
-    }
-  ]);
+  // Map cases to estate transactions format
+  const estateTransactions: EstateTransaction[] = cases.map(c => ({
+    id: c.id,
+    transaction_number: c.case_number,
+    property_title: c.property?.title || 'Property',
+    property_address: c.property?.address || 'Address pending',
+    selling_price: c.property?.price || 0,
+    buyer_name: c.client_name,
+    seller_name: c.notes || 'Seller TBD',
+    buyer_contact: c.client_phone || '',
+    seller_contact: '',
+    agent_commission_rate: 5,
+    agent_commission_type: 'percentage' as const,
+    conveyancer_firm: c.organization?.name || 'Unassigned',
+    status: (c.status === 'initiated' ? 'submitted' : c.status === 'in_progress' ? 'kyc_complete' : c.status === 'completed' ? 'registered' : 'submitted') as EstateTransaction['status'],
+    progress: c.status === 'completed' ? 100 : c.status === 'in_progress' ? 50 : 10,
+    uploaded_documents: Array.isArray(c.documents) ? c.documents.map((d: any) => d.name || 'Document') : [],
+    special_instructions: '',
+    submitted_at: c.created_at,
+    updated_at: c.updated_at,
+    commission_amount: (c.property?.price || 0) * 0.05,
+    commission_status: c.status === 'completed' ? 'approved' as const : 'pending' as const,
+    timeline_events: [
+      { event: 'Transaction Submitted', description: 'Submitted', timestamp: c.created_at, status: 'completed' as const },
+    ],
+  }));
 
   const formatCurrency = (amount: number) => `P ${amount.toLocaleString()}`;
 

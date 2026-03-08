@@ -63,7 +63,7 @@ const EstateDetails: React.FC<EstateDetailsProps> = ({
         Please provide the required information about the deceased's estate for this transaction.
       </p>
 
-      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8">
+      <div className="bg-background rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8">
         <div className="space-y-6">
           {/* Deceased Person Information */}
           <div>
@@ -242,7 +242,7 @@ const EstateDetails: React.FC<EstateDetailsProps> = ({
         
         <button
           onClick={handleNext}
-          className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-transparent rounded-lg text-sm md:text-base font-medium shadow-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-transparent rounded-lg text-sm md:text-base font-medium shadow-md text-white bg-primary hover:bg-primary-dark transition-colors"
         >
           Next
           <ArrowRight className="ml-1 md:ml-2 h-4 w-4" />

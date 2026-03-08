@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { 
-  ArrowLeft, 
-  Search, 
-  BarChart3, 
-  FileText, 
-  Building, 
-  Filter, 
+import {
+  ArrowLeft,
+  Search,
+  BarChart3,
+  FileText,
+  Building,
+  Filter,
   Bell,
   Settings,
   RefreshCw,
-  Eye
+  Eye,
+  Plus
 } from 'lucide-react';
 import { OrganizationUser } from '../types/database';
 import TransactionTypesSection from './dashboard-sections/TransactionTypesSection';
@@ -18,6 +19,14 @@ import OngoingMattersSection from './dashboard-sections/OngoingMattersSection';
 import BankApplicationsSection from './dashboard-sections/BankApplicationsSection';
 import SearchFiltersSection from './dashboard-sections/SearchFiltersSection';
 import AuditLogger from './AuditLogger';
+import { useAuth } from '../hooks/useAuth';
+import { useLoans } from '../hooks/useLoans';
+import { useOrganization } from '../hooks/useOrganization';
+import { useCases } from '../hooks/useCases';
+import { useNotifications } from '../hooks/useNotifications';
+import { useRealtimeSubscription } from '../hooks/useRealtimeSubscription';
+import NotificationCenter from './NotificationCenter';
+import NewCaseModal from './NewCaseModal';
 
 interface ConveyancerOverviewProps {
   user: OrganizationUser;
@@ -32,85 +41,61 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
   onViewTransaction,
   onBack
 }) => {
+  const { organization: authOrg } = useAuth();
+  const orgId = authOrg?.id || user.organization_id;
+  const { members } = useOrganization(orgId);
+  const { loans } = useLoans(orgId);
+  const { unreadCount } = useNotifications(orgId);
+  const { cases, refetch: refetchCases } = useCases(orgId);
+
+  // Subscribe to real-time case updates for this org
+  useRealtimeSubscription(
+    {
+      table: 'cases',
+      event: '*',
+      filter: orgId ? `organization_id=eq.${orgId}` : undefined,
+    },
+    () => {
+      refetchCases();
+    },
+    !!orgId
+  );
+
   const [activeTab, setActiveTab] = useState<'types' | 'status' | 'ongoing' | 'banks' | 'search'>('types');
   const [searchTerm, setSearchTerm] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAuditLogger, setShowAuditLogger] = useState(false);
+  const [showNewCase, setShowNewCase] = useState(false);
 
-  // Mock data for the dashboard
-  const mockBankApplications = [
-    {
-      id: 'app-1',
-      loan_id: 'loan-1',
-      bank_name: 'Capital Bank Botswana',
-      case_number: 'CONV-2025-001',
-      applicant_name: 'John Doe',
-      applicant_email: 'john@example.com',
-      loan_amount: 2000000,
-      property_address: 'Block 8, Plot 123, Gaborone',
-      transaction_type: 'buying',
-      urgency_level: 'high' as const,
-      status: 'submitted' as const,
-      special_instructions: 'First time buyer, please expedite processing',
-      submitted_at: new Date().toISOString(),
-      loan_officer: 'Michael Chen',
-      interest_rate: 8.5,
-      term_months: 240
-    },
-    {
-      id: 'app-2',
-      loan_id: 'loan-2',
-      bank_name: 'First National Bank',
-      case_number: 'CONV-2025-002',
-      applicant_name: 'Jane Smith',
-      applicant_email: 'jane@example.com',
-      loan_amount: 1500000,
-      property_address: 'Plot 456, Francistown',
-      transaction_type: 'buying',
-      urgency_level: 'medium' as const,
-      status: 'accepted' as const,
-      special_instructions: '',
-      submitted_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      loan_officer: 'Sarah Wilson',
-      interest_rate: 9.0,
-      term_months: 180
-    }
-  ];
+  // Map loans to bank applications format for BankApplicationsSection
+  const bankApplications = loans.map(loan => ({
+    id: loan.id,
+    loan_id: loan.id,
+    bank_name: loan.organization?.name || 'Unknown Bank',
+    case_number: loan.case?.case_number || loan.application_number,
+    applicant_name: loan.applicant_name,
+    applicant_email: loan.applicant_email || '',
+    loan_amount: loan.loan_amount,
+    property_address: loan.property?.address || 'Address pending',
+    transaction_type: 'buying',
+    urgency_level: 'medium' as const,
+    status: (loan.status === 'application' ? 'submitted' : loan.status === 'approved' ? 'accepted' : 'submitted') as 'submitted' | 'accepted',
+    special_instructions: '',
+    submitted_at: loan.created_at,
+    loan_officer: loan.loan_officer?.first_name ? `${loan.loan_officer.first_name} ${loan.loan_officer.last_name}` : 'Unassigned',
+    interest_rate: loan.interest_rate || 0,
+    term_months: loan.term_months || 0,
+  }));
 
-  const mockTeamMembers = [
-    {
-      id: '1',
-      name: 'Sarah K.',
-      role: 'Senior Conveyancer',
-      activeMatters: 12,
-      completedThisMonth: 8,
-      averageTime: '18 days'
-    },
-    {
-      id: '2',
-      name: 'Mike T.',
-      role: 'Conveyancer',
-      activeMatters: 9,
-      completedThisMonth: 6,
-      averageTime: '22 days'
-    },
-    {
-      id: '3',
-      name: 'Lisa M.',
-      role: 'Junior Conveyancer',
-      activeMatters: 6,
-      completedThisMonth: 4,
-      averageTime: '25 days'
-    },
-    {
-      id: '4',
-      name: 'Admin User',
-      role: 'Practice Manager',
-      activeMatters: 3,
-      completedThisMonth: 12,
-      averageTime: '15 days'
-    }
-  ];
+  // Map org members to team members format for OngoingMattersSection
+  const teamMembers = members.map(m => ({
+    id: m.id,
+    name: `${m.first_name} ${m.last_name?.charAt(0) || ''}.`,
+    role: m.role === 'super_admin' ? 'Practice Manager' : m.role === 'admin' ? 'Senior Conveyancer' : 'Conveyancer',
+    activeMatters: cases.filter(c => c.conveyancer_id === m.id && c.status !== 'completed').length,
+    completedThisMonth: cases.filter(c => c.conveyancer_id === m.id && c.status === 'completed').length,
+    averageTime: 'N/A',
+  }));
 
   const handleAcceptApplication = (applicationId: string) => {
     console.log(`Accepting application: ${applicationId}`);
@@ -123,7 +108,7 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
   };
 
   const handleCreateCase = (applicationId: string) => {
-    const application = mockBankApplications.find(app => app.id === applicationId);
+    const application = bankApplications.find(app => app.id === applicationId);
     if (application) {
       // Mock transaction data for the case
       const transactionData = {
@@ -174,7 +159,7 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
       name: 'Bank Applications',
       icon: Building,
       description: 'Financial institution matters',
-      count: mockBankApplications.filter(app => app.status === 'submitted').length
+      count: bankApplications.filter(app => app.status === 'submitted').length
     },
     {
       id: 'search',
@@ -186,33 +171,45 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white shadow-soft border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
               <button
                 onClick={onBack}
-                className="mr-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="mr-4 p-2 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Conveyancer Admin Dashboard</h1>
-                <p className="text-sm text-gray-600">OrionX Legal Services • Practice Management</p>
+                <h1 className="font-serif text-xl font-semibold text-primary tracking-tight">
+                  EasyConvey<span className="text-secondary">.</span>
+                </h1>
+                <p className="text-sm text-gray-500">{authOrg?.name || 'Practice'} — Practice Management</p>
               </div>
             </div>
             
             <div className="flex items-center space-x-3">
               <button
+                onClick={() => setShowNewCase(true)}
+                className="btn-shine inline-flex items-center px-4 py-2 bg-secondary text-primary text-sm font-semibold rounded-lg hover:bg-secondary-dark transition-colors"
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                New Case
+              </button>
+
+              <button
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                  3
-                </span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
               
               <button
@@ -256,7 +253,7 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
+                      ? 'border-secondary text-primary'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >
@@ -280,6 +277,8 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
           <TransactionTypesSection
             searchTerm={searchTerm}
             onSearch={setSearchTerm}
+            cases={cases}
+            onViewTransaction={onViewTransaction}
           />
         )}
         
@@ -292,15 +291,15 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
         
         {activeTab === 'ongoing' && (
           <OngoingMattersSection
-            totalMatters={61}
-            completedMatters={25}
-            teamMembers={mockTeamMembers}
+            totalMatters={cases.length}
+            completedMatters={cases.filter(c => c.status === 'completed').length}
+            teamMembers={teamMembers}
           />
         )}
         
         {activeTab === 'banks' && (
           <BankApplicationsSection
-            applications={mockBankApplications}
+            applications={bankApplications}
             onAcceptApplication={handleAcceptApplication}
             onDeclineApplication={handleDeclineApplication}
             onCreateCase={handleCreateCase}
@@ -317,30 +316,25 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
       </div>
 
       {/* Notifications Dropdown */}
-      {showNotifications && (
-        <div className="fixed top-16 right-4 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-          <div className="p-4 border-b border-gray-200">
-            <h3 className="font-medium text-gray-900">Notifications</h3>
-          </div>
-          <div className="max-h-64 overflow-y-auto">
-            {[
-              { id: 1, message: 'New bank application received', time: '5 minutes ago', type: 'info' },
-              { id: 2, message: 'TXN-001 requires your attention', time: '1 hour ago', type: 'warning' },
-              { id: 3, message: 'Document uploaded for BOND-012', time: '2 hours ago', type: 'success' }
-            ].map(notification => (
-              <div key={notification.id} className="p-3 border-b border-gray-100 hover:bg-gray-50">
-                <p className="text-sm text-gray-900">{notification.message}</p>
-                <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <NotificationCenter
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
 
       {/* Audit Logger Modal */}
       <AuditLogger
         isOpen={showAuditLogger}
         onClose={() => setShowAuditLogger(false)}
+      />
+
+      {/* New Case Modal */}
+      <NewCaseModal
+        isOpen={showNewCase}
+        onClose={() => setShowNewCase(false)}
+        onCaseCreated={(caseId) => {
+          setShowNewCase(false);
+          refetchCases();
+        }}
       />
     </div>
   );

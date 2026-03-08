@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, Upload, CheckCircle, AlertCircle, User, Building, Users } from 'lucide-react';
 import { useTransactions } from '../App';
+import * as casesService from '../services/cases.service';
+import { useAuth } from '../hooks/useAuth';
 import Step1TransactionType from './steps/Step1TransactionType';
 import Step2UploadDeed from './steps/Step2UploadDeed';
 import Step3SellingPrice from './steps/Step3SellingPrice';
@@ -29,14 +31,22 @@ interface TransactionWizardProps {
   transactionId: string | null;
   onSharedLink?: (transactionId: string, transactionType: string, sharedPricing?: any) => void;
   sharedTransactionData?: SharedTransactionData;
+  mode?: 'conveyancer' | 'client';
+  clientToken?: string;
+  onClientSubmitComplete?: () => void;
 }
 
-const TransactionWizard: React.FC<TransactionWizardProps> = ({ 
-  transactionId, 
-  onSharedLink, 
-  sharedTransactionData 
+const TransactionWizard: React.FC<TransactionWizardProps> = ({
+  transactionId,
+  onSharedLink,
+  sharedTransactionData,
+  mode = 'conveyancer',
+  clientToken,
+  onClientSubmitComplete,
 }) => {
   const { updateTransactionProgress, updateTransaction, markTransactionComplete } = useTransactions();
+  const { orgUser, organization } = useAuth();
+  const supabaseCaseId = useRef<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [transactionData, setTransactionData] = useState({
     transactionType: '',
@@ -122,12 +132,13 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   }, [sharedTransactionData]);
 
   const updateTransactionData = (data: Partial<typeof transactionData>) => {
+    const merged = { ...transactionData, ...data };
     setTransactionData(prev => ({ ...prev, ...data }));
-    
+
     // Update transaction in global state with latest data
     if (transactionId) {
       updateTransaction(transactionId, {
-        fullData: { ...transactionData, ...data },
+        fullData: merged,
         type: data.transactionType || transactionData.transactionType,
         nationality: data.nationality || transactionData.nationality,
         isFirstTimeBuyer: data.isFirstTimeBuyer !== undefined ? data.isFirstTimeBuyer : transactionData.isFirstTimeBuyer,
@@ -138,6 +149,52 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         propertyPrice: parseInt(data.sellingPrice || transactionData.sellingPrice) || 0,
         priority: (data.isFirstTimeBuyer || transactionData.isFirstTimeBuyer) ? 'high' : 'medium'
       });
+    }
+
+    // Persist to Supabase if user is logged in (skip in client mode — submit on completion only)
+    if (mode === 'conveyancer' && organization?.id) {
+      persistToSupabase(merged);
+    }
+  };
+
+  const persistToSupabase = async (data: typeof transactionData) => {
+    try {
+      // Derive client name from entity type
+      const clientName = data.hasAgent ? data.agentName
+        : data.entityType === 'company' ? data.companyName
+        : data.entityType === 'trust' ? data.trustName
+        : data.entityType === 'estate' ? data.deceasedName
+        : data.entityType === 'society' ? data.societyName
+        : 'Client';
+
+      if (!supabaseCaseId.current) {
+        // Create new case in Supabase
+        const created = await casesService.createCase({
+          organization_id: organization!.id,
+          case_type: data.transactionType || 'buying',
+          client_name: clientName || 'Client',
+          client_email: data.agentEmail || undefined,
+          client_phone: data.agentContact || undefined,
+          conveyancer_id: orgUser?.id,
+          status: 'initiated',
+          priority: data.isFirstTimeBuyer ? 'high' : 'medium',
+          documents: [{ wizardData: data, savedAt: new Date().toISOString() }],
+          notes: transactionId || undefined,
+        });
+        supabaseCaseId.current = created.id;
+      } else {
+        // Update existing case
+        await casesService.updateCase(supabaseCaseId.current, {
+          case_type: data.transactionType || 'buying',
+          client_name: clientName || 'Client',
+          client_email: data.agentEmail || undefined,
+          client_phone: data.agentContact || undefined,
+          priority: data.isFirstTimeBuyer ? 'high' : 'medium',
+          documents: [{ wizardData: data, savedAt: new Date().toISOString() }],
+        });
+      }
+    } catch (err) {
+      console.error('Failed to persist transaction to Supabase:', err);
     }
   };
 
@@ -458,8 +515,8 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             skippedDeedUpload={transactionData.skippedDeedUpload}
             transactionType={transactionData.transactionType}
             originalTransactionId={transactionData.originalTransactionId}
-            isSharedTransaction={transactionData.isSharedTransaction}
-            currentTransactionData={transactionData} // Pass current data for sharing
+            isSharedTransaction={transactionData.isSharedTransaction || mode === 'client'}
+            currentTransactionData={transactionData}
             onUpdate={updateTransactionData}
             onNext={nextStep}
             onPrevious={previousStep}
@@ -472,6 +529,9 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             transactionData={transactionData}
             transactionId={transactionId}
             onPrevious={previousStep}
+            mode={mode}
+            clientToken={clientToken}
+            onClientSubmitComplete={onClientSubmitComplete}
           />
         );
       case 8: // Company Details

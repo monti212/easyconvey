@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Scale, Building, MapPin, User, FileText, X } from 'lucide-react';
 import { Loan } from '../../types/database';
+import { useOrganizationsByType } from '../../hooks/useOrganization';
 
 interface ConveyancingApplicationFormProps {
   loan: Loan;
@@ -25,14 +26,9 @@ const ConveyancingApplicationForm: React.FC<ConveyancingApplicationFormProps> = 
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Mock conveyancer firms
-  const conveyancerFirms = [
-    'OrionX Legal Services',
-    'Botswana Law Chambers',
-    'Gaborone Conveyancing Attorneys',
-    'Legal Hub Botswana',
-    'Property Law Associates'
-  ];
+  // Fetch real conveyancer firms from database
+  const { orgs: conveyancerOrgs } = useOrganizationsByType('conveyancer');
+  const conveyancerFirms = conveyancerOrgs.map(o => o.name);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

@@ -181,7 +181,7 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
         Please provide information about who is participating in this transaction.
       </p>
 
-      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8">
+      <div className="bg-background rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8">
         <fieldset>
           <legend className="text-lg md:text-xl font-semibold text-primary mb-4 md:mb-6 font-serif">
             Is an estate agent participating in this transaction?

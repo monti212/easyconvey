@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FileText, 
   Download, 
@@ -21,10 +21,19 @@ import {
   Printer,
   Shield,
   History,
-  Clock as ClockIcon
+  Clock as ClockIcon,
+  Copy,
+  Check,
+  Link2
 } from 'lucide-react';
 import TransactionAuditLog from './TransactionAuditLog';
 import TransactionLogger from './TransactionLogger';
+import { useAuth } from '../hooks/useAuth';
+import { pdf } from '@react-pdf/renderer';
+import DeedOfSalePDF from '../lib/pdf/deedOfSale';
+import * as casesService from '../services/cases.service';
+import type { CaseShareToken } from '../types/database';
+import DocumentStreamViewer from './DocumentStreamViewer';
 
 interface ConveyancerDashboardProps {
   transactionId: string;
@@ -39,63 +48,129 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
   sellerData,
   onBack
 }) => {
+  const { orgUser, organization: authOrg } = useAuth();
   const [isGeneratingDocument, setIsGeneratingDocument] = useState(false);
   const [generatedDocument, setGeneratedDocument] = useState<string | null>(null);
   const [documentError, setDocumentError] = useState<string | null>(null);
+  const [showDocumentViewer, setShowDocumentViewer] = useState(false);
+  const [streamingContent, setStreamingContent] = useState('');
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [isLoadingCase, setIsLoadingCase] = useState(true);
   const [showAuditLog, setShowAuditLog] = useState(false);
-  
-  // Mock user for logging actions
-  const mockUser = {
-    id: 'user-1',
-    organization_id: 'org-1',
-    email: 'monti@orionx.xyz',
-    first_name: 'Monti',
-    last_name: 'K.',
-    role: 'super_admin',
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    organization: {
-      id: 'org-1',
-      name: 'OrionX Legal Services',
-      type: 'conveyancer',
-      email: 'info@orionxlegal.co.bw',
-      is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-  };
+  const [shareTokens, setShareTokens] = useState<CaseShareToken[]>([]);
+  const [copiedToken, setCopiedToken] = useState<'buyer' | 'seller' | null>(null);
+  const [buyerStatus, setBuyerStatus] = useState<string>('pending');
+  const [sellerStatus, setSellerStatus] = useState<string>('pending');
 
-  // Mock transaction data - in a real app, this would come from a database
+  // Use real user from auth context for logging
+  const currentUser = orgUser ? {
+    id: orgUser.id,
+    organization_id: orgUser.organization_id,
+    email: orgUser.email,
+    first_name: orgUser.first_name,
+    last_name: orgUser.last_name,
+    role: orgUser.role,
+    is_active: orgUser.is_active,
+    created_at: orgUser.created_at,
+    updated_at: orgUser.updated_at,
+    organization: authOrg ? {
+      id: authOrg.id,
+      name: authOrg.name,
+      type: authOrg.type,
+      email: authOrg.email,
+      is_active: authOrg.is_active,
+      created_at: authOrg.created_at,
+      updated_at: authOrg.updated_at,
+    } : undefined,
+  } : null;
+
+  // Fetch case data from Supabase (real data) with props as fallback
   useEffect(() => {
-    // Simulate loading transaction data
-    const mockTransactions = [
-      {
-        id: transactionId,
-        buyerName: buyerData?.hasAgent ? buyerData.agentName : (buyerData?.entityType === 'individual' ? 'John Doe' : buyerData?.companyName || 'Buyer Entity'),
-        sellerName: sellerData?.hasAgent ? sellerData.agentName : (sellerData?.entityType === 'individual' ? 'Jane Smith' : sellerData?.companyName || 'Seller Entity'),
-        propertyPrice: buyerData?.sellingPrice || sellerData?.sellingPrice || '1500000',
-        status: 'Documents Uploaded',
-        progress: 75,
-        submissionDate: new Date().toISOString().split('T')[0],
-        buyerDocuments: buyerData?.uploadedDocuments || ['ID Document', 'Proof of Address', 'Bank Statement'],
-        sellerDocuments: sellerData?.uploadedDocuments || ['Title Deed', 'Rates Clearance', 'ID Document'],
-        buyerDetails: buyerData,
-        sellerDetails: sellerData
-      }
-    ];
-    setTransactions(mockTransactions);
+    async function loadCaseData() {
+      let dbBuyerData = buyerData;
+      let dbSellerData = sellerData;
+      let caseRecord: any = null;
 
-    // Log this view in the audit trail
-    TransactionLogger.log(
-      transactionId,
-      mockUser,
-      TransactionLogger.ActionTypes.VIEW,
-      'Viewed transaction details',
-      { dashboard_access: 'conveyancer_dashboard' }
-    );
+      // Try to fetch real case from database
+      try {
+        caseRecord = await casesService.getCase(transactionId);
+        if (caseRecord) {
+          // Use DB data if available, props as fallback
+          if (caseRecord.buyer_data) dbBuyerData = caseRecord.buyer_data;
+          if (caseRecord.seller_data) dbSellerData = caseRecord.seller_data;
+          setBuyerStatus(caseRecord.buyer_status || 'pending');
+          setSellerStatus(caseRecord.seller_status || 'pending');
+        }
+      } catch {
+        // Case may not exist in DB (legacy transactions)
+      }
+
+      // Fetch share tokens
+      try {
+        const tokens = await casesService.getTokensForCase(transactionId);
+        setShareTokens(tokens);
+      } catch {
+        // Tokens may not exist
+      }
+
+      // Build transaction display data
+      const bd = dbBuyerData;
+      const sd = dbSellerData;
+
+      const getBuyerName = () => {
+        if (bd?.clientName) return bd.clientName;
+        if (bd?.hasAgent) return bd.agentName;
+        if (caseRecord?.client_name) return caseRecord.client_name;
+        return buyerData?.agentName || 'Buyer';
+      };
+
+      const getSellerName = () => {
+        if (sd?.clientName) return sd.clientName;
+        if (sd?.hasAgent) return sd.agentName;
+        return sellerData?.agentName || 'Seller';
+      };
+
+      const price = bd?.sellingPrice || sd?.sellingPrice || caseRecord?.property?.price?.toString() || '0';
+
+      const txn = {
+        id: transactionId,
+        buyerName: getBuyerName(),
+        sellerName: getSellerName(),
+        propertyPrice: price,
+        propertyAddress: caseRecord?.property?.address || 'Address pending',
+        status: caseRecord?.status === 'in_progress' ? 'In Progress' : caseRecord?.status === 'completed' ? 'Completed' : 'Documents Uploaded',
+        progress: caseRecord?.status === 'completed' ? 100 : (bd && sd ? 75 : 50),
+        submissionDate: caseRecord?.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+        buyerDocuments: bd?.uploadedDocuments || caseRecord?.documents || [],
+        sellerDocuments: sd?.uploadedDocuments || [],
+        buyerDetails: bd,
+        sellerDetails: sd,
+        caseNumber: caseRecord?.case_number || transactionId,
+      };
+
+      setTransactions([txn]);
+
+      // Log this view
+      TransactionLogger.log(
+        transactionId,
+        currentUser,
+        TransactionLogger.ActionTypes.VIEW,
+        'Viewed transaction details',
+        { dashboard_access: 'conveyancer_dashboard' }
+      );
+    }
+
+    loadCaseData().finally(() => setIsLoadingCase(false));
   }, [transactionId, buyerData, sellerData]);
+
+  const copyShareLink = (role: 'buyer' | 'seller') => {
+    const token = shareTokens.find(t => t.role === role);
+    if (!token) return;
+    const link = `${window.location.origin}?case=${token.token}&role=${role}`;
+    navigator.clipboard.writeText(link);
+    setCopiedToken(role);
+    setTimeout(() => setCopiedToken(null), 2000);
+  };
 
   const currentTransaction = transactions.find(t => t.id === transactionId);
 
@@ -103,88 +178,116 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
     return `P ${parseInt(amount || '0').toLocaleString()}`;
   };
 
-  const generateConveyancingDocument = async () => {
+  const generateConveyancingDocument = useCallback(async () => {
     setIsGeneratingDocument(true);
     setDocumentError(null);
+    setStreamingContent('');
+    setShowDocumentViewer(true);
 
-    // Log the document generation attempt
     TransactionLogger.log(
       transactionId,
-      mockUser,
+      currentUser,
       TransactionLogger.ActionTypes.DOCUMENT_REVIEW,
       'Initiated document generation',
       { document_type: 'conveyancing_document' }
     );
 
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/generate-conveyancing-document`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gpt-4',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a legal document generator specializing in property conveyancing documents for Botswana. Generate professional, legally compliant conveyancing documents.'
-            },
-            {
-              role: 'user',
-              content: `Generate a comprehensive conveyancing document for a property transaction in Botswana with the following details:
-
-Transaction ID: ${transactionId}
-Property Price: ${formatCurrency(currentTransaction?.propertyPrice || '0')}
-
-BUYER INFORMATION:
-${currentTransaction?.buyerDetails ? JSON.stringify(currentTransaction.buyerDetails, null, 2) : 'Buyer: ' + currentTransaction?.buyerName}
-
-SELLER INFORMATION:
-${currentTransaction?.sellerDetails ? JSON.stringify(currentTransaction.sellerDetails, null, 2) : 'Seller: ' + currentTransaction?.sellerName}
-
-Please generate a complete conveyancing document including:
-1. Deed of Sale/Transfer
-2. All necessary clauses for Botswana property law
-3. Buyer and seller obligations
-4. Payment terms
-5. Transfer conditions
-6. Legal warranties
-7. Signature blocks
-
-Format it as a professional legal document with proper headings, clauses, and legal language appropriate for Botswana conveyancing.`
-            }
-          ],
-          max_tokens: 3000,
-          temperature: 0.1
+          transactionId,
+          propertyPrice: formatCurrency(currentTransaction?.propertyPrice || '0'),
+          buyerDetails: currentTransaction?.buyerDetails || null,
+          sellerDetails: currentTransaction?.sellerDetails || null,
+          buyerName: currentTransaction?.buyerName || 'Not specified',
+          sellerName: currentTransaction?.sellerName || 'Not specified',
+          stream: true,
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || errorData.error || `API request failed: ${response.status}`);
       }
 
-      const data = await response.json();
-      const generatedText = data.choices[0]?.message?.content || 'Failed to generate document';
-      
-      setGeneratedDocument(generatedText);
-      
-      // Log successful generation
+      // Check if we got SSE stream or JSON
+      const contentType = response.headers.get('content-type') || '';
+
+      if (contentType.includes('text/event-stream') && response.body) {
+        // Stream SSE events from OpenAI Responses API
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6).trim();
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              // OpenAI Responses API stream: look for text delta
+              const delta =
+                parsed.delta?.content?.[0]?.text ||
+                parsed.delta?.content ||
+                parsed.choices?.[0]?.delta?.content ||
+                '';
+              if (typeof delta === 'string' && delta) {
+                fullText += delta;
+                setStreamingContent(fullText);
+              }
+              // Also handle output_text.delta for Responses API
+              if (parsed.type === 'response.output_text.delta' && parsed.delta) {
+                fullText += parsed.delta;
+                setStreamingContent(fullText);
+              }
+            } catch {
+              // Skip non-JSON lines
+            }
+          }
+        }
+
+        setGeneratedDocument(fullText);
+        setStreamingContent(fullText);
+      } else {
+        // Fallback: JSON response (non-streaming)
+        const data = await response.json();
+        const text = data.document || '';
+        setGeneratedDocument(text);
+        setStreamingContent(text);
+      }
+
       TransactionLogger.log(
         transactionId,
-        mockUser,
+        currentUser,
         TransactionLogger.ActionTypes.DOCUMENT_REVIEW,
         'Successfully generated conveyancing document',
-        { document_size: generatedText.length }
+        { document_size: (generatedDocument || '').length }
       );
     } catch (error) {
       console.error('Error generating document:', error);
-      setDocumentError('Failed to generate document. Please check your API key and try again.');
-      
-      // Log error
+      setDocumentError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to generate document. Please check your API key and try again.'
+      );
+      setShowDocumentViewer(false);
+
       TransactionLogger.log(
         transactionId,
-        mockUser,
+        currentUser,
         TransactionLogger.ActionTypes.DOCUMENT_REVIEW,
         'Failed to generate document',
         { error: error instanceof Error ? error.message : 'Unknown error' }
@@ -192,25 +295,40 @@ Format it as a professional legal document with proper headings, clauses, and le
     } finally {
       setIsGeneratingDocument(false);
     }
-  };
+  }, [transactionId, currentTransaction, currentUser]);
 
-  const downloadDocument = () => {
+  const downloadDocument = async () => {
     if (!generatedDocument) return;
     
     // Log document download
     TransactionLogger.log(
       transactionId,
-      mockUser,
+      currentUser,
       TransactionLogger.ActionTypes.DOCUMENT_DOWNLOAD,
       'Downloaded conveyancing document',
       { document_type: 'conveyancing_document' }
     );
     
-    const blob = new Blob([generatedDocument], { type: 'text/plain' });
+    // Generate a professional PDF from the AI content
+    let blob: Blob;
+    try {
+      blob = await pdf(
+        <DeedOfSalePDF
+          transactionId={transactionId}
+          buyerName={currentTransaction?.buyerName || 'Buyer'}
+          sellerName={currentTransaction?.sellerName || 'Seller'}
+          propertyPrice={currentTransaction?.propertyPrice || '0'}
+          generatedContent={generatedDocument}
+        />
+      ).toBlob();
+    } catch {
+      // Fallback to text if PDF generation fails
+      blob = new Blob([generatedDocument], { type: 'text/plain' });
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `conveyancing-document-${transactionId}.txt`;
+    a.download = `conveyancing-document-${transactionId}.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -223,7 +341,7 @@ Format it as a professional legal document with proper headings, clauses, and le
     // Log document print
     TransactionLogger.log(
       transactionId,
-      mockUser,
+      currentUser,
       TransactionLogger.ActionTypes.DOCUMENT_DOWNLOAD,
       'Printed conveyancing document',
       { document_type: 'conveyancing_document', print_request: true }
@@ -255,6 +373,17 @@ Format it as a professional legal document with proper headings, clauses, and le
       printWindow.print();
     }
   };
+
+  if (isLoadingCase) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading case data...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentTransaction) {
     return (
@@ -472,6 +601,13 @@ Format it as a professional legal document with proper headings, clauses, and le
                 {generatedDocument && (
                   <div className="flex space-x-2">
                     <button
+                      onClick={() => setShowDocumentViewer(true)}
+                      className="px-3 py-1 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors flex items-center"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View Document
+                    </button>
+                    <button
                       onClick={printDocument}
                       className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center"
                     >
@@ -488,64 +624,52 @@ Format it as a professional legal document with proper headings, clauses, and le
                   </div>
                 )}
               </div>
-              
+
               {!generatedDocument && !isGeneratingDocument && (
-                <div className="text-center py-8">
-                  <Sparkles className="h-12 w-12 text-purple-600 mx-auto mb-4" />
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">Generate Conveyancing Document</h4>
-                  <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                    Use AI to automatically generate a comprehensive conveyancing document including both buyer and seller information.
-                  </p>
-                  <button
-                    onClick={generateConveyancingDocument}
-                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center mx-auto"
-                  >
-                    <Sparkles className="h-5 w-5 mr-2" />
-                    Generate Document with AI
-                  </button>
-                </div>
-              )}
-              
-              {isGeneratingDocument && (
-                <div className="text-center py-8">
-                  <Loader2 className="h-12 w-12 text-purple-600 mx-auto mb-4 animate-spin" />
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">Generating Document...</h4>
-                  <p className="text-gray-600">
-                    AI is creating your conveyancing document. This may take a few moments.
-                  </p>
-                </div>
-              )}
-              
-              {documentError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
-                    <p className="text-red-800 font-medium">Generation Failed</p>
-                  </div>
-                  <p className="text-red-700 text-sm mt-1">{documentError}</p>
-                  <button
-                    onClick={generateConveyancingDocument}
-                    className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-                  >
-                    Try Again
-                  </button>
-                </div>
-              )}
-              
-              {generatedDocument && (
-                <div className="space-y-4">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-                      <p className="text-green-800 font-medium">Document Generated Successfully</p>
+                <div className="text-center py-12 bg-gradient-to-br from-purple-50 via-white to-indigo-50 rounded-xl border border-purple-100">
+                  <div className="relative inline-block mb-6">
+                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-xl shadow-purple-500/25">
+                      <Sparkles className="h-10 w-10 text-white" />
                     </div>
-                    <p className="text-green-700 text-sm mt-1">
-                      Your conveyancing document has been generated and is ready for review.
-                    </p>
                   </div>
-                  
-                  <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
-                    <pre className="text-sm text-gray-800 whitespace-pre-wrap">{generatedDocument}</pre>
+                  <h4 className="text-xl font-serif font-semibold text-gray-900 mb-3">
+                    Generate Conveyancing Agreement
+                  </h4>
+                  <p className="text-gray-500 mb-8 max-w-lg mx-auto leading-relaxed">
+                    AI will draft a comprehensive, legally-structured Deed of Sale and Transfer Agreement
+                    using all transaction details, buyer and seller information, and property data.
+                  </p>
+                  <button
+                    onClick={generateConveyancingDocument}
+                    className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg shadow-purple-500/25 flex items-center mx-auto text-base font-medium"
+                  >
+                    <Sparkles className="h-5 w-5 mr-3" />
+                    Generate Agreement with AI
+                  </button>
+                </div>
+              )}
+
+              {generatedDocument && !showDocumentViewer && (
+                <div className="space-y-4">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <CheckCircle className="h-6 w-6 text-emerald-600 mr-3" />
+                        <div>
+                          <p className="text-emerald-900 font-semibold">Agreement Generated Successfully</p>
+                          <p className="text-emerald-700 text-sm mt-0.5">
+                            {generatedDocument.split(/\s+/).filter(Boolean).length.toLocaleString()} words &middot; Ready for review
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setShowDocumentViewer(true)}
+                        className="px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium flex items-center"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Open Document
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -554,6 +678,63 @@ Format it as a professional legal document with proper headings, clauses, and le
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Party Status & Share Links */}
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <Link2 className="h-5 w-5 text-blue-600 mr-2" />
+                Party Status
+              </h3>
+              <div className="space-y-4">
+                {/* Buyer */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <User className="h-4 w-4 text-green-600 mr-2" />
+                    <span className="text-sm font-medium text-gray-700">Buyer</span>
+                  </div>
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                    buyerStatus === 'completed'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {buyerStatus === 'completed' ? 'Completed' : 'Pending'}
+                  </span>
+                </div>
+                {shareTokens.find(t => t.role === 'buyer') && (
+                  <button
+                    onClick={() => copyShareLink('buyer')}
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center"
+                  >
+                    {copiedToken === 'buyer' ? <Check className="h-3.5 w-3.5 mr-1.5 text-green-600" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
+                    {copiedToken === 'buyer' ? 'Copied!' : 'Copy Buyer Link'}
+                  </button>
+                )}
+
+                {/* Seller */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Building className="h-4 w-4 text-blue-600 mr-2" />
+                    <span className="text-sm font-medium text-gray-700">Seller</span>
+                  </div>
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                    sellerStatus === 'completed'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {sellerStatus === 'completed' ? 'Completed' : 'Pending'}
+                  </span>
+                </div>
+                {shareTokens.find(t => t.role === 'seller') && (
+                  <button
+                    onClick={() => copyShareLink('seller')}
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center"
+                  >
+                    {copiedToken === 'seller' ? <Check className="h-3.5 w-3.5 mr-1.5 text-green-600" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
+                    {copiedToken === 'seller' ? 'Copied!' : 'Copy Seller Link'}
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Quick Actions */}
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
@@ -629,7 +810,7 @@ Format it as a professional legal document with proper headings, clauses, and le
                   if (e.target.value.trim() !== '') {
                     TransactionLogger.log(
                       transactionId,
-                      mockUser,
+                      currentUser,
                       TransactionLogger.ActionTypes.COMMENT_ADD,
                       'Added transaction note',
                       { note_content: e.target.value }
@@ -642,7 +823,7 @@ Format it as a professional legal document with proper headings, clauses, and le
                 onClick={() => {
                   TransactionLogger.log(
                     transactionId,
-                    mockUser,
+                    currentUser,
                     TransactionLogger.ActionTypes.COMMENT_ADD,
                     'Saved transaction note',
                     { note_saved: true }
@@ -663,6 +844,50 @@ Format it as a professional legal document with proper headings, clauses, and le
         transactionId={transactionId}
         onClose={() => setShowAuditLog(false)}
       />
+
+      {/* Streaming Document Viewer */}
+      <DocumentStreamViewer
+        isOpen={showDocumentViewer}
+        isStreaming={isGeneratingDocument}
+        content={streamingContent || generatedDocument || ''}
+        onClose={() => setShowDocumentViewer(false)}
+        onDownload={downloadDocument}
+        onPrint={printDocument}
+        caseNumber={currentTransaction?.caseNumber || transactionId}
+        buyerName={currentTransaction?.buyerName || 'Buyer'}
+        sellerName={currentTransaction?.sellerName || 'Seller'}
+      />
+
+      {/* Error Popup Modal */}
+      {documentError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="bg-red-50 px-6 py-4 border-b border-red-100">
+              <div className="flex items-center">
+                <AlertTriangle className="h-6 w-6 text-red-600 mr-3" />
+                <h3 className="text-lg font-semibold text-red-900">Document Generation Failed</h3>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-gray-700 text-sm leading-relaxed">{documentError}</p>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 flex justify-end space-x-3">
+              <button
+                onClick={() => setDocumentError(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={() => { setDocumentError(null); generateConveyancingDocument(); }}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

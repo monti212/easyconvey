@@ -1,4 +1,5 @@
-import { OrganizationUser, Organization } from '../types/database';
+import { OrganizationUser } from '../types/database';
+import * as auditService from '../services/audit.service';
 
 export interface TransactionLogEntry {
   transaction_id: string;
@@ -21,31 +22,27 @@ export interface TransactionLogEntry {
 }
 
 class TransactionLogger {
-  // In a real application, this would connect to a database
-  // For this demo, we'll store logs in localStorage
-  private static STORAGE_KEY = 'transactionAuditLogs';
-
   /**
-   * Log a transaction action
+   * Log a transaction action to Supabase (with localStorage fallback)
    */
   static log(
     transactionId: string,
-    user: OrganizationUser,
+    user: OrganizationUser | null,
     action: string,
     description: string,
     details: any = {}
   ): void {
     const entry: TransactionLogEntry = {
       transaction_id: transactionId,
-      user_id: user.id,
-      user: {
+      user_id: user?.id || 'anonymous',
+      user: user ? {
         first_name: user.first_name,
         last_name: user.last_name,
         email: user.email,
         role: user.role
-      },
-      organization_id: user.organization_id,
-      organization: user.organization ? {
+      } : undefined,
+      organization_id: user?.organization_id || 'unknown',
+      organization: user?.organization ? {
         name: user.organization.name,
         type: user.organization.type
       } : undefined,
@@ -55,93 +52,75 @@ class TransactionLogger {
       created_at: new Date().toISOString()
     };
 
-    // Get existing logs
-    const existingLogs = this.getTransactionLogs(transactionId);
-    
-    // Add new log
-    existingLogs.push(entry);
-    
-    // Save logs
-    this.saveTransactionLogs(transactionId, existingLogs);
-    
-    // In a real application, this would make an API call to the backend
-    console.log(`Transaction Log [${transactionId}]:`, action, description);
+    // Write to Supabase (fire-and-forget)
+    auditService.logAction({
+      transaction_id: transactionId,
+      action,
+      details: { description, ...details },
+      user_email: user?.email || 'anonymous',
+    }).catch(err => {
+      console.warn('Supabase audit log failed, falling back to localStorage:', err.message);
+    });
+
+    // Also store in localStorage as fallback
+    try {
+      const allLogs = JSON.parse(localStorage.getItem('transactionAuditLogs') || '{}');
+      const logs = allLogs[transactionId] || [];
+      logs.push(entry);
+      allLogs[transactionId] = logs;
+      localStorage.setItem('transactionAuditLogs', JSON.stringify(allLogs));
+    } catch {
+      // localStorage may not be available
+    }
+
+    console.log(`Audit [${transactionId}]:`, action, description);
   }
 
   /**
-   * Get all logs for a transaction
+   * Get all logs for a transaction from Supabase (with localStorage fallback)
+   */
+  static async getTransactionLogsAsync(transactionId: string): Promise<TransactionLogEntry[]> {
+    try {
+      const logs = await auditService.getAuditLogs(transactionId);
+      return logs.map(l => ({
+        transaction_id: l.transaction_id,
+        user_id: '',
+        organization_id: '',
+        action: l.action,
+        description: l.details?.description || l.action,
+        details: l.details,
+        created_at: l.created_at,
+      }));
+    } catch {
+      return this.getTransactionLogs(transactionId);
+    }
+  }
+
+  /**
+   * Get logs from localStorage (sync fallback)
    */
   static getTransactionLogs(transactionId: string): TransactionLogEntry[] {
     try {
-      const allLogs = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '{}');
+      const allLogs = JSON.parse(localStorage.getItem('transactionAuditLogs') || '{}');
       return allLogs[transactionId] || [];
-    } catch (error) {
-      console.error('Error getting transaction logs:', error);
+    } catch {
       return [];
     }
   }
 
-  /**
-   * Save logs for a transaction
-   */
-  private static saveTransactionLogs(transactionId: string, logs: TransactionLogEntry[]): void {
-    try {
-      // Get all logs
-      const allLogs = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '{}');
-      
-      // Update logs for this transaction
-      allLogs[transactionId] = logs;
-      
-      // Save back to localStorage
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(allLogs));
-    } catch (error) {
-      console.error('Error saving transaction logs:', error);
-    }
-  }
-
-  /**
-   * Clear all logs (for testing/development)
-   */
   static clearAllLogs(): void {
-    localStorage.removeItem(this.STORAGE_KEY);
+    localStorage.removeItem('transactionAuditLogs');
   }
 
-  /**
-   * System log (for automated actions)
-   */
   static systemLog(
     transactionId: string,
     action: string,
     description: string,
     details: any = {}
   ): void {
-    const systemUser: OrganizationUser = {
-      id: 'system',
-      organization_id: 'system',
-      email: 'system@easyconvey.com',
-      first_name: 'System',
-      last_name: '',
-      role: 'system',
-      is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      organization: {
-        id: 'system',
-        name: 'EasyConvey System',
-        type: 'system',
-        email: 'system@easyconvey.com',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    };
-
-    this.log(transactionId, systemUser, action, description, details);
+    this.log(transactionId, null, action, description, { ...details, system: true });
   }
 
-  /**
-   * Standard action types for consistency
-   */
   static ActionTypes = {
     VIEW: 'VIEW',
     EDIT: 'EDIT',

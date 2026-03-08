@@ -61,11 +61,25 @@ export interface Case {
   priority: 'low' | 'medium' | 'high';
   documents: any[];
   notes?: string;
+  buyer_data?: any;
+  seller_data?: any;
+  buyer_status?: 'pending' | 'completed';
+  seller_status?: 'pending' | 'completed';
   created_at: string;
   updated_at: string;
   conveyancer?: OrganizationUser;
   property?: Property;
   organization?: Organization;
+}
+
+export interface CaseShareToken {
+  id: string;
+  case_id: string;
+  role: 'buyer' | 'seller';
+  token: string;
+  expires_at: string;
+  used_at?: string;
+  created_at: string;
 }
 
 export interface Loan {

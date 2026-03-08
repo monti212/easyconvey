@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { ArrowLeft, CheckCircle, Clipboard, Download, FileText, Users, Clock, Banknote, UserCircle, Building, Lock, Shield, ExternalLink, Share2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clipboard, Download, FileText, Users, Clock, Banknote, UserCircle, Building, Lock, Shield, ExternalLink, Share2, Loader2 } from 'lucide-react';
 import { useTransactions } from '../../App';
+import { pdf } from '@react-pdf/renderer';
+import TransactionSummaryPDF from '../../lib/pdf/transactionSummary';
+import * as casesService from '../../services/cases.service';
 
 interface Step7Props {
   transactionData: {
@@ -32,19 +35,26 @@ interface Step7Props {
   };
   transactionId: string | null;
   onPrevious: () => void;
+  mode?: 'conveyancer' | 'client';
+  clientToken?: string;
+  onClientSubmitComplete?: () => void;
 }
 
 const Step7Summary: React.FC<Step7Props> = ({
   transactionData,
   transactionId,
-  onPrevious
+  onPrevious,
+  mode = 'conveyancer',
+  clientToken,
+  onClientSubmitComplete,
 }) => {
   const [copied, setCopied] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [conveyancerLinkCopied, setConveyancerLinkCopied] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const { markTransactionComplete } = useTransactions();
-  
+
   const formatPrice = (value: string) => {
     if (!value) return 'P 0';
     return `P ${new Intl.NumberFormat().format(parseInt(value))}`;
@@ -83,23 +93,43 @@ const Step7Summary: React.FC<Step7Props> = ({
     [transactionId]
   );
 
-  // Mark transaction as complete when component mounts
-  React.useEffect(() => {
-    if (transactionId) {
-      markTransactionComplete(transactionId);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const handleSubmitTransaction = async () => {
+    if (mode === 'client' && clientToken) {
+      setIsSubmitting(true);
+      setSubmitError(null);
+      try {
+        const result = await casesService.submitPartyData(clientToken, transactionData);
+        if (!result.success) {
+          setSubmitError(result.error || 'Submission failed. Please try again.');
+          return;
+        }
+        setIsSubmitted(true);
+        onClientSubmitComplete?.();
+      } catch (err: any) {
+        setSubmitError(err.message || 'An unexpected error occurred.');
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      if (transactionId) {
+        markTransactionComplete(transactionId);
+      }
+      setIsSubmitted(true);
     }
-  }, [transactionId, markTransactionComplete]);
-  
+  };
+
   const copyReferenceNumber = () => {
     navigator.clipboard.writeText(transactionReferenceId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Generate conveyancer dashboard link
+  // Generate conveyancer dashboard link (case ID only — conveyancer fetches data from DB)
   const generateConveyancerLink = () => {
-    const encodedTransactionData = encodeURIComponent(JSON.stringify(transactionData));
-    return `${window.location.origin}?conveyancer=${transactionReferenceId}&data=${encodedTransactionData}`;
+    return `${window.location.origin}?conveyancer=${transactionReferenceId}`;
   };
 
   const copyConveyancerLink = async () => {
@@ -118,40 +148,100 @@ const Step7Summary: React.FC<Step7Props> = ({
     window.open(link, '_blank');
   };
   
-  const handleDownloadSummary = () => {
-    // In a real app, this would generate and download a PDF
-    alert('Summary downloaded!');
+  const handleDownloadSummary = async () => {
+    try {
+      const blob = await pdf(
+        <TransactionSummaryPDF
+          transactionId={transactionId || 'UNKNOWN'}
+          transactionType={transactionData.transactionType}
+          buyerName={transactionData.hasAgent ? transactionData.agentName : 'Buyer'}
+          sellerName="Seller"
+          propertyPrice={transactionData.sellingPrice}
+          nationality={transactionData.nationality}
+          entityType={transactionData.entityType}
+          hasAgent={transactionData.hasAgent}
+          agentName={transactionData.agentName}
+          agentCompany={transactionData.agentCompany}
+          uploadedDocuments={transactionData.uploadedDocuments}
+        />
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transaction-summary-${transactionId || 'draft'}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      alert('Failed to generate PDF. Please try again.');
+    }
   };
   
   return (
     <div className="py-4 md:py-8 max-w-4xl mx-auto px-4">
-      <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-4 md:p-6 mb-6 md:mb-8 shadow-lg">
-        <div className="flex items-center">
-          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-green-100 flex items-center justify-center mr-3 md:mr-4">
-            <CheckCircle className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
-          </div>
-          <div>
-            <h3 className="text-lg md:text-xl font-bold text-green-800">Transaction Successfully Submitted</h3>
-            <p className="text-sm md:text-base text-green-700 mt-1">
-              Your property transaction has been submitted and is now visible in the conveyancer's live dashboard.
-            </p>
+      {submitError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 md:p-6 mb-6 md:mb-8">
+          <div className="flex items-center">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mr-3">
+              <Shield className="h-5 w-5 text-red-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-red-800">Submission Failed</h3>
+              <p className="text-sm text-red-700 mt-1">{submitError}</p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Live Transaction Notification */}
-      <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 md:p-6 mb-6 md:mb-8 shadow-lg">
-        <div className="flex items-center">
-          <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse mr-3"></div>
-          <div>
-            <h3 className="text-sm font-medium text-blue-800">Live Data Integration</h3>
-            <p className="text-xs text-blue-700 mt-1">
-              This transaction is now live in the conveyancer's dashboard with complete step-by-step progress tracking. 
-              Your conveyancer can see exactly which steps you've completed and monitor the transaction in real-time.
-            </p>
+      {isSubmitted ? (
+        <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-4 md:p-6 mb-6 md:mb-8 shadow-lg">
+          <div className="flex items-center">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-green-100 flex items-center justify-center mr-3 md:mr-4">
+              <CheckCircle className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
+            </div>
+            <div>
+              <h3 className="text-lg md:text-xl font-bold text-green-800">
+                {mode === 'client' ? 'Information Successfully Submitted' : 'Transaction Successfully Submitted'}
+              </h3>
+              <p className="text-sm md:text-base text-green-700 mt-1">
+                {mode === 'client'
+                  ? 'Your information has been submitted to the conveyancer. They will review your details and contact you if anything else is needed.'
+                  : 'Your property transaction has been submitted and is now visible in the conveyancer\'s live dashboard.'}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 md:p-6 mb-6 md:mb-8 shadow-lg">
+          <div className="flex items-center">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-100 flex items-center justify-center mr-3 md:mr-4">
+              <FileText className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-lg md:text-xl font-bold text-blue-800">Review Your Transaction</h3>
+              <p className="text-sm md:text-base text-blue-700 mt-1">
+                Please review all details below before submitting your transaction.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Live Transaction Notification — conveyancer mode only */}
+      {mode === 'conveyancer' && (
+        <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 md:p-6 mb-6 md:mb-8 shadow-lg">
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse mr-3"></div>
+            <div>
+              <h3 className="text-sm font-medium text-blue-800">Live Data Integration</h3>
+              <p className="text-xs text-blue-700 mt-1">
+                This transaction is now live in the conveyancer's dashboard with complete step-by-step progress tracking.
+                Your conveyancer can see exactly which steps you've completed and monitor the transaction in real-time.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white overflow-hidden rounded-2xl shadow-xl mb-6 md:mb-8">
         <div className="px-4 py-4 md:px-6 md:py-5 bg-gradient-to-r from-blue-900 to-blue-800 relative">
@@ -358,8 +448,8 @@ const Step7Summary: React.FC<Step7Props> = ({
         </div>
       </div>
 
-      {/* Conveyancer Dashboard Link Section */}
-      <div className="bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-4 md:p-6 mb-6 md:mb-8 shadow-lg">
+      {/* Conveyancer Dashboard Link Section — conveyancer mode only */}
+      {mode === 'conveyancer' && <div className="bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-4 md:p-6 mb-6 md:mb-8 shadow-lg">
         <div className="flex items-start">
           <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-purple-100 flex items-center justify-center mr-3 md:mr-4 flex-shrink-0">
             <Users className="h-5 w-5 md:h-6 md:w-6 text-purple-600" />
@@ -395,12 +485,29 @@ const Step7Summary: React.FC<Step7Props> = ({
             </div>
           </div>
         </div>
-      </div>
+      </div>}
+
+      {!isSubmitted && (
+        <div className="mb-6">
+          <button
+            onClick={handleSubmitTransaction}
+            disabled={isSubmitting}
+            className={`w-full py-3 px-6 border-2 border-transparent rounded-xl text-base font-semibold shadow-lg text-white bg-green-600 hover:bg-green-700 transition-colors ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {isSubmitting ? (
+              <><Loader2 className="inline-block mr-2 h-5 w-5 animate-spin" />Submitting...</>
+            ) : (
+              <><CheckCircle className="inline-block mr-2 h-5 w-5" />{mode === 'client' ? 'Submit Your Information' : 'Submit Transaction'}</>
+            )}
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-4">
         <button
           onClick={onPrevious}
-          className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-gray-300 rounded-lg text-sm md:text-base font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors"
+          disabled={isSubmitted}
+          className={`inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-gray-300 rounded-lg text-sm md:text-base font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors ${isSubmitted ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <ArrowLeft className="mr-1 md:mr-2 h-4 w-4" />
           Back
@@ -414,21 +521,25 @@ const Step7Summary: React.FC<Step7Props> = ({
           {copied ? 'Copied!' : 'Copy Reference'}
         </button>
         
-        <button
-          onClick={handleDownloadSummary}
-          className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-transparent rounded-lg text-sm md:text-base font-medium shadow-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
-        >
-          <Download className="mr-1 md:mr-2 h-4 w-4" />
-          Download Summary
-        </button>
-        
-        <button
-          onClick={() => setShowRoleModal(true)}
-          className="sm:ml-auto inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-gray-300 rounded-lg text-sm md:text-base font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors"
-        >
-          <Users className="mr-1 md:mr-2 h-4 w-4 text-blue-600" />
-          View as...
-        </button>
+        {mode === 'conveyancer' && (
+          <>
+            <button
+              onClick={handleDownloadSummary}
+              className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-transparent rounded-lg text-sm md:text-base font-medium shadow-md text-white bg-primary hover:bg-primary-dark transition-colors"
+            >
+              <Download className="mr-1 md:mr-2 h-4 w-4" />
+              Download Summary
+            </button>
+
+            <button
+              onClick={() => setShowRoleModal(true)}
+              className="sm:ml-auto inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-gray-300 rounded-lg text-sm md:text-base font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors"
+            >
+              <Users className="mr-1 md:mr-2 h-4 w-4 text-blue-600" />
+              View as...
+            </button>
+          </>
+        )}
       </div>
 
       <div className="mt-6 md:mt-8 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-4 md:p-6 shadow-md border border-blue-200">

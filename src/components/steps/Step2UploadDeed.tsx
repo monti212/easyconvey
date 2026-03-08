@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, CheckCircle, AlertCircle, ArrowLeft, ArrowRight, FileText, Database, Shield, Eye, X } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
+import * as storageService from '../../services/storage.service';
 
 interface Step2Props {
   documentUploaded: boolean;
@@ -36,61 +38,88 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
   const [hasBond, setHasBond] = useState<boolean | null>(null);
   const [bondDocument, setBondDocument] = useState<string | null>(null);
   const [bondDocumentType, setBondDocumentType] = useState<string | null>(null);
+  const [analysisUnavailable, setAnalysisUnavailable] = useState(false);
 
   // Check if the user is selling to determine if deed upload is mandatory
   const isSelling = transactionType === 'selling';
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    
+
     if (file) {
       setIsAnalyzing(true);
-      // Simulating AI analysis with setTimeout
-      setTimeout(() => {
-        setIsAnalyzing(false);
-        const isValid = Math.random() > 0.7; // 30% chance of being valid for demo purposes
-        
-        if (isValid) {
-          onUpdate({ 
-            documentUploaded: true, 
+      setErrorMessage('');
+
+      try {
+        // Upload to Supabase Storage
+        let uploadPath = '';
+        try {
+          const orgId = 'public'; // Unauthenticated users use public folder
+          const caseId = 'deeds';
+          const result = await storageService.uploadFile(file, orgId, caseId, 'title-deed', 'deeds');
+          uploadPath = result.path;
+        } catch {
+          // Storage upload may fail for unauthenticated users — continue with AI analysis
+        }
+
+        // Call AI analysis endpoint
+        const formData = new FormData();
+        formData.append('file', file);
+        if (uploadPath) formData.append('storagePath', uploadPath);
+
+        const response = await fetch('/api/analyze-deed', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const isValid = result.isValid !== false;
+
+          if (isValid) {
+            onUpdate({
+              documentUploaded: true,
+              documentValid: true,
+              skippedDeedUpload: false
+            });
+            setErrorMessage('');
+            setLandType(result.landType || 'Unknown');
+            setHasCaveats(result.hasCaveats || false);
+            setHasBonds(result.hasBonds || false);
+            setHasSubdivisions(result.hasSubdivisions || false);
+            setShowBondPrompt(true);
+          } else {
+            onUpdate({
+              documentUploaded: true,
+              documentValid: false,
+              skippedDeedUpload: false
+            });
+            setErrorMessage(result.errors?.[0] || 'Document could not be validated. Please upload a clearer scan.');
+          }
+        } else {
+          // API not available — accept upload but warn user
+          onUpdate({
+            documentUploaded: true,
             documentValid: true,
             skippedDeedUpload: false
           });
-          setErrorMessage('');
-          
-          // Simulate AI detecting land type and potential issues
-          const landTypes = ['Urban Residential', 'Tribal Land', 'Communal Land', 'Commercial'];
-          setLandType(landTypes[Math.floor(Math.random() * landTypes.length)]);
-          
-          // Random detection of caveats, bonds, subdivisions (for demo)
-          setHasCaveats(Math.random() > 0.7);
-          setHasBonds(Math.random() > 0.7);
-          setHasSubdivisions(Math.random() > 0.7);
-          
-          // Show bond prompt if document is valid
+          setLandType('Pending AI Analysis');
+          setAnalysisUnavailable(true);
           setShowBondPrompt(true);
-        } else {
-          onUpdate({ 
-            documentUploaded: true, 
-            documentValid: false,
-            skippedDeedUpload: false 
-          });
-          
-          // Enhanced error messages
-          const errorMessages = [
-            "Document quality is too poor for analysis. Please upload a clearer, high-resolution scan of your title deed.",
-            "The text in your document is not legible. Please ensure the document is well-lit and in focus before scanning.",
-            "Multiple pages detected but some are blurry. Please re-scan each page clearly and upload as a single PDF.",
-            "Document appears to be a photocopy of a photocopy. Please upload the original document or a high-quality scan.",
-            "The document edges are cut off. Please ensure the entire document is visible in your scan.",
-            "Poor image quality detected. Please use a document scanner app or high-resolution camera for better results.",
-            "Text is too small or pixelated to read. Please upload a higher resolution version of this document.",
-            "Document appears to be damaged or faded. Please provide a clearer copy or contact the relevant authority for a new copy."
-          ];
-          
-          setErrorMessage(errorMessages[Math.floor(Math.random() * errorMessages.length)]);
         }
-      }, 2000);
+      } catch {
+        // Network error — accept upload but warn user
+        onUpdate({
+          documentUploaded: true,
+          documentValid: true,
+          skippedDeedUpload: false
+        });
+        setLandType('Pending AI Analysis');
+        setAnalysisUnavailable(true);
+        setShowBondPrompt(true);
+      } finally {
+        setIsAnalyzing(false);
+      }
     }
   };
 
@@ -112,14 +141,20 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
     setBondDocumentType(type);
   };
 
-  const handleBondDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBondDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Upload bond document to Supabase Storage
+      try {
+        await storageService.uploadFile(file, 'public', 'deeds', 'bond-cancellation', 'documents');
+      } catch {
+        // Storage may not be available for unauthenticated users
+      }
       setBondDocument(file.name);
-      onUpdate({ 
-        documentUploaded: true, 
-        documentValid: true, 
-        hasBond: true, 
+      onUpdate({
+        documentUploaded: true,
+        documentValid: true,
+        hasBond: true,
         bondDocument: file.name,
         skippedDeedUpload: false
       });
@@ -165,7 +200,7 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
       </p>
 
       {!documentUploaded ? (
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-dashed border-blue-300 rounded-2xl p-6 md:p-12 text-center transition-all hover:shadow-lg">
+        <div className="bg-background border-2 border-dashed border-blue-300 rounded-2xl p-6 md:p-12 text-center transition-all hover:shadow-lg">
           <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white flex items-center justify-center mx-auto mb-4 md:mb-6 shadow-md">
             <FileText className="h-8 w-8 md:h-10 md:w-10 text-primary" />
           </div>
@@ -286,9 +321,25 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
             </div>
           </div>
           
+          {/* Unverified warning */}
+          {analysisUnavailable && (
+            <div className="bg-amber-50 rounded-xl p-4 border border-amber-200 mb-6">
+              <div className="flex items-start">
+                <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="ml-3">
+                  <h4 className="text-sm font-medium text-amber-800">AI Analysis Unavailable</h4>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Your document was accepted but could not be verified by our AI analysis service.
+                    It will be manually reviewed by your conveyancer.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Bond Disclosure Prompt */}
           {showBondPrompt && (
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-5 md:p-8 shadow-md border border-blue-200 mb-6">
+            <div className="bg-background rounded-2xl p-5 md:p-8 shadow-md border border-blue-200 mb-6">
               <h3 className="text-lg md:text-xl font-semibold text-primary mb-3 font-serif">Important Question</h3>
               <p className="text-sm md:text-base text-gray-700 mb-4">
                 Have you used this property to secure a loan?

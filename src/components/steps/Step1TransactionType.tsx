@@ -58,7 +58,7 @@ const Step1TransactionType: React.FC<Step1Props> = ({
             onClick={() => handleTransactionTypeSelect('buying')}
             className={`flex flex-col items-center p-6 md:p-10 rounded-xl transition-all duration-300 ${
               transactionType === 'buying'
-                ? 'bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-secondary shadow-lg shadow-blue-100'
+                ? 'bg-background border-2 border-secondary shadow-lg shadow-blue-100'
                 : 'bg-white border-2 border-gray-200 hover:border-secondary hover:shadow-md'
             }`}
           >
@@ -100,7 +100,7 @@ const Step1TransactionType: React.FC<Step1Props> = ({
           onClick={() => handleTransactionTypeSelect('selling')}
           className={`flex flex-col items-center p-6 md:p-10 rounded-xl transition-all duration-300 ${
             transactionType === 'selling'
-              ? 'bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-secondary shadow-lg shadow-blue-100'
+              ? 'bg-background border-2 border-secondary shadow-lg shadow-blue-100'
               : 'bg-white border-2 border-gray-200 hover:border-secondary hover:shadow-md'
           }`}
         >

@@ -24,9 +24,27 @@ const AuditLogger: React.FC<AuditLoggerProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (isOpen) {
-      // Load audit logs from localStorage
-      const storedLogs = JSON.parse(localStorage.getItem('auditLogs') || '[]');
-      setLogs(storedLogs.reverse()); // Show newest first
+      // Try loading from Supabase audit service first
+      import('../services/audit.service').then(async (auditService) => {
+        try {
+          const supabaseLogs = await auditService.getAuditLogs();
+          if (supabaseLogs.length > 0) {
+            setLogs(supabaseLogs.map(l => ({
+              timestamp: l.created_at,
+              action: l.action,
+              user_email: l.user_email,
+              success: true,
+              ip_address: l.ip_address || 'unknown',
+              ...l.details,
+            })));
+            return;
+          }
+        } catch {
+          // Fallback to localStorage
+        }
+        const storedLogs = JSON.parse(localStorage.getItem('auditLogs') || '[]');
+        setLogs(storedLogs.reverse());
+      });
     }
   }, [isOpen]);
 

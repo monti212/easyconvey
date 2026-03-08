@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import * as storageService from '../../services/storage.service';
+import { useDebounce } from '../../hooks/useDebounce';
 import {
   ArrowLeft,
   ArrowRight,
@@ -129,10 +131,14 @@ const Step3SellingPrice: React.FC<Step3Props> = ({
 
   const propertyPriceInfo = getPropertyPriceInfo();
 
-  // Sync local → parent any time the user edits price / valuation
+  // Debounce price values to avoid excessive parent updates / Supabase calls
+  const debouncedBuyingPrice = useDebounce(buyingPrice, 500);
+  const debouncedMarketValue = useDebounce(marketValue, 500);
+
+  // Sync local → parent after debounce
   useEffect(() => {
-    onUpdate({ sellingPrice: buyingPrice, valuationAmount: marketValue });
-  }, [buyingPrice, marketValue, onUpdate]);
+    onUpdate({ sellingPrice: debouncedBuyingPrice, valuationAmount: debouncedMarketValue });
+  }, [debouncedBuyingPrice, debouncedMarketValue]);
 
   // Auto-set exemption for first time buyers
   useEffect(() => {
@@ -217,16 +223,24 @@ const Step3SellingPrice: React.FC<Step3Props> = ({
   }, [buyingPrice, marketValue, taxType, isExempt, isAutoExempt, effectivePropertyPrice, nationality]);
 
   // ---------------------------------------------------------------------------
-  // Upload handler (mock)
+  // Upload handler
   // ---------------------------------------------------------------------------
-  const handleValuationUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleValuationUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsUploading(true);
-    setTimeout(() => {
-      setIsUploading(false);
+    try {
+      try {
+        await storageService.uploadFile(file, 'public', 'valuations', 'valuation', 'valuations');
+      } catch {
+        // Storage may not be available for unauthenticated users — file name still recorded
+      }
       onUpdate({ valuationDocument: file.name });
-    }, 1500);
+    } catch {
+      onUpdate({ valuationDocument: file.name });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   // Handle tax type change
@@ -350,7 +364,7 @@ const Step3SellingPrice: React.FC<Step3Props> = ({
         </p>
 
         {/* Pricing Display */}
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-5 md:p-8 shadow-md mb-6 md:mb-8">
+        <div className="bg-background rounded-2xl p-5 md:p-8 shadow-md mb-6 md:mb-8">
           {/* Shared Pricing Notification */}
           <div className="mb-6 bg-white border border-blue-200 rounded-xl p-4 shadow-sm">
             <div className="flex items-start">
@@ -501,7 +515,7 @@ const Step3SellingPrice: React.FC<Step3Props> = ({
       {/* --------------------------------------------------------------------- */}
       {/* Main Form with Progressive Disclosure                                 */}
       {/* --------------------------------------------------------------------- */}
-      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-5 md:p-8 shadow-md mb-6 md:mb-8 space-y-6">
+      <div className="bg-background rounded-2xl p-5 md:p-8 shadow-md mb-6 md:mb-8 space-y-6">
         {/* Step 1: Transaction Price */}
         <div>
           <h3 className="text-lg md:text-xl font-semibold text-primary mb-3 md:mb-4 font-serif">

@@ -22,6 +22,10 @@ import {
 } from 'lucide-react';
 import { Loan, Case, Organization, OrganizationUser } from '../../types/database';
 import ConveyancingApplicationForm from './ConveyancingApplicationForm';
+import { useLoans } from '../../hooks/useLoans';
+import { useCases } from '../../hooks/useCases';
+import LoadingSpinner from '../ui/LoadingSpinner';
+import EmptyState from '../ui/EmptyState';
 
 interface FinancialInstitutionDashboardProps {
   user: OrganizationUser;
@@ -34,74 +38,28 @@ const FinancialInstitutionDashboard: React.FC<FinancialInstitutionDashboardProps
   organization,
   onLogout
 }) => {
+  const { loans, loading: loansLoading, update: updateLoan } = useLoans(organization.id);
+  const { cases } = useCases(organization.id);
+
   const [activeTab, setActiveTab] = useState<'loans' | 'applications' | 'conveyancing' | 'team'>('loans');
   const [searchTerm, setSearchTerm] = useState('');
   const [showConveyancingForm, setShowConveyancingForm] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
 
-  // Mock data - in real app, this would come from the database
-  const [loans, setLoans] = useState<Loan[]>([
-    {
-      id: '1',
-      organization_id: organization.id,
-      loan_officer_id: user.id,
-      application_number: 'LOAN-2025-001',
-      applicant_name: 'John Doe',
-      applicant_email: 'john@example.com',
-      loan_amount: 2000000,
-      interest_rate: 8.5,
-      term_months: 240,
-      status: 'approved',
-      documents: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    },
-    {
-      id: '2',
-      organization_id: organization.id,
-      loan_officer_id: user.id,
-      application_number: 'LOAN-2025-002',
-      applicant_name: 'Jane Smith',
-      applicant_email: 'jane@example.com',
-      loan_amount: 1500000,
-      interest_rate: 9.0,
-      term_months: 180,
-      status: 'approved',
-      documents: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    },
-    {
-      id: '3',
-      organization_id: organization.id,
-      loan_officer_id: user.id,
-      application_number: 'LOAN-2025-003',
-      applicant_name: 'Michael Chen',
-      applicant_email: 'michael@example.com',
-      loan_amount: 3200000,
-      interest_rate: 8.0,
-      term_months: 300,
-      status: 'application',
-      documents: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-  ]);
-
-  // Mock conveyancing applications submitted by this bank
-  const [conveyancingApplications, setConveyancingApplications] = useState([
-    {
-      id: 'conv-app-1',
-      loan_id: '1',
-      loan: loans[0],
-      conveyancer_firm: 'OrionX Legal Services',
-      case_number: 'CONV-2025-001',
-      status: 'submitted',
-      submitted_at: new Date().toISOString(),
-      property_address: 'Block 8, Plot 123, Gaborone',
-      transaction_type: 'buying'
-    }
-  ]);
+  // Conveyancing applications derived from cases linked to loans
+  const conveyancingApplications = cases
+    .filter(c => c.property_id || c.case_type === 'buying')
+    .map(c => ({
+      id: c.id,
+      loan_id: '',
+      loan: loans.find(l => l.case_id === c.id) || { applicant_name: c.client_name, loan_amount: 0 } as any,
+      conveyancer_firm: c.organization?.name || 'Unknown',
+      case_number: c.case_number,
+      status: c.status === 'initiated' ? 'submitted' : c.status,
+      submitted_at: c.created_at,
+      property_address: c.property?.address || 'Address pending',
+      transaction_type: c.case_type,
+    }));
 
   const formatCurrency = (amount: number) => `P ${amount.toLocaleString()}`;
 
@@ -146,30 +104,16 @@ const FinancialInstitutionDashboard: React.FC<FinancialInstitutionDashboardProps
     setShowConveyancingForm(true);
   };
 
-  const handleConveyancingSubmit = (applicationData: any) => {
-    // Create new conveyancing application
-    const newApplication = {
-      id: `conv-app-${Date.now()}`,
-      loan_id: selectedLoan!.id,
-      loan: selectedLoan!,
-      conveyancer_firm: applicationData.conveyancerFirm,
-      case_number: `CONV-${Date.now()}`,
-      status: 'submitted',
-      submitted_at: new Date().toISOString(),
-      property_address: applicationData.propertyAddress,
-      transaction_type: applicationData.transactionType
-    };
-
-    setConveyancingApplications(prev => [...prev, newApplication]);
+  const handleConveyancingSubmit = async (applicationData: any) => {
+    if (selectedLoan) {
+      try {
+        await updateLoan(selectedLoan.id, { status: 'disbursed' });
+      } catch (err) {
+        console.error('Failed to update loan:', err);
+      }
+    }
     setShowConveyancingForm(false);
     setSelectedLoan(null);
-
-    // Update loan status to indicate conveyancing has been initiated
-    setLoans(prev => prev.map(loan => 
-      loan.id === selectedLoan!.id 
-        ? { ...loan, status: 'disbursed' as any }
-        : loan
-    ));
   };
 
   const renderLoans = () => (
