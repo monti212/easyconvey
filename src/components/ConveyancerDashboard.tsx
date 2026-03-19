@@ -43,6 +43,17 @@ interface ConveyancerDashboardProps {
   onBack: () => void;
 }
 
+type DocumentType = 'deed_of_sale' | 'transfer_duty' | 'power_of_attorney' | 'affidavit' | 'bond_registration' | 'compliance_certificate';
+
+const DOCUMENT_TYPES: { id: DocumentType; label: string; description: string }[] = [
+  { id: 'deed_of_sale', label: 'Deed of Sale & Transfer', description: 'Full conveyancing agreement between buyer and seller' },
+  { id: 'transfer_duty', label: 'Transfer Duty Declaration', description: 'Transfer Duty Act (Cap 53:01) declaration form' },
+  { id: 'power_of_attorney', label: 'Power of Attorney', description: 'Authority to act on behalf of a party in the transfer' },
+  { id: 'affidavit', label: 'Affidavit', description: 'Sworn statement supporting the property transaction' },
+  { id: 'bond_registration', label: 'Bond Registration', description: 'Mortgage bond registration document for the property' },
+  { id: 'compliance_certificate', label: 'Compliance Certificate', description: 'Municipal and regulatory compliance declaration' },
+];
+
 const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
   transactionId,
   buyerData,
@@ -63,6 +74,8 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
   const [buyerStatus, setBuyerStatus] = useState<string>('pending');
   const [sellerStatus, setSellerStatus] = useState<string>('pending');
   const [caseDocuments, setCaseDocuments] = useState<CaseDocument[]>([]);
+  const [selectedDocType, setSelectedDocType] = useState<DocumentType>('deed_of_sale');
+  const [generatedDocuments, setGeneratedDocuments] = useState<Record<DocumentType, string>>({} as Record<DocumentType, string>);
 
   // Use real user from auth context for logging
   const currentUser = orgUser ? {
@@ -188,18 +201,23 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
     return `P ${parseInt(amount || '0').toLocaleString()}`;
   };
 
-  const generateConveyancingDocument = useCallback(async () => {
+  const generateConveyancingDocument = useCallback(async (docType?: DocumentType) => {
+    const typeToGenerate = docType || selectedDocType;
+    let finalText = '';
     setIsGeneratingDocument(true);
     setDocumentError(null);
     setStreamingContent('');
     setShowDocumentViewer(true);
+    setGeneratedDocument(null);
+
+    const docLabel = DOCUMENT_TYPES.find(d => d.id === typeToGenerate)?.label || 'Document';
 
     TransactionLogger.log(
       transactionId,
       currentUser,
       TransactionLogger.ActionTypes.DOCUMENT_REVIEW,
-      'Initiated document generation',
-      { document_type: 'conveyancing_document' }
+      `Initiated ${docLabel} generation`,
+      { document_type: typeToGenerate }
     );
 
     try {
@@ -209,6 +227,7 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           transactionId,
+          documentType: typeToGenerate,
           propertyPrice: formatCurrency(currentTransaction?.propertyPrice || '0'),
           buyerDetails: currentTransaction?.buyerDetails || null,
           sellerDetails: currentTransaction?.sellerDetails || null,
@@ -249,19 +268,10 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
 
             try {
               const parsed = JSON.parse(data);
-              // OpenAI Responses API stream: look for text delta
-              const delta =
-                parsed.delta?.content?.[0]?.text ||
-                parsed.delta?.content ||
-                parsed.choices?.[0]?.delta?.content ||
-                '';
+              // Chat Completions streaming format
+              const delta = parsed.choices?.[0]?.delta?.content || '';
               if (typeof delta === 'string' && delta) {
                 fullText += delta;
-                setStreamingContent(fullText);
-              }
-              // Also handle output_text.delta for Responses API
-              if (parsed.type === 'response.output_text.delta' && parsed.delta) {
-                fullText += parsed.delta;
                 setStreamingContent(fullText);
               }
             } catch {
@@ -272,20 +282,24 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
 
         setGeneratedDocument(fullText);
         setStreamingContent(fullText);
+        setGeneratedDocuments(prev => ({ ...prev, [typeToGenerate]: fullText }));
+        finalText = fullText;
       } else {
         // Fallback: JSON response (non-streaming)
         const data = await response.json();
         const text = data.document || '';
         setGeneratedDocument(text);
         setStreamingContent(text);
+        setGeneratedDocuments(prev => ({ ...prev, [typeToGenerate]: text }));
+        finalText = text;
       }
 
       TransactionLogger.log(
         transactionId,
         currentUser,
         TransactionLogger.ActionTypes.DOCUMENT_REVIEW,
-        'Successfully generated conveyancing document',
-        { document_size: (generatedDocument || '').length }
+        `Successfully generated ${docLabel}`,
+        { document_type: typeToGenerate, document_size: finalText.length }
       );
     } catch (error) {
       console.error('Error generating document:', error);
@@ -306,7 +320,7 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
     } finally {
       setIsGeneratingDocument(false);
     }
-  }, [transactionId, currentTransaction, currentUser, caseDocuments]);
+  }, [transactionId, currentTransaction, currentUser, caseDocuments, selectedDocType]);
 
   const downloadDocument = async () => {
     if (!generatedDocument) return;
@@ -616,7 +630,7 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                       className="px-3 py-1 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors flex items-center"
                     >
                       <Eye className="h-4 w-4 mr-1" />
-                      View Document
+                      View
                     </button>
                     <button
                       onClick={printDocument}
@@ -636,50 +650,97 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                 )}
               </div>
 
+              {/* Document Type Selector */}
+              <div className="mb-5">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Document Type</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {DOCUMENT_TYPES.map((doc) => (
+                    <button
+                      key={doc.id}
+                      onClick={() => {
+                        setSelectedDocType(doc.id);
+                        // Show previously generated doc if available
+                        if (generatedDocuments[doc.id]) {
+                          setGeneratedDocument(generatedDocuments[doc.id]);
+                          setStreamingContent(generatedDocuments[doc.id]);
+                        } else {
+                          setGeneratedDocument(null);
+                          setStreamingContent('');
+                        }
+                      }}
+                      className={`flex items-start p-3 rounded-lg border-2 transition-colors text-left ${
+                        selectedDocType === doc.id
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center">
+                          <p className="text-sm font-medium text-gray-900 truncate">{doc.label}</p>
+                          {generatedDocuments[doc.id] && (
+                            <CheckCircle className="h-3.5 w-3.5 text-emerald-500 ml-1.5 flex-shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">{doc.description}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {!generatedDocument && !isGeneratingDocument && (
-                <div className="text-center py-12 bg-gradient-to-br from-purple-50 via-white to-indigo-50 rounded-xl border border-purple-100">
-                  <div className="relative inline-block mb-6">
-                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-xl shadow-purple-500/25">
-                      <Sparkles className="h-10 w-10 text-white" />
+                <div className="text-center py-8 bg-gradient-to-br from-purple-50 via-white to-indigo-50 rounded-xl border border-purple-100">
+                  <div className="relative inline-block mb-4">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-xl shadow-purple-500/25">
+                      <Sparkles className="h-8 w-8 text-white" />
                     </div>
                   </div>
-                  <h4 className="text-xl font-serif font-semibold text-gray-900 mb-3">
-                    Generate Conveyancing Agreement
+                  <h4 className="text-lg font-serif font-semibold text-gray-900 mb-2">
+                    Generate {DOCUMENT_TYPES.find(d => d.id === selectedDocType)?.label}
                   </h4>
-                  <p className="text-gray-500 mb-8 max-w-lg mx-auto leading-relaxed">
-                    AI will draft a comprehensive, legally-structured Deed of Sale and Transfer Agreement
-                    using all transaction details, buyer and seller information, and property data.
+                  <p className="text-gray-500 mb-6 max-w-lg mx-auto text-sm leading-relaxed">
+                    AI will draft a comprehensive, legally-structured document using all transaction details, buyer and seller information, and property data.
                   </p>
                   <button
-                    onClick={generateConveyancingDocument}
-                    className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg shadow-purple-500/25 flex items-center mx-auto text-base font-medium"
+                    onClick={() => generateConveyancingDocument()}
+                    className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg shadow-purple-500/25 flex items-center mx-auto text-sm font-medium"
                   >
-                    <Sparkles className="h-5 w-5 mr-3" />
-                    Generate Agreement with AI
+                    <Sparkles className="h-5 w-5 mr-2" />
+                    Generate with AI
                   </button>
                 </div>
               )}
 
               {generatedDocument && !showDocumentViewer && (
-                <div className="space-y-4">
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                <div className="space-y-3">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <CheckCircle className="h-6 w-6 text-emerald-600 mr-3" />
+                        <CheckCircle className="h-5 w-5 text-emerald-600 mr-2" />
                         <div>
-                          <p className="text-emerald-900 font-semibold">Agreement Generated Successfully</p>
-                          <p className="text-emerald-700 text-sm mt-0.5">
+                          <p className="text-emerald-900 font-semibold text-sm">
+                            {DOCUMENT_TYPES.find(d => d.id === selectedDocType)?.label} Generated
+                          </p>
+                          <p className="text-emerald-700 text-xs mt-0.5">
                             {generatedDocument.split(/\s+/).filter(Boolean).length.toLocaleString()} words &middot; Ready for review
                           </p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => setShowDocumentViewer(true)}
-                        className="px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium flex items-center"
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        Open Document
-                      </button>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => generateConveyancingDocument()}
+                          className="px-3 py-1.5 text-xs bg-white border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors"
+                        >
+                          Regenerate
+                        </button>
+                        <button
+                          onClick={() => setShowDocumentViewer(true)}
+                          className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-xs font-medium flex items-center"
+                        >
+                          <Eye className="h-3.5 w-3.5 mr-1" />
+                          Open
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

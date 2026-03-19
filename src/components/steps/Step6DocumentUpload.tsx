@@ -14,7 +14,7 @@ interface Step6Props {
   originalTransactionId?: string;
   isSharedTransaction?: boolean;
   currentTransactionData?: any; // Current transaction data for sharing
-  onUpdate: (data: { uploadedDocuments?: string[]; otherPartyDocuments?: string[] }) => void;
+  onUpdate: (data: { uploadedDocuments?: string[]; otherPartyDocuments?: string[]; documentFilePaths?: { path: string; bucket: string; name: string; type: string }[]; documentDataUrls?: { dataUrl: string; name: string; docType: string }[] }) => void;
   onNext: () => void;
   onPrevious: () => void;
   onSharedLink?: (transactionId: string, transactionType: string, sharedPricing?: any) => void;
@@ -46,6 +46,16 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle');
   const [storageWarnings, setStorageWarnings] = useState<string[]>([]);
 
+  // Convert a File to a base64 data URL for direct AI vision processing
+  const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Check if Title Deed needs to be added to required documents
   useEffect(() => {
     let updatedDocs = [...requiredDocuments];
@@ -72,14 +82,30 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
     setIsUploading(true);
     const newUploads: string[] = [];
     const newQuality: Record<string, string> = { ...documentQuality };
+    const newPaths: { path: string; bucket: string; name: string; type: string }[] = [];
+    const newDataUrls: { dataUrl: string; name: string; docType: string }[] = [];
 
     for (const originalFile of Array.from(files)) {
+      // Capture original as base64 if image (for direct AI vision processing)
+      const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(originalFile.name);
+      if (isImage) {
+        try {
+          const dataUrl = await fileToDataUrl(originalFile);
+          newDataUrls.push({ dataUrl, name: originalFile.name, docType: 'bulk-upload' });
+        } catch { /* ignore */ }
+      }
+
       // Auto-convert images to PDF
       const file = await convertToPdf(originalFile);
       try {
         // Try to upload to Supabase Storage
         try {
-          await storageService.uploadFile(file, 'public', 'documents', 'bulk', 'documents');
+          const result = await storageService.uploadFile(file, 'public', 'documents', 'bulk', 'documents');
+          newPaths.push({ path: result.path, bucket: 'documents', name: originalFile.name, type: 'bulk-upload' });
+          if (isImage) {
+            const origResult = await storageService.uploadFile(originalFile, 'public', 'documents', 'bulk-original', 'documents');
+            newPaths.push({ path: origResult.path, bucket: 'documents', name: originalFile.name, type: 'bulk-upload-original' });
+          }
         } catch {
           setStorageWarnings(prev => [...prev, file.name]);
         }
@@ -108,7 +134,11 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
       }
     }
 
-    onUpdate({ uploadedDocuments: [...uploadedDocuments, ...newUploads] });
+    onUpdate({
+      uploadedDocuments: [...uploadedDocuments, ...newUploads],
+      documentFilePaths: newPaths,
+      documentDataUrls: newDataUrls,
+    });
     setDocumentQuality(newQuality);
     setIsUploading(false);
   };
@@ -117,6 +147,18 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
     const originalFile = e.target.files?.[0];
     if (!originalFile) return;
 
+    const docSlug = docType.replace(/\s+/g, '-');
+    const singleDataUrls: { dataUrl: string; name: string; docType: string }[] = [];
+
+    // Capture original as base64 if image (for direct AI vision processing)
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(originalFile.name);
+    if (isImage) {
+      try {
+        const dataUrl = await fileToDataUrl(originalFile);
+        singleDataUrls.push({ dataUrl, name: originalFile.name, docType: docSlug });
+      } catch { /* ignore */ }
+    }
+
     // Auto-convert images to PDF
     const file = await convertToPdf(originalFile);
     const newFileName = `${docType.replace(/\s+/g, '_')}.pdf`;
@@ -124,15 +166,21 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
     setIsUploading(true);
 
     try {
+      const singlePaths: { path: string; bucket: string; name: string; type: string }[] = [];
       // Try to upload to Supabase Storage
       try {
-        await storageService.uploadFile(file, 'public', 'documents', docType.replace(/\s+/g, '-'), 'documents');
+        const result = await storageService.uploadFile(file, 'public', 'documents', docSlug, 'documents');
+        singlePaths.push({ path: result.path, bucket: 'documents', name: originalFile.name, type: docSlug });
+        if (isImage) {
+          const origResult = await storageService.uploadFile(originalFile, 'public', 'documents', `${docSlug}-original`, 'documents');
+          singlePaths.push({ path: origResult.path, bucket: 'documents', name: originalFile.name, type: `${docSlug}-original` });
+        }
       } catch {
         setStorageWarnings(prev => [...prev, newFileName]);
       }
 
       const newUploads = [...uploadedDocuments, newFileName];
-      onUpdate({ uploadedDocuments: newUploads });
+      onUpdate({ uploadedDocuments: newUploads, documentFilePaths: singlePaths, documentDataUrls: singleDataUrls });
 
       // Try AI quality analysis
       const newQuality = { ...documentQuality };

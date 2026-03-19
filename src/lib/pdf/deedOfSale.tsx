@@ -24,6 +24,7 @@ interface DeedOfSaleProps {
   propertyAddress?: string;
   entityType?: string;
   generatedContent?: string;
+  documentTitle?: string;
   date?: string;
 }
 
@@ -34,10 +35,34 @@ export default function DeedOfSalePDF(props: DeedOfSaleProps) {
     sellerName,
     propertyPrice,
     propertyAddress = 'As per title deed',
+    generatedContent,
+    documentTitle,
     date = new Date().toLocaleDateString('en-BW', { year: 'numeric', month: 'long', day: 'numeric' }),
   } = props;
 
   const priceFormatted = `P ${parseInt(propertyPrice || '0').toLocaleString()}`;
+  const title = documentTitle || 'Deed of Sale';
+
+  // If AI-generated content is provided, render it as the document body
+  if (generatedContent) {
+    return (
+      <Document>
+        <Page size="A4" style={styles.page}>
+          <View style={styles.header}>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle}>Republic of Botswana</Text>
+            <Text style={{ fontSize: 9, color: '#666', marginTop: 4 }}>Reference: {transactionId} | Date: {date}</Text>
+          </View>
+          <View style={styles.section}>
+            <Text>{generatedContent}</Text>
+          </View>
+          <Text style={styles.footer}>
+            Prepared by Minchin & Kelly | Powered by OrionX | This document requires proper legal review before execution
+          </Text>
+        </Page>
+      </Document>
+    );
+  }
 
   return (
     <Document>

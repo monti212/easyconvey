@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { ArrowLeft, CheckCircle, Clipboard, Download, FileText, Users, Clock, Banknote, UserCircle, Building, Lock, Shield, ExternalLink, Share2, Loader2 } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { ArrowLeft, CheckCircle, Clipboard, Download, FileText, Users, Clock, Banknote, UserCircle, Building, Lock, Shield, ExternalLink, Share2, Loader2, Sparkles, Eye, Printer } from 'lucide-react';
 import { useTransactions } from '../../App';
 import { pdf } from '@react-pdf/renderer';
 import TransactionSummaryPDF from '../../lib/pdf/transactionSummary';
+import DeedOfSalePDF from '../../lib/pdf/deedOfSale';
+import DocumentStreamViewer from '../DocumentStreamViewer';
 import * as casesService from '../../services/cases.service';
 
 interface Step7Props {
@@ -32,13 +34,27 @@ interface Step7Props {
     requiredDocuments: string[];
     uploadedDocuments: string[];
     isFirstTimeBuyer?: boolean; // Added for first time buyer status
+    documentFilePaths?: { path: string; bucket: string; name: string; type: string }[];
+    documentDataUrls?: { dataUrl: string; name: string; docType: string }[];
   };
   transactionId: string | null;
   onPrevious: () => void;
   mode?: 'conveyancer' | 'client';
   clientToken?: string;
   onClientSubmitComplete?: () => void;
+  onComplete?: () => void;
 }
+
+type DocumentType = 'deed_of_sale' | 'transfer_duty' | 'power_of_attorney' | 'affidavit' | 'bond_registration' | 'compliance_certificate';
+
+const DOC_TYPES: { id: DocumentType; label: string; short: string }[] = [
+  { id: 'deed_of_sale', label: 'Deed of Sale & Transfer', short: 'Deed of Sale' },
+  { id: 'transfer_duty', label: 'Transfer Duty Declaration', short: 'Transfer Duty' },
+  { id: 'power_of_attorney', label: 'Power of Attorney', short: 'Power of Attorney' },
+  { id: 'affidavit', label: 'Affidavit', short: 'Affidavit' },
+  { id: 'bond_registration', label: 'Bond Registration', short: 'Bond Reg.' },
+  { id: 'compliance_certificate', label: 'Compliance Certificate', short: 'Compliance' },
+];
 
 const Step7Summary: React.FC<Step7Props> = ({
   transactionData,
@@ -47,6 +63,7 @@ const Step7Summary: React.FC<Step7Props> = ({
   mode = 'conveyancer',
   clientToken,
   onClientSubmitComplete,
+  onComplete,
 }) => {
   const [copied, setCopied] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
@@ -95,6 +112,188 @@ const Step7Summary: React.FC<Step7Props> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // AI Document Generation state
+  const [selectedDocType, setSelectedDocType] = useState<DocumentType>('deed_of_sale');
+  const [isGeneratingDoc, setIsGeneratingDoc] = useState(false);
+  const [generatedDocuments, setGeneratedDocuments] = useState<Record<string, string>>({});
+  const [activeDocument, setActiveDocument] = useState<string | null>(null);
+  const [streamingContent, setStreamingContent] = useState('');
+  const [showDocViewer, setShowDocViewer] = useState(false);
+  const [docError, setDocError] = useState<string | null>(null);
+
+  const generateDocument = useCallback(async (docType: DocumentType) => {
+    setIsGeneratingDoc(true);
+    setDocError(null);
+    setStreamingContent('');
+    setActiveDocument(null);
+    setShowDocViewer(true);
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      // Map wizard fields to the format the edge function expects
+      const clientName = transactionData.hasAgent ? transactionData.agentName
+        : transactionData.entityType === 'company' ? transactionData.companyName
+        : transactionData.entityType === 'trust' ? transactionData.trustName
+        : transactionData.entityType === 'estate' ? transactionData.deceasedName
+        : transactionData.entityType === 'society' ? transactionData.societyName
+        : 'Not specified';
+
+      const buyerDetails = {
+        clientName,
+        entityType: transactionData.entityType || 'Individual',
+        gender: transactionData.gender || 'Not specified',
+        nationality: transactionData.nationality || 'Not specified',
+        maritalStatus: transactionData.maritalStatus || 'Not specified',
+        idNumber: transactionData.agentIdPassport || 'To be verified',
+        phone: transactionData.agentContact || 'On file',
+        email: transactionData.agentEmail || 'On file',
+        isFirstTimeBuyer: transactionData.isFirstTimeBuyer || false,
+        hasAgent: transactionData.hasAgent,
+        agentName: transactionData.agentName,
+        agentCompany: transactionData.agentCompany,
+        agentContact: transactionData.agentContact,
+        agentEmail: transactionData.agentEmail,
+        agentRegNumber: transactionData.agentRegNumber,
+        commissionType: transactionData.commissionType,
+        commissionValue: transactionData.commissionValue,
+        sellingPrice: transactionData.sellingPrice,
+        valuationAmount: transactionData.valuationAmount,
+        uploadedDocuments: transactionData.uploadedDocuments,
+        hasBond: transactionData.hasBond,
+        // Company details
+        companyName: transactionData.companyName,
+        registrationNumber: transactionData.registrationNumber,
+        // Trust details
+        trustName: transactionData.trustName,
+        trustNumber: transactionData.trustNumber,
+      };
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/generate-conveyancing-document`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: transactionReferenceId,
+          documentType: docType,
+          propertyPrice: transactionData.sellingPrice ? `P ${parseInt(transactionData.sellingPrice).toLocaleString()}` : 'Not specified',
+          buyerDetails,
+          sellerDetails: null,
+          buyerName: clientName,
+          sellerName: 'Not specified',
+          documentPaths: (transactionData.documentFilePaths || []).map(fp => ({ path: fp.path, bucket: fp.bucket })),
+          documentImages: (transactionData.documentDataUrls || []).map(d => ({ dataUrl: d.dataUrl, name: d.name, docType: d.docType })),
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || errorData.error || `API request failed: ${response.status}`);
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+
+      if (contentType.includes('text/event-stream') && response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6).trim();
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              // Chat Completions streaming format
+              const delta = parsed.choices?.[0]?.delta?.content || '';
+              if (typeof delta === 'string' && delta) {
+                fullText += delta;
+                setStreamingContent(fullText);
+              }
+            } catch {
+              // Skip non-JSON lines
+            }
+          }
+        }
+
+        setActiveDocument(fullText);
+        setStreamingContent(fullText);
+        setGeneratedDocuments(prev => ({ ...prev, [docType]: fullText }));
+      } else {
+        const data = await response.json();
+        const text = data.document || '';
+        setActiveDocument(text);
+        setStreamingContent(text);
+        setGeneratedDocuments(prev => ({ ...prev, [docType]: text }));
+      }
+    } catch (error) {
+      console.error('Error generating document:', error);
+      setDocError(error instanceof Error ? error.message : 'Failed to generate document.');
+      setShowDocViewer(false);
+    } finally {
+      setIsGeneratingDoc(false);
+    }
+  }, [transactionData, transactionReferenceId]);
+
+  const handleDocDownload = async () => {
+    const content = activeDocument || generatedDocuments[selectedDocType];
+    if (!content) return;
+    let blob: Blob;
+    try {
+      if (selectedDocType === 'deed_of_sale') {
+        blob = await pdf(
+          <DeedOfSalePDF
+            transactionId={transactionReferenceId}
+            buyerName={transactionData.hasAgent ? transactionData.agentName : 'Buyer'}
+            sellerName="Seller"
+            propertyPrice={transactionData.sellingPrice || '0'}
+            generatedContent={content}
+          />
+        ).toBlob();
+      } else {
+        // For other document types, use plain text PDF layout
+        blob = await pdf(
+          <DeedOfSalePDF
+            transactionId={transactionReferenceId}
+            buyerName={transactionData.hasAgent ? transactionData.agentName : 'Buyer'}
+            sellerName="Seller"
+            propertyPrice={transactionData.sellingPrice || '0'}
+            generatedContent={content}
+            documentTitle={DOC_TYPES.find(d => d.id === selectedDocType)?.label}
+          />
+        ).toBlob();
+      }
+    } catch {
+      blob = new Blob([content], { type: 'text/plain' });
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedDocType}-${transactionReferenceId}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDocPrint = () => {
+    const content = activeDocument || generatedDocuments[selectedDocType];
+    if (!content) return;
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`<html><head><title>${DOC_TYPES.find(d => d.id === selectedDocType)?.label} - ${transactionReferenceId}</title><style>body{font-family:Arial,sans-serif;line-height:1.6;margin:40px}h1,h2,h3{color:#333}.content{white-space:pre-wrap}</style></head><body><div class="content">${content.replace(/\n/g, '<br>')}</div></body></html>`);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
 
   const handleSubmitTransaction = async () => {
     if (mode === 'client' && clientToken) {
@@ -208,6 +407,14 @@ const Step7Summary: React.FC<Step7Props> = ({
                   ? 'Your information has been submitted to the conveyancer. They will review your details and contact you if anything else is needed.'
                   : 'Your property transaction has been submitted and is now visible in the conveyancer\'s live dashboard.'}
               </p>
+              {mode === 'conveyancer' && onComplete && (
+                <button
+                  onClick={onComplete}
+                  className="mt-3 px-4 py-2 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-lg hover:bg-green-50 transition-colors"
+                >
+                  Back to Dashboard
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -487,6 +694,132 @@ const Step7Summary: React.FC<Step7Props> = ({
         </div>
       </div>}
 
+      {/* AI Document Generation — conveyancer mode */}
+      {mode === 'conveyancer' && (
+        <div className="bg-white rounded-2xl shadow-xl border mb-6 md:mb-8 overflow-hidden">
+          <div className="px-4 py-4 md:px-6 md:py-5 bg-gradient-to-r from-purple-600 to-indigo-600">
+            <div className="flex items-center">
+              <Sparkles className="h-5 w-5 md:h-6 md:w-6 text-white mr-2 md:mr-3" />
+              <div>
+                <h3 className="text-base md:text-lg font-bold text-white">AI Document Generation</h3>
+                <p className="text-xs md:text-sm text-purple-100 mt-0.5">Generate legal documents from the transaction details entered so far</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-4 py-4 md:px-6 md:py-5">
+            {/* Document type pills */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {DOC_TYPES.map((doc) => (
+                <button
+                  key={doc.id}
+                  onClick={() => {
+                    setSelectedDocType(doc.id);
+                    if (generatedDocuments[doc.id]) {
+                      setActiveDocument(generatedDocuments[doc.id]);
+                      setStreamingContent(generatedDocuments[doc.id]);
+                    } else {
+                      setActiveDocument(null);
+                      setStreamingContent('');
+                    }
+                  }}
+                  className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    selectedDocType === doc.id
+                      ? 'bg-purple-100 text-purple-800 border-2 border-purple-400'
+                      : 'bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200'
+                  }`}
+                >
+                  {doc.short}
+                  {generatedDocuments[doc.id] && (
+                    <CheckCircle className="h-3 w-3 text-emerald-500 ml-1" />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Generate / Status area */}
+            {!generatedDocuments[selectedDocType] ? (
+              <div className="text-center py-6 bg-gradient-to-br from-purple-50 via-white to-indigo-50 rounded-xl border border-purple-100">
+                <Sparkles className="h-8 w-8 text-purple-500 mx-auto mb-3" />
+                <p className="text-sm text-gray-600 mb-4 max-w-md mx-auto">
+                  Generate a {DOC_TYPES.find(d => d.id === selectedDocType)?.label} using the transaction information entered. Missing details will be marked for completion.
+                </p>
+                <button
+                  onClick={() => generateDocument(selectedDocType)}
+                  disabled={isGeneratingDoc}
+                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md text-sm font-medium inline-flex items-center disabled:opacity-50"
+                >
+                  {isGeneratingDoc ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating...</>
+                  ) : (
+                    <><Sparkles className="h-4 w-4 mr-2" />Generate with AI</>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <CheckCircle className="h-5 w-5 text-emerald-600 mr-2" />
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-900">
+                        {DOC_TYPES.find(d => d.id === selectedDocType)?.label} Generated
+                      </p>
+                      <p className="text-xs text-emerald-700">
+                        {generatedDocuments[selectedDocType].split(/\s+/).filter(Boolean).length.toLocaleString()} words
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => generateDocument(selectedDocType)}
+                      disabled={isGeneratingDoc}
+                      className="px-2.5 py-1.5 text-xs bg-white border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 disabled:opacity-50"
+                    >
+                      Regenerate
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveDocument(generatedDocuments[selectedDocType]);
+                        setStreamingContent(generatedDocuments[selectedDocType]);
+                        setShowDocViewer(true);
+                      }}
+                      className="px-2.5 py-1.5 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 inline-flex items-center"
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1" />View
+                    </button>
+                    <button
+                      onClick={handleDocPrint}
+                      className="px-2.5 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 inline-flex items-center"
+                    >
+                      <Printer className="h-3.5 w-3.5 mr-1" />Print
+                    </button>
+                    <button
+                      onClick={handleDocDownload}
+                      className="px-2.5 py-1.5 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 inline-flex items-center"
+                    >
+                      <Download className="h-3.5 w-3.5 mr-1" />PDF
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {docError && (
+              <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between">
+                <p className="text-sm text-red-700">{docError}</p>
+                <button
+                  onClick={() => { setDocError(null); generateDocument(selectedDocType); }}
+                  className="px-3 py-1 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {!isSubmitted && (
         <div className="mb-6">
           <button
@@ -586,6 +919,19 @@ const Step7Summary: React.FC<Step7Props> = ({
         </div>
       </div>
       
+      {/* Document Stream Viewer */}
+      <DocumentStreamViewer
+        isOpen={showDocViewer}
+        isStreaming={isGeneratingDoc}
+        content={streamingContent || activeDocument || ''}
+        onClose={() => setShowDocViewer(false)}
+        onDownload={handleDocDownload}
+        onPrint={handleDocPrint}
+        caseNumber={transactionReferenceId}
+        buyerName={transactionData.hasAgent ? transactionData.agentName : 'Buyer'}
+        sellerName="Seller"
+      />
+
       {/* Role-Based View Modal */}
       {showRoleModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-10 px-4">

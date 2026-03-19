@@ -33,13 +33,15 @@ interface ConveyancerOverviewProps {
   onLogout: () => void;
   onViewTransaction: (transactionId: string, transactionData: any) => void;
   onBack: () => void;
+  onStartNewTransaction?: (caseId?: string) => void;
 }
 
 const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
   user,
   onLogout,
   onViewTransaction,
-  onBack
+  onBack,
+  onStartNewTransaction
 }) => {
   const { organization: authOrg } = useAuth();
   const orgId = authOrg?.id || user.organization_id;
@@ -331,9 +333,12 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
       <NewCaseModal
         isOpen={showNewCase}
         onClose={() => setShowNewCase(false)}
-        onCaseCreated={(caseId) => {
+        onCaseCreated={(caseId, transactionData) => {
           setShowNewCase(false);
           refetchCases();
+          if (transactionData && onStartNewTransaction) {
+            onStartNewTransaction(caseId);
+          }
         }}
       />
     </div>

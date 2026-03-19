@@ -1,5 +1,5 @@
-import React, { useState, createContext, useContext } from 'react';
-import { LogIn, LogOut } from 'lucide-react';
+import React, { useState, createContext, useContext, useRef, useEffect } from 'react';
+import { LogIn, LogOut, ChevronDown, User, LayoutDashboard, Settings } from 'lucide-react';
 import TransactionWizard from './components/TransactionWizard';
 import WelcomePage from './components/WelcomePage';
 import ConveyancerDashboard from './components/ConveyancerDashboard';
@@ -76,6 +76,7 @@ function App() {
   const [conveyancerData, setConveyancerData] = useState<any>(null);
   const [showPortalLogin, setShowPortalLogin] = useState(false);
   const [showConveyancerOverview, setShowConveyancerOverview] = useState(false);
+  const [showConveyancerWizard, setShowConveyancerWizard] = useState(false);
   const [transactions, setTransactions] = useState<TransactionData[]>([]);
   const [currentTransactionId, setCurrentTransactionId] = useState<string | null>(null);
   const [sharedTransactionData, setSharedTransactionData] = useState({
@@ -90,6 +91,8 @@ function App() {
   });
   const [clientShareToken, setClientShareToken] = useState<string | null>(null);
   const [clientShareRole, setClientShareRole] = useState<'buyer' | 'seller' | null>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const isPortalLoggedIn = !!session && !!orgUser;
 
@@ -211,6 +214,19 @@ function App() {
     setShowConveyancerOverview(false);
   };
 
+  const handleStartNewTransaction = (caseId?: string) => {
+    if (caseId) {
+      // Use the Supabase case ID so the wizard updates the existing case
+      setCurrentTransactionId(caseId);
+      setStarted(true);
+    } else {
+      handleStartTransaction();
+    }
+    setShowConveyancerWizard(true);
+    setShowConveyancerOverview(false);
+    setShowConveyancerDashboard(false);
+  };
+
   const handlePortalLogout = async () => {
     await authSignOut();
     setShowConveyancerOverview(false);
@@ -262,6 +278,17 @@ function App() {
       handleSharedLink(transactionId, transactionType, parsedData);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+  }, []);
+
+  // Close user menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Auto-redirect to conveyancer overview on login
@@ -319,6 +346,24 @@ function App() {
     }
 
     if (organization.type === 'conveyancer') {
+      if (showConveyancerWizard && started) {
+        return (
+          <TransactionContext.Provider value={transactionContextValue}>
+            <TransactionWizard
+              transactionId={currentTransactionId}
+              initialCaseId={currentTransactionId}
+              onSharedLink={handleSharedLink}
+              sharedTransactionData={sharedTransactionData}
+              mode="conveyancer"
+              onComplete={() => {
+                setShowConveyancerWizard(false);
+                setStarted(false);
+              }}
+            />
+          </TransactionContext.Provider>
+        );
+      }
+
       if (showConveyancerDashboard && conveyancerData) {
         return (
           <TransactionContext.Provider value={transactionContextValue}>
@@ -344,6 +389,7 @@ function App() {
             onLogout={handlePortalLogout}
             onViewTransaction={handleConveyancerDashboard}
             onBack={() => setShowConveyancerOverview(false)}
+            onStartNewTransaction={handleStartNewTransaction}
           />
         </TransactionContext.Provider>
       );
@@ -376,7 +422,11 @@ function App() {
         <header className="bg-white shadow-soft">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-4 md:py-5">
-              <div className="flex items-center">
+              {/* Brand */}
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                  <span className="text-secondary font-serif font-bold text-sm">M</span>
+                </div>
                 <span className="text-lg md:text-xl font-serif font-semibold text-primary tracking-tight">
                   Minchin & Kelly<span className="text-secondary">.</span>
                 </span>
@@ -392,33 +442,77 @@ function App() {
                 )}
               </div>
 
+              {/* Right side */}
               <div className="flex items-center space-x-3">
                 {isPortalLoggedIn && orgUser && organization ? (
-                  <div className="flex items-center space-x-3">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-sm font-medium text-gray-900">{orgUser.first_name} {orgUser.last_name}</p>
-                      <p className="text-xs text-gray-500">{organization.name}</p>
-                      <p className="text-xs text-blue-600 capitalize">
-                        {organization.type.replace('_', ' ')} - {orgUser.role.replace('_', ' ')}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {organization.type === 'conveyancer' && (
-                        <button
-                          onClick={() => setShowConveyancerOverview(true)}
-                          className="px-3 py-2 text-sm font-medium text-primary bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                        >
-                          Dashboard
-                        </button>
-                      )}
-                      <button
-                        onClick={handlePortalLogout}
-                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Logout"
-                      >
-                        <LogOut className="h-4 w-4" />
-                      </button>
-                    </div>
+                  <div className="relative" ref={userMenuRef}>
+                    <button
+                      onClick={() => setUserMenuOpen(prev => !prev)}
+                      className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors group"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                        <span className="text-secondary font-semibold text-sm">
+                          {orgUser.first_name?.[0]?.toUpperCase() || 'U'}
+                        </span>
+                      </div>
+                      <div className="text-left hidden sm:block">
+                        <p className="text-sm font-medium text-gray-900 leading-tight">
+                          {orgUser.first_name} {orgUser.last_name}
+                        </p>
+                        <p className="text-xs text-gray-500 leading-tight capitalize">
+                          {organization.type.replace(/_/g, ' ')}
+                        </p>
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {userMenuOpen && (
+                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-border overflow-hidden z-50 animate-fade-in">
+                        {/* User info header */}
+                        <div className="px-4 py-3 bg-primary/5 border-b border-border">
+                          <p className="text-sm font-semibold text-primary">{orgUser.first_name} {orgUser.last_name}</p>
+                          <p className="text-xs text-gray-500">{organization.name}</p>
+                          <span className="inline-block mt-1 px-2 py-0.5 bg-secondary/15 text-secondary text-xs rounded-full font-medium capitalize">
+                            {orgUser.role.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+
+                        {/* Menu items */}
+                        <div className="py-1">
+                          {organization.type === 'conveyancer' && (
+                            <button
+                              onClick={() => { setShowConveyancerOverview(true); setUserMenuOpen(false); }}
+                              className="w-full flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors"
+                            >
+                              <LayoutDashboard className="h-4 w-4 mr-3 text-secondary" />
+                              Dashboard
+                            </button>
+                          )}
+                          <button
+                            className="w-full flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors"
+                          >
+                            <User className="h-4 w-4 mr-3 text-secondary" />
+                            My Profile
+                          </button>
+                          <button
+                            className="w-full flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors"
+                          >
+                            <Settings className="h-4 w-4 mr-3 text-secondary" />
+                            Settings
+                          </button>
+                        </div>
+
+                        <div className="border-t border-border py-1">
+                          <button
+                            onClick={() => { handlePortalLogout(); setUserMenuOpen(false); }}
+                            className="w-full flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <LogOut className="h-4 w-4 mr-3" />
+                            Sign Out
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <button
@@ -426,8 +520,7 @@ function App() {
                     className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     <LogIn className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Portal Login</span>
-                    <span className="sm:hidden">Login</span>
+                    Sign In
                   </button>
                 )}
               </div>
@@ -471,6 +564,7 @@ function App() {
             </div>
           </div>
         </footer>
+
       </div>
     </TransactionContext.Provider>
   );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, LogIn, Eye, EyeOff, Shield, Lock, Mail, Users, Building, Briefcase, Play, UserPlus } from 'lucide-react';
+import { ArrowLeft, LogIn, Eye, EyeOff, Shield, Lock, Mail, Users, Building, Briefcase, UserPlus } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 interface ConveyancerLoginProps {
@@ -18,7 +18,6 @@ const ConveyancerLogin: React.FC<ConveyancerLoginProps> = ({ onBack }) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [isDemoMode, setIsDemoMode] = useState(false);
   const [detectedType, setDetectedType] = useState<string | null>(null);
   const [signUpSuccess, setSignUpSuccess] = useState(false);
 
@@ -33,15 +32,6 @@ const ConveyancerLogin: React.FC<ConveyancerLoginProps> = ({ onBack }) => {
     { value: '', label: 'Select Login Role', disabled: true },
     { value: 'super_admin', label: 'Super User (Admin)', description: 'Full organization access' },
     { value: 'user', label: 'Team Member (Staff)', description: 'Limited to assigned tasks' }
-  ];
-
-  const demoCredentials = [
-    { orgType: 'conveyancer', role: 'super_admin', email: 'admin@orionxlegal.co.bw', name: 'Conveyancer Admin' },
-    { orgType: 'conveyancer', role: 'user', email: 'lawyer@orionxlegal.co.bw', name: 'Conveyancer Staff' },
-    { orgType: 'estate_agent', role: 'super_admin', email: 'admin@premiumproperties.co.bw', name: 'Estate Agent Admin' },
-    { orgType: 'estate_agent', role: 'user', email: 'agent@premiumproperties.co.bw', name: 'Estate Agent Staff' },
-    { orgType: 'financial_institution', role: 'super_admin', email: 'admin@capitalbank.co.bw', name: 'Bank Admin' },
-    { orgType: 'financial_institution', role: 'user', email: 'officer@capitalbank.co.bw', name: 'Loan Officer' }
   ];
 
   const detectUserTypeFromEmail = (emailVal: string) => {
@@ -59,14 +49,14 @@ const ConveyancerLogin: React.FC<ConveyancerLoginProps> = ({ onBack }) => {
   };
 
   useEffect(() => {
-    if (email && !isDemoMode) {
+    if (email) {
       const detected = detectUserTypeFromEmail(email);
       setDetectedType(detected);
       if (detected && !organizationType) setOrganizationType(detected);
     } else {
       setDetectedType(null);
     }
-  }, [email, organizationType, isDemoMode]);
+  }, [email, organizationType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,48 +74,18 @@ const ConveyancerLogin: React.FC<ConveyancerLoginProps> = ({ onBack }) => {
 
     try {
       if (isSignUp) {
-        await signUp(email, password, firstName, lastName);
+        await signUp(email, password, { first_name: firstName, last_name: lastName });
         setSignUpSuccess(true);
       } else {
         await signIn(email, password);
-        // Auth state change in AuthContext will trigger redirect in App.tsx
       }
     } catch {
       // Error is set via authError from context
     }
   };
 
-  const handleDemoMode = () => {
-    setIsDemoMode(true);
-    const firstDemo = demoCredentials[0];
-    setOrganizationType(firstDemo.orgType);
-    setLoginRole(firstDemo.role);
-    setEmail(firstDemo.email);
-    setPassword('demo123');
-  };
-
-  const handleDemoCredentialSelect = (credential: typeof demoCredentials[0]) => {
-    setOrganizationType(credential.orgType);
-    setLoginRole(credential.role);
-    setEmail(credential.email);
-    setPassword('demo123');
-  };
-
-  const exitDemoMode = () => {
-    setIsDemoMode(false);
-    setEmail('');
-    setPassword('');
-    setOrganizationType('');
-    setLoginRole('');
-  };
-
-  const getSelectedOrgTypeInfo = () => {
-    const selected = organizationTypes.find(type => type.value === organizationType);
-    if (!selected || !selected.value) return null;
-    return { label: selected.label, icon: selected.icon };
-  };
-
-  const selectedOrgInfo = getSelectedOrgTypeInfo();
+  const selectedOrgType = organizationTypes.find(t => t.value === organizationType && t.value !== '');
+  const SelectedIcon = selectedOrgType?.icon;
   const displayError = localError || authError;
 
   if (signUpSuccess) {
@@ -167,8 +127,8 @@ const ConveyancerLogin: React.FC<ConveyancerLoginProps> = ({ onBack }) => {
               Minchin & Kelly<span className="text-secondary">.</span>
             </p>
             <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4 ring-2 ring-secondary/20">
-              {selectedOrgInfo ? (
-                <selectedOrgInfo.icon className="h-8 w-8 text-white" />
+              {SelectedIcon ? (
+                <SelectedIcon className="h-8 w-8 text-white" />
               ) : (
                 <Users className="h-8 w-8 text-white" />
               )}
@@ -178,8 +138,8 @@ const ConveyancerLogin: React.FC<ConveyancerLoginProps> = ({ onBack }) => {
             </h1>
             <p className="text-gray-500 text-sm">
               {isSignUp ? 'Get started with Minchin & Kelly' : (
-                selectedOrgInfo
-                  ? `Access your ${selectedOrgInfo.label.toLowerCase()} dashboard`
+                selectedOrgType
+                  ? `Access your ${selectedOrgType.label.toLowerCase()} dashboard`
                   : 'Access your professional dashboard'
               )}
             </p>
@@ -201,53 +161,13 @@ const ConveyancerLogin: React.FC<ConveyancerLoginProps> = ({ onBack }) => {
             </button>
           </div>
 
-          {/* Demo Mode Toggle */}
-          {!isSignUp && !isDemoMode && (
-            <div className="mb-6 text-center">
-              <button
-                onClick={handleDemoMode}
-                className="inline-flex items-center px-4 py-2 bg-secondary/10 text-primary rounded-lg hover:bg-secondary/20 transition-colors text-sm font-medium"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                Try Demo Mode
-              </button>
-            </div>
-          )}
-
-          {!isSignUp && isDemoMode && (
-            <div className="mb-6 p-4 bg-secondary/5 border border-secondary/30 rounded-lg">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-medium text-primary">Demo Mode Active</h3>
-                <button onClick={exitDemoMode} className="text-xs text-secondary hover:text-secondary-dark underline">
-                  Exit Demo
-                </button>
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                {demoCredentials.map((cred, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleDemoCredentialSelect(cred)}
-                    className={`text-left p-2 text-xs rounded border ${
-                      email === cred.email
-                        ? 'bg-secondary/15 border-secondary/40 text-primary'
-                        : 'bg-white border-secondary/20 text-gray-700 hover:bg-secondary/5'
-                    }`}
-                  >
-                    <div className="font-medium">{cred.name}</div>
-                    <div className="text-gray-500">{cred.email}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {displayError && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-600">{displayError}</p>
             </div>
           )}
 
-          {detectedType && detectedType === organizationType && !isDemoMode && !isSignUp && (
+          {detectedType && detectedType === organizationType && !isSignUp && (
             <div className="mb-6 p-3 bg-secondary/10 border border-secondary/30 rounded-lg">
               <p className="text-sm text-primary">
                 Auto-detected: {organizationTypes.find(t => t.value === detectedType)?.label}

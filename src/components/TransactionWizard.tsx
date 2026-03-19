@@ -29,24 +29,28 @@ interface SharedTransactionData {
 
 interface TransactionWizardProps {
   transactionId: string | null;
+  initialCaseId?: string | null;
   onSharedLink?: (transactionId: string, transactionType: string, sharedPricing?: any) => void;
   sharedTransactionData?: SharedTransactionData;
   mode?: 'conveyancer' | 'client';
   clientToken?: string;
   onClientSubmitComplete?: () => void;
+  onComplete?: () => void;
 }
 
 const TransactionWizard: React.FC<TransactionWizardProps> = ({
   transactionId,
+  initialCaseId,
   onSharedLink,
   sharedTransactionData,
   mode = 'conveyancer',
   clientToken,
   onClientSubmitComplete,
+  onComplete,
 }) => {
   const { updateTransactionProgress, updateTransaction, markTransactionComplete } = useTransactions();
   const { orgUser, organization } = useAuth();
-  const supabaseCaseId = useRef<string | null>(null);
+  const supabaseCaseId = useRef<string | null>(initialCaseId || null);
   const [currentStep, setCurrentStep] = useState(1);
   const [transactionData, setTransactionData] = useState({
     transactionType: '',
@@ -72,22 +76,24 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     gender: '',
     nationality: '',
     maritalStatus: '',
-    requiredDocuments: [],
-    uploadedDocuments: [],
-    otherPartyDocuments: [], // Track other party's documents
+    requiredDocuments: [] as string[],
+    uploadedDocuments: [] as string[],
+    documentFilePaths: [] as { path: string; bucket: string; name: string; type: string }[],
+    documentDataUrls: [] as { dataUrl: string; name: string; docType: string }[],
+    otherPartyDocuments: [] as string[], // Track other party's documents
     isFirstTimeBuyer: false,  // Added for first time buyer status
     // Company specific fields
     companyName: '',
     registrationNumber: '',
     vatNumber: '',
     incorporationDate: '',
-    companyDirectors: [],
+    companyDirectors: [] as { id: string; name: string; idNumber: string; position: string }[],
     // Trust specific fields
     trustName: '',
     trustNumber: '',
     trustDate: '',
-    trustees: [],
-    beneficiaries: [],
+    trustees: [] as { id: string; name: string; idNumber: string; contact?: string }[],
+    beneficiaries: [] as { id: string; name: string; idNumber: string; contact?: string }[],
     // Estate specific fields
     deceasedName: '',
     dateOfDeath: '',
@@ -98,7 +104,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     societyName: '',
     societyRegNumber: '',
     societyFormationDate: '',
-    committeeMembers: [],
+    committeeMembers: [] as { id: string; name: string; idNumber: string; position: string }[],
     societyAddress: '',
     societyContact: '',
     // Shared transaction fields
@@ -132,6 +138,13 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   }, [sharedTransactionData]);
 
   const updateTransactionData = (data: Partial<typeof transactionData>) => {
+    // Append documentFilePaths and documentDataUrls rather than replacing
+    if (data.documentFilePaths && data.documentFilePaths.length > 0) {
+      data = { ...data, documentFilePaths: [...transactionData.documentFilePaths, ...data.documentFilePaths] };
+    }
+    if (data.documentDataUrls && data.documentDataUrls.length > 0) {
+      data = { ...data, documentDataUrls: [...transactionData.documentDataUrls, ...data.documentDataUrls] };
+    }
     const merged = { ...transactionData, ...data };
     setTransactionData(prev => ({ ...prev, ...data }));
 
@@ -532,6 +545,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             mode={mode}
             clientToken={clientToken}
             onClientSubmitComplete={onClientSubmitComplete}
+            onComplete={onComplete}
           />
         );
       case 8: // Company Details

@@ -9,12 +9,14 @@ interface Step2Props {
   documentValid: boolean;
   skippedDeedUpload: boolean;
   transactionType: string;
-  onUpdate: (data: { 
-    documentUploaded: boolean; 
-    documentValid: boolean; 
-    hasBond?: boolean; 
+  onUpdate: (data: {
+    documentUploaded: boolean;
+    documentValid: boolean;
+    hasBond?: boolean;
     bondDocument?: string;
     skippedDeedUpload: boolean;
+    documentFilePaths?: { path: string; bucket: string; name: string; type: string }[];
+    documentDataUrls?: { dataUrl: string; name: string; docType: string }[];
   }) => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -44,6 +46,16 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
   // Check if the user is selling to determine if deed upload is mandatory
   const isSelling = transactionType === 'selling';
 
+  // Convert a File to a base64 data URL for direct AI vision processing
+  const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
 
@@ -54,6 +66,17 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
       try {
         // Auto-convert images to PDF
         const pdfFile = await convertToPdf(file);
+        const filePaths: { path: string; bucket: string; name: string; type: string }[] = [];
+        const dataUrls: { dataUrl: string; name: string; docType: string }[] = [];
+
+        // Capture original file as base64 for direct AI vision processing
+        const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+        if (isImage) {
+          try {
+            const dataUrl = await fileToDataUrl(file);
+            dataUrls.push({ dataUrl, name: file.name, docType: 'title-deed' });
+          } catch { /* ignore base64 conversion errors */ }
+        }
 
         // Upload to Supabase Storage
         let uploadPath = '';
@@ -62,6 +85,14 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
           const caseId = 'deeds';
           const result = await storageService.uploadFile(pdfFile, orgId, caseId, 'title-deed', 'deeds');
           uploadPath = result.path;
+          filePaths.push({ path: result.path, bucket: 'deeds', name: file.name, type: 'title-deed' });
+
+          // Also upload original file if it's an image (for AI vision processing)
+          const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+          if (isImage) {
+            const origResult = await storageService.uploadFile(file, orgId, caseId, 'title-deed-original', 'deeds');
+            filePaths.push({ path: origResult.path, bucket: 'deeds', name: file.name, type: 'title-deed-original' });
+          }
         } catch {
           // Storage upload may fail for unauthenticated users — continue with AI analysis
         }
@@ -84,7 +115,9 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
             onUpdate({
               documentUploaded: true,
               documentValid: true,
-              skippedDeedUpload: false
+              skippedDeedUpload: false,
+              documentFilePaths: filePaths,
+              documentDataUrls: dataUrls,
             });
             setErrorMessage('');
             setLandType(result.landType || 'Unknown');
@@ -96,7 +129,9 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
             onUpdate({
               documentUploaded: true,
               documentValid: false,
-              skippedDeedUpload: false
+              skippedDeedUpload: false,
+              documentFilePaths: filePaths,
+              documentDataUrls: dataUrls,
             });
             setErrorMessage(result.errors?.[0] || 'Document could not be validated. Please upload a clearer scan.');
           }
@@ -105,7 +140,9 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
           onUpdate({
             documentUploaded: true,
             documentValid: true,
-            skippedDeedUpload: false
+            skippedDeedUpload: false,
+            documentFilePaths: filePaths,
+            documentDataUrls: dataUrls,
           });
           setLandType('Pending AI Analysis');
           setAnalysisUnavailable(true);
@@ -150,9 +187,26 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
     if (file) {
       // Auto-convert images to PDF
       const pdfFile = await convertToPdf(file);
+      const bondPaths: { path: string; bucket: string; name: string; type: string }[] = [];
+      const bondDataUrls: { dataUrl: string; name: string; docType: string }[] = [];
+
+      // Capture original as base64 if image
+      const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+      if (isImage) {
+        try {
+          const dataUrl = await fileToDataUrl(file);
+          bondDataUrls.push({ dataUrl, name: file.name, docType: 'bond-document' });
+        } catch { /* ignore */ }
+      }
+
       // Upload bond document to Supabase Storage
       try {
-        await storageService.uploadFile(pdfFile, 'public', 'deeds', 'bond-cancellation', 'documents');
+        const result = await storageService.uploadFile(pdfFile, 'public', 'deeds', 'bond-cancellation', 'documents');
+        bondPaths.push({ path: result.path, bucket: 'documents', name: file.name, type: 'bond-document' });
+        if (isImage) {
+          const origResult = await storageService.uploadFile(file, 'public', 'deeds', 'bond-cancellation-original', 'documents');
+          bondPaths.push({ path: origResult.path, bucket: 'documents', name: file.name, type: 'bond-document-original' });
+        }
       } catch {
         // Storage may not be available for unauthenticated users
       }
@@ -162,7 +216,9 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
         documentValid: true,
         hasBond: true,
         bondDocument: file.name,
-        skippedDeedUpload: false
+        skippedDeedUpload: false,
+        documentFilePaths: bondPaths,
+        documentDataUrls: bondDataUrls,
       });
       setShowBondPrompt(false);
     }
