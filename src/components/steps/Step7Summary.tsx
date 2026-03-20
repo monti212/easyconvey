@@ -1,11 +1,12 @@
-import React, { useState, useCallback } from 'react';
-import { ArrowLeft, CheckCircle, Clipboard, Download, FileText, Users, Clock, Banknote, UserCircle, Building, Lock, Shield, ExternalLink, Share2, Loader2, Sparkles, Eye, Printer } from 'lucide-react';
+import React, { useState, useCallback, useRef } from 'react';
+import { ArrowLeft, CheckCircle, Clipboard, Download, FileText, Users, Clock, Banknote, UserCircle, Building, Lock, Shield, ExternalLink, Share2, Loader2, Sparkles, Eye, Printer, StopCircle, PlayCircle, FolderDown, Send, Building2 } from 'lucide-react';
 import { useTransactions } from '../../App';
 import { pdf } from '@react-pdf/renderer';
 import TransactionSummaryPDF from '../../lib/pdf/transactionSummary';
 import DeedOfSalePDF from '../../lib/pdf/deedOfSale';
 import DocumentStreamViewer from '../DocumentStreamViewer';
 import * as casesService from '../../services/cases.service';
+import JSZip from 'jszip';
 
 interface Step7Props {
   transactionData: {
@@ -43,14 +44,21 @@ interface Step7Props {
   clientToken?: string;
   onClientSubmitComplete?: () => void;
   onComplete?: () => void;
+  firmName?: string;
+  lawyerName?: string;
+  lawFirms?: { id: string; name: string }[];
+  onSendToLawFirm?: (firmId: string, firmName: string) => void;
 }
 
-type DocumentType = 'deed_of_sale' | 'transfer_duty' | 'power_of_attorney' | 'affidavit' | 'bond_registration' | 'compliance_certificate';
+type DocumentType = 'deed_of_sale' | 'deed_of_transfer' | 'transfer_duty' | 'power_of_attorney' | 'declaration_of_purchase' | 'affidavit' | 'bond_registration' | 'compliance_certificate' | 'missing_information';
 
 const DOC_TYPES: { id: DocumentType; label: string; short: string }[] = [
+  { id: 'missing_information', label: 'Missing Information Checklist', short: 'Readiness Check' },
   { id: 'deed_of_sale', label: 'Deed of Sale & Transfer', short: 'Deed of Sale' },
+  { id: 'deed_of_transfer', label: 'Deed of Transfer (Registry)', short: 'Deed of Transfer' },
   { id: 'transfer_duty', label: 'Transfer Duty Declaration', short: 'Transfer Duty' },
-  { id: 'power_of_attorney', label: 'Power of Attorney', short: 'Power of Attorney' },
+  { id: 'power_of_attorney', label: 'Power of Attorney to Transfer', short: 'POA & Seller Dec.' },
+  { id: 'declaration_of_purchase', label: 'Declaration of Purchaser', short: 'Purchaser Dec.' },
   { id: 'affidavit', label: 'Affidavit', short: 'Affidavit' },
   { id: 'bond_registration', label: 'Bond Registration', short: 'Bond Reg.' },
   { id: 'compliance_certificate', label: 'Compliance Certificate', short: 'Compliance' },
@@ -64,12 +72,18 @@ const Step7Summary: React.FC<Step7Props> = ({
   clientToken,
   onClientSubmitComplete,
   onComplete,
+  firmName = 'Minchin & Kelly',
+  lawyerName = 'Conveyancer',
+  lawFirms,
+  onSendToLawFirm,
 }) => {
   const [copied, setCopied] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [conveyancerLinkCopied, setConveyancerLinkCopied] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [selectedLawFirm, setSelectedLawFirm] = useState('');
+  const [lawFirmSent, setLawFirmSent] = useState(false);
   const { markTransactionComplete } = useTransactions();
 
   const formatPrice = (value: string) => {
@@ -122,8 +136,17 @@ const Step7Summary: React.FC<Step7Props> = ({
   const [showDocViewer, setShowDocViewer] = useState(false);
   const [docError, setDocError] = useState<string | null>(null);
 
-  const generateDocument = useCallback(async (docType: DocumentType) => {
+  // Sequential generation state
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [generationQueue, setGenerationQueue] = useState<DocumentType[]>([]);
+  const [currentQueueIndex, setCurrentQueueIndex] = useState(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const stopRequestedRef = useRef(false);
+  const [isDownloadingPack, setIsDownloadingPack] = useState(false);
+
+  const generateDocument = useCallback(async (docType: DocumentType, signal?: AbortSignal) => {
     setIsGeneratingDoc(true);
+    setSelectedDocType(docType);
     setDocError(null);
     setStreamingContent('');
     setActiveDocument(null);
@@ -131,12 +154,11 @@ const Step7Summary: React.FC<Step7Props> = ({
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      // Map wizard fields to the format the edge function expects
       const clientName = transactionData.hasAgent ? transactionData.agentName
-        : transactionData.entityType === 'company' ? transactionData.companyName
-        : transactionData.entityType === 'trust' ? transactionData.trustName
-        : transactionData.entityType === 'estate' ? transactionData.deceasedName
-        : transactionData.entityType === 'society' ? transactionData.societyName
+        : transactionData.entityType === 'company' ? (transactionData as any).companyName
+        : transactionData.entityType === 'trust' ? (transactionData as any).trustName
+        : transactionData.entityType === 'estate' ? (transactionData as any).deceasedName
+        : transactionData.entityType === 'society' ? (transactionData as any).societyName
         : 'Not specified';
 
       const buyerDetails = {
@@ -161,12 +183,10 @@ const Step7Summary: React.FC<Step7Props> = ({
         valuationAmount: transactionData.valuationAmount,
         uploadedDocuments: transactionData.uploadedDocuments,
         hasBond: transactionData.hasBond,
-        // Company details
-        companyName: transactionData.companyName,
-        registrationNumber: transactionData.registrationNumber,
-        // Trust details
-        trustName: transactionData.trustName,
-        trustNumber: transactionData.trustNumber,
+        companyName: (transactionData as any).companyName,
+        registrationNumber: (transactionData as any).registrationNumber,
+        trustName: (transactionData as any).trustName,
+        trustNumber: (transactionData as any).trustNumber,
       };
 
       const response = await fetch(`${supabaseUrl}/functions/v1/generate-conveyancing-document`, {
@@ -184,6 +204,7 @@ const Step7Summary: React.FC<Step7Props> = ({
           documentImages: (transactionData.documentDataUrls || []).map(d => ({ dataUrl: d.dataUrl, name: d.name, docType: d.docType })),
           stream: true,
         }),
+        signal,
       });
 
       if (!response.ok) {
@@ -199,36 +220,55 @@ const Step7Summary: React.FC<Step7Props> = ({
         let fullText = '';
         let buffer = '';
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        try {
+          while (true) {
+            if (signal?.aborted) {
+              await reader.cancel();
+              break;
+            }
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            const data = line.slice(6).trim();
-            if (data === '[DONE]') continue;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
 
-            try {
-              const parsed = JSON.parse(data);
-              // Chat Completions streaming format
-              const delta = parsed.choices?.[0]?.delta?.content || '';
-              if (typeof delta === 'string' && delta) {
-                fullText += delta;
-                setStreamingContent(fullText);
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              const data = line.slice(6).trim();
+              if (data === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                const delta = parsed.choices?.[0]?.delta?.content || '';
+                if (typeof delta === 'string' && delta) {
+                  fullText += delta;
+                  setStreamingContent(fullText);
+                }
+              } catch {
+                // Skip non-JSON lines
               }
-            } catch {
-              // Skip non-JSON lines
             }
           }
+        } catch (e) {
+          if (signal?.aborted) {
+            // Save whatever we got so far if aborted mid-stream
+            if (fullText) {
+              setActiveDocument(fullText);
+              setStreamingContent(fullText);
+              setGeneratedDocuments(prev => ({ ...prev, [docType]: fullText }));
+            }
+            throw new DOMException('Aborted', 'AbortError');
+          }
+          throw e;
         }
 
-        setActiveDocument(fullText);
-        setStreamingContent(fullText);
-        setGeneratedDocuments(prev => ({ ...prev, [docType]: fullText }));
+        if (!signal?.aborted) {
+          setActiveDocument(fullText);
+          setStreamingContent(fullText);
+          setGeneratedDocuments(prev => ({ ...prev, [docType]: fullText }));
+        }
       } else {
         const data = await response.json();
         const text = data.document || '';
@@ -237,6 +277,10 @@ const Step7Summary: React.FC<Step7Props> = ({
         setGeneratedDocuments(prev => ({ ...prev, [docType]: text }));
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        // Don't show error for user-initiated abort
+        return;
+      }
       console.error('Error generating document:', error);
       setDocError(error instanceof Error ? error.message : 'Failed to generate document.');
       setShowDocViewer(false);
@@ -245,34 +289,112 @@ const Step7Summary: React.FC<Step7Props> = ({
     }
   }, [transactionData, transactionReferenceId]);
 
+  // Generate all documents sequentially
+  const generateAllDocuments = useCallback(async () => {
+    const queue = DOC_TYPES.map(d => d.id);
+    setGenerationQueue(queue);
+    setCurrentQueueIndex(0);
+    setIsGeneratingAll(true);
+    stopRequestedRef.current = false;
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    for (let i = 0; i < queue.length; i++) {
+      if (stopRequestedRef.current || controller.signal.aborted) break;
+
+      setCurrentQueueIndex(i);
+      setSelectedDocType(queue[i]);
+
+      try {
+        await generateDocument(queue[i], controller.signal);
+      } catch {
+        // generateDocument handles its own errors; if aborted, stop the loop
+        if (controller.signal.aborted) break;
+      }
+    }
+
+    setIsGeneratingAll(false);
+    abortControllerRef.current = null;
+    setGenerationQueue([]);
+  }, [generateDocument]);
+
+  // Stop all generation
+  const stopGeneration = useCallback(() => {
+    stopRequestedRef.current = true;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsGeneratingAll(false);
+    setIsGeneratingDoc(false);
+    setGenerationQueue([]);
+  }, []);
+
+  // Download all generated documents as a PDF zip pack
+  const handleDownloadPack = useCallback(async () => {
+    const generatedDocs = Object.entries(generatedDocuments);
+    if (generatedDocs.length === 0) return;
+
+    setIsDownloadingPack(true);
+    try {
+      const zip = new JSZip();
+
+      for (const [docTypeId, content] of generatedDocs) {
+        const docTitle = DOC_TYPES.find(d => d.id === docTypeId)?.label || 'Legal Document';
+        let blob: Blob;
+        try {
+          blob = await pdf(
+            <DeedOfSalePDF
+              transactionId={transactionReferenceId}
+              buyerName={transactionData.hasAgent ? transactionData.agentName : 'Buyer'}
+              sellerName="Seller"
+              propertyPrice={transactionData.sellingPrice || '0'}
+              generatedContent={content}
+              documentTitle={docTitle}
+              firmName={firmName}
+              lawyerName={lawyerName}
+            />
+          ).toBlob();
+        } catch {
+          blob = new Blob([content], { type: 'text/plain' });
+        }
+        const fileName = `${docTypeId}-${transactionReferenceId}.pdf`;
+        zip.file(fileName, blob);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `document-pack-${transactionReferenceId}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to create document pack:', err);
+    } finally {
+      setIsDownloadingPack(false);
+    }
+  }, [generatedDocuments, transactionReferenceId, transactionData, firmName, lawyerName]);
+
   const handleDocDownload = async () => {
     const content = activeDocument || generatedDocuments[selectedDocType];
     if (!content) return;
     let blob: Blob;
     try {
-      if (selectedDocType === 'deed_of_sale') {
-        blob = await pdf(
-          <DeedOfSalePDF
-            transactionId={transactionReferenceId}
-            buyerName={transactionData.hasAgent ? transactionData.agentName : 'Buyer'}
-            sellerName="Seller"
-            propertyPrice={transactionData.sellingPrice || '0'}
-            generatedContent={content}
-          />
-        ).toBlob();
-      } else {
-        // For other document types, use plain text PDF layout
-        blob = await pdf(
-          <DeedOfSalePDF
-            transactionId={transactionReferenceId}
-            buyerName={transactionData.hasAgent ? transactionData.agentName : 'Buyer'}
-            sellerName="Seller"
-            propertyPrice={transactionData.sellingPrice || '0'}
-            generatedContent={content}
-            documentTitle={DOC_TYPES.find(d => d.id === selectedDocType)?.label}
-          />
-        ).toBlob();
-      }
+      const docTitle = DOC_TYPES.find(d => d.id === selectedDocType)?.label || 'Legal Document';
+      blob = await pdf(
+        <DeedOfSalePDF
+          transactionId={transactionReferenceId}
+          buyerName={transactionData.hasAgent ? transactionData.agentName : 'Buyer'}
+          sellerName="Seller"
+          propertyPrice={transactionData.sellingPrice || '0'}
+          generatedContent={content}
+          documentTitle={docTitle}
+          firmName={firmName}
+          lawyerName={lawyerName}
+        />
+      ).toBlob();
     } catch {
       blob = new Blob([content], { type: 'text/plain' });
     }
@@ -287,9 +409,49 @@ const Step7Summary: React.FC<Step7Props> = ({
   const handleDocPrint = () => {
     const content = activeDocument || generatedDocuments[selectedDocType];
     if (!content) return;
+    const docTitle = DOC_TYPES.find(d => d.id === selectedDocType)?.label || 'Legal Document';
     const printWindow = window.open('', '_blank');
     if (printWindow) {
-      printWindow.document.write(`<html><head><title>${DOC_TYPES.find(d => d.id === selectedDocType)?.label} - ${transactionReferenceId}</title><style>body{font-family:Arial,sans-serif;line-height:1.6;margin:40px}h1,h2,h3{color:#333}.content{white-space:pre-wrap}</style></head><body><div class="content">${content.replace(/\n/g, '<br>')}</div></body></html>`);
+      // Convert markdown to basic HTML for printing
+      const htmlContent = content
+        .replace(/^#### (.*$)/gm, '<h4>$1</h4>')
+        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+        .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/^[-*+] (.*$)/gm, '<li>$1</li>')
+        .replace(/^\d+[.)] (.*$)/gm, '<li>$1</li>')
+        .replace(/^---$/gm, '<hr>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>');
+      printWindow.document.write(`<html><head><title>${docTitle} - ${transactionReferenceId}</title>
+<style>
+  @page { margin: 2cm; }
+  body { font-family: 'Times New Roman', Georgia, serif; font-size: 11pt; line-height: 1.7; color: #333; max-width: 700px; margin: 0 auto; }
+  .header { text-align: center; border-bottom: 2px solid #1a1a2e; padding-bottom: 16px; margin-bottom: 24px; }
+  .header .firm { font-size: 8pt; letter-spacing: 4px; text-transform: uppercase; color: #4a3f8a; font-weight: bold; margin-bottom: 4px; }
+  .header .republic { font-size: 9pt; letter-spacing: 3px; text-transform: uppercase; color: #999; margin-bottom: 8px; }
+  .header .ref { font-size: 8pt; color: #999; }
+  h1 { font-size: 14pt; text-align: center; text-transform: uppercase; letter-spacing: 3px; color: #1a1a2e; margin: 20px 0; }
+  h2 { font-size: 12pt; text-transform: uppercase; letter-spacing: 1.5px; color: #1a1a2e; border-bottom: 0.5px solid #ddd; padding-bottom: 4px; margin-top: 24px; }
+  h3 { font-size: 11pt; color: #333; margin-top: 16px; }
+  h4 { font-size: 10pt; color: #444; margin-top: 12px; }
+  p { text-align: justify; margin-bottom: 8px; }
+  li { margin-bottom: 4px; }
+  hr { border: none; border-top: 0.5px solid #ddd; margin: 16px 0; }
+  strong { color: #1a1a2e; }
+  .footer { text-align: center; border-top: 0.5px solid #ddd; padding-top: 12px; margin-top: 40px; font-size: 8pt; color: #999; text-transform: uppercase; letter-spacing: 2px; }
+</style></head><body>
+<div class="header">
+  <div class="firm">${firmName}</div>
+  <div class="republic">Republic of Botswana &middot; Property Conveyancing</div>
+  <div class="ref">Ref: ${transactionReferenceId} &middot; ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+</div>
+<p>${htmlContent}</p>
+<div class="footer">Prepared by ${firmName} | ${lawyerName}</div>
+</body></html>`);
       printWindow.document.close();
       printWindow.print();
     }
@@ -362,6 +524,8 @@ const Step7Summary: React.FC<Step7Props> = ({
           agentName={transactionData.agentName}
           agentCompany={transactionData.agentCompany}
           uploadedDocuments={transactionData.uploadedDocuments}
+          firmName={firmName}
+          lawyerName={lawyerName}
         />
       ).toBlob();
       const url = URL.createObjectURL(blob);
@@ -393,86 +557,177 @@ const Step7Summary: React.FC<Step7Props> = ({
       )}
 
       {isSubmitted ? (
-        <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-4 md:p-6 mb-6 md:mb-8 shadow-lg">
-          <div className="flex items-center">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-green-100 flex items-center justify-center mr-3 md:mr-4">
-              <CheckCircle className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
+        <div className="relative bg-white border border-[#D1D5DB] rounded-2xl overflow-hidden mb-6 md:mb-8 shadow-[0px_6px_12px_rgba(0,0,0,0.08)]">
+          {/* Navy header band */}
+          <div className="bg-[#0B1F3A] px-5 py-6 md:px-8 md:py-8 relative overflow-hidden">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAyMCAwIEwgMCAyMCIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDMpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IGZpbGw9InVybCgjZykiIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiLz48L3N2Zz4=')] opacity-50"></div>
+            <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-[#C8A14F]/10 blur-3xl"></div>
+            <div className="relative flex items-center gap-4">
+              <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-[#C8A14F]/20 flex items-center justify-center flex-shrink-0 ring-2 ring-[#C8A14F]/30">
+                <CheckCircle className="h-6 w-6 md:h-7 md:w-7 text-[#C8A14F]" />
+              </div>
+              <div>
+                <h3 className="font-serif text-xl md:text-2xl font-bold text-white tracking-tight">
+                  {mode === 'client' ? 'Successfully Submitted' : 'Transaction Submitted'}
+                </h3>
+                <p className="text-sm text-gray-300 mt-1 leading-relaxed">
+                  {mode === 'client'
+                    ? 'Your information has been submitted to the conveyancer. They will review your details and contact you if anything else is needed.'
+                    : 'Your property transaction is now live in the conveyancer dashboard.'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg md:text-xl font-bold text-green-800">
-                {mode === 'client' ? 'Information Successfully Submitted' : 'Transaction Successfully Submitted'}
-              </h3>
-              <p className="text-sm md:text-base text-green-700 mt-1">
-                {mode === 'client'
-                  ? 'Your information has been submitted to the conveyancer. They will review your details and contact you if anything else is needed.'
-                  : 'Your property transaction has been submitted and is now visible in the conveyancer\'s live dashboard.'}
-              </p>
-              {mode === 'conveyancer' && onComplete && (
-                <button
-                  onClick={onComplete}
-                  className="mt-3 px-4 py-2 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-lg hover:bg-green-50 transition-colors"
-                >
-                  Back to Dashboard
-                </button>
-              )}
+          </div>
+          {/* Gold accent line */}
+          <div className="h-0.5 bg-gradient-to-r from-[#C8A14F] via-[#C8A14F]/60 to-transparent"></div>
+          {/* White body with actions */}
+          <div className="px-5 py-4 md:px-8 md:py-5 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <Lock className="h-3.5 w-3.5" />
+              <span>Encrypted & Secure</span>
+              <span className="mx-1 text-gray-300">|</span>
+              <Shield className="h-3.5 w-3.5" />
+              <span>POPIA Compliant</span>
             </div>
+            {mode === 'conveyancer' && onComplete && !lawFirms && (
+              <button
+                onClick={onComplete}
+                className="btn-shine px-4 py-2 text-sm font-medium text-[#0B1F3A] bg-[#C8A14F]/10 border border-[#C8A14F]/30 rounded-lg hover:bg-[#C8A14F]/20 transition-colors"
+              >
+                Back to Dashboard
+              </button>
+            )}
           </div>
         </div>
       ) : (
-        <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 md:p-6 mb-6 md:mb-8 shadow-lg">
-          <div className="flex items-center">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-100 flex items-center justify-center mr-3 md:mr-4">
-              <FileText className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="text-lg md:text-xl font-bold text-blue-800">Review Your Transaction</h3>
-              <p className="text-sm md:text-base text-blue-700 mt-1">
-                Please review all details below before submitting your transaction.
-              </p>
+        <div className="relative bg-white border border-[#D1D5DB] rounded-2xl overflow-hidden mb-6 md:mb-8 shadow-[0px_4px_8px_rgba(0,0,0,0.05)]">
+          <div className="bg-[#0B1F3A] px-5 py-5 md:px-8 md:py-6 relative overflow-hidden">
+            <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-[#C8A14F]/10 blur-3xl"></div>
+            <div className="relative flex items-center gap-4">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+                <FileText className="h-5 w-5 md:h-6 md:w-6 text-[#C8A14F]" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg md:text-xl font-bold text-white tracking-tight">Review Your Transaction</h3>
+                <p className="text-sm text-gray-300 mt-0.5">
+                  Please review all details below before submitting.
+                </p>
+              </div>
             </div>
           </div>
+          <div className="h-0.5 bg-gradient-to-r from-[#C8A14F] via-[#C8A14F]/60 to-transparent"></div>
+        </div>
+      )}
+
+      {/* Send to Law Firm — shown when lawFirms prop is provided and transaction is submitted */}
+      {isSubmitted && lawFirms && lawFirms.length > 0 && onSendToLawFirm && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 md:p-6 mb-6 md:mb-8 shadow-sm">
+          {lawFirmSent ? (
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                <CheckCircle className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-emerald-800">Sent to Law Firm</h3>
+                <p className="text-sm text-emerald-700 mt-0.5">
+                  Transaction has been sent to <span className="font-medium">{lawFirms.find(f => f.id === selectedLawFirm)?.name}</span> for conveyancing.
+                </p>
+                {onComplete && (
+                  <button
+                    onClick={onComplete}
+                    className="mt-3 px-4 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
+                  >
+                    Back to Dashboard
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-10 w-10 rounded-full bg-[#0B1F3A]/5 flex items-center justify-center flex-shrink-0">
+                  <Building2 className="h-5 w-5 text-[#0B1F3A]" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-[#0B1F3A]">Send to Law Firm</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    Select a conveyancing firm to handle this transaction
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <select
+                  value={selectedLawFirm}
+                  onChange={e => setSelectedLawFirm(e.target.value)}
+                  className="flex-1 px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#C8A14F]/40 focus:border-[#C8A14F]"
+                >
+                  <option value="">Select a law firm...</option>
+                  {lawFirms.map(f => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    const firm = lawFirms.find(f => f.id === selectedLawFirm);
+                    if (firm) {
+                      onSendToLawFirm(firm.id, firm.name);
+                      setLawFirmSent(true);
+                    }
+                  }}
+                  disabled={!selectedLawFirm}
+                  className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    selectedLawFirm
+                      ? 'bg-[#C8A14F] text-white hover:bg-[#b8923f]'
+                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  }`}
+                >
+                  <Send className="h-4 w-4" />
+                  Send
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {/* Live Transaction Notification — conveyancer mode only */}
       {mode === 'conveyancer' && (
-        <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 md:p-6 mb-6 md:mb-8 shadow-lg">
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse mr-3"></div>
-            <div>
-              <h3 className="text-sm font-medium text-blue-800">Live Data Integration</h3>
-              <p className="text-xs text-blue-700 mt-1">
-                This transaction is now live in the conveyancer's dashboard with complete step-by-step progress tracking.
-                Your conveyancer can see exactly which steps you've completed and monitor the transaction in real-time.
-              </p>
-            </div>
+        <div className="flex items-center gap-3 bg-white border border-[#D1D5DB] rounded-xl px-4 py-3 md:px-5 md:py-3.5 mb-6 md:mb-8 shadow-[0px_4px_8px_rgba(0,0,0,0.05)]">
+          <div className="relative flex-shrink-0">
+            <div className="w-2.5 h-2.5 bg-[#2ECC71] rounded-full"></div>
+            <div className="absolute inset-0 w-2.5 h-2.5 bg-[#2ECC71] rounded-full animate-ping opacity-75"></div>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[#0B1F3A]">Live Data Integration</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              This transaction is live in the conveyancer dashboard with real-time progress tracking.
+            </p>
           </div>
         </div>
       )}
 
-      <div className="bg-white overflow-hidden rounded-2xl shadow-xl mb-6 md:mb-8">
-        <div className="px-4 py-4 md:px-6 md:py-5 bg-gradient-to-r from-blue-900 to-blue-800 relative">
-          <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
-          <div className="absolute -top-10 -left-10 h-32 w-32 rounded-full bg-blue-500 opacity-20 blur-2xl"></div>
-          
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 relative">
-            <h3 className="text-lg md:text-xl leading-6 font-bold text-white">
-              Transaction Summary
-            </h3>
-            <span className="inline-flex items-center px-3 py-1 md:px-4 md:py-1.5 rounded-full text-xs md:text-sm font-medium bg-blue-100 text-blue-800 shadow-inner">
+      <div className="bg-white overflow-hidden rounded-2xl border border-[#D1D5DB] shadow-[0px_6px_12px_rgba(0,0,0,0.08)] mb-6 md:mb-8">
+        <div className="px-5 py-4 md:px-6 md:py-5 border-b border-[#D1D5DB] bg-[#FAFAFA]">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-[#0B1F3A] flex items-center justify-center flex-shrink-0">
+                <FileText className="h-4 w-4 text-[#C8A14F]" />
+              </div>
+              <h3 className="font-serif text-lg md:text-xl font-bold text-[#0B1F3A] tracking-tight">
+                Transaction Summary
+              </h3>
+            </div>
+            <span className="inline-flex items-center px-3 py-1 md:px-4 md:py-1.5 rounded-full text-xs md:text-sm font-medium bg-[#0B1F3A]/5 text-[#0B1F3A] border border-[#0B1F3A]/10">
               Ref: {transactionReferenceId}
             </span>
           </div>
-          <p className="mt-1 max-w-2xl text-xs md:text-sm text-blue-100">
-            Complete summary of your property transaction details
-          </p>
         </div>
         
         <div className="border-t border-gray-200 px-4 py-4 md:px-6 md:py-5">
           <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-4 md:gap-x-6 gap-y-4 md:gap-y-8">
             <div className="flex">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
-                <FileText className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#0B1F3A]/5 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
+                <FileText className="h-4 w-4 md:h-5 md:w-5 text-[#0B1F3A]" />
               </div>
               <div>
                 <dt className="text-xs md:text-sm font-medium text-gray-500">Transaction Type</dt>
@@ -481,8 +736,8 @@ const Step7Summary: React.FC<Step7Props> = ({
             </div>
             
             <div className="flex">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
-                <Clock className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#0B1F3A]/5 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
+                <Clock className="h-4 w-4 md:h-5 md:w-5 text-[#0B1F3A]" />
               </div>
               <div>
                 <dt className="text-xs md:text-sm font-medium text-gray-500">Submission Date</dt>
@@ -491,8 +746,8 @@ const Step7Summary: React.FC<Step7Props> = ({
             </div>
             
             <div className="flex">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
-                <Banknote className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#0B1F3A]/5 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
+                <Banknote className="h-4 w-4 md:h-5 md:w-5 text-[#C8A14F]" />
               </div>
               <div>
                 <dt className="text-xs md:text-sm font-medium text-gray-500">Property Price</dt>
@@ -502,8 +757,8 @@ const Step7Summary: React.FC<Step7Props> = ({
             
             {transactionData.valuationAmount && (
               <div className="flex">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
-                  <Building className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#0B1F3A]/5 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
+                  <Building className="h-4 w-4 md:h-5 md:w-5 text-[#C8A14F]" />
                 </div>
                 <div>
                   <dt className="text-xs md:text-sm font-medium text-gray-500">Valuation Amount</dt>
@@ -516,8 +771,8 @@ const Step7Summary: React.FC<Step7Props> = ({
             {transactionData.transactionType === 'buying' && 
              transactionData.nationality === 'Botswana' && (
               <div className="flex">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
-                  <Building className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#0B1F3A]/5 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
+                  <Building className="h-4 w-4 md:h-5 md:w-5 text-[#0B1F3A]" />
                 </div>
                 <div>
                   <dt className="text-xs md:text-sm font-medium text-gray-500">First Time Buyer</dt>
@@ -530,8 +785,8 @@ const Step7Summary: React.FC<Step7Props> = ({
             
             {transactionData.hasAgent ? (
               <div className="flex md:col-span-2">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
-                  <Users className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#0B1F3A]/5 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
+                  <Users className="h-4 w-4 md:h-5 md:w-5 text-[#0B1F3A]" />
                 </div>
                 <div className="flex-grow">
                   <dt className="text-xs md:text-sm font-medium text-gray-500">Estate Agent</dt>
@@ -543,7 +798,7 @@ const Step7Summary: React.FC<Step7Props> = ({
                     <div className="mt-2 text-sm text-gray-700">
                       <span className="font-medium">Company:</span> {transactionData.agentCompany}
                       {transactionData.commissionType && transactionData.commissionValue && (
-                        <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs">
+                        <span className="ml-2 px-2 py-0.5 bg-[#0B1F3A]/5 text-[#0B1F3A] rounded-full text-xs">
                           Commission: {transactionData.commissionType === 'percentage' ? `${transactionData.commissionValue}%` : formatPrice(transactionData.commissionValue)}
                         </span>
                       )}
@@ -553,8 +808,8 @@ const Step7Summary: React.FC<Step7Props> = ({
               </div>
             ) : (
               <div className="flex">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
-                  <Users className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#0B1F3A]/5 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
+                  <Users className="h-4 w-4 md:h-5 md:w-5 text-[#0B1F3A]" />
                 </div>
                 <div>
                   <dt className="text-xs md:text-sm font-medium text-gray-500">Entity Type</dt>
@@ -564,8 +819,8 @@ const Step7Summary: React.FC<Step7Props> = ({
             )}
             
             <div className="flex">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
-                <UserCircle className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#0B1F3A]/5 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
+                <UserCircle className="h-4 w-4 md:h-5 md:w-5 text-[#0B1F3A]" />
               </div>
               <div>
                 <dt className="text-xs md:text-sm font-medium text-gray-500">Personal Information</dt>
@@ -585,8 +840,8 @@ const Step7Summary: React.FC<Step7Props> = ({
             
             {transactionData.hasBond !== undefined && (
               <div className="flex">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
-                  <FileText className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#0B1F3A]/5 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
+                  <FileText className="h-4 w-4 md:h-5 md:w-5 text-[#0B1F3A]" />
                 </div>
                 <div>
                   <dt className="text-xs md:text-sm font-medium text-gray-500">Bond Status</dt>
@@ -610,19 +865,19 @@ const Step7Summary: React.FC<Step7Props> = ({
           </dl>
         </div>
         
-        <div className="px-4 py-4 md:px-6 md:py-5 bg-gray-50 border-t border-gray-200">
-          <h4 className="text-sm md:text-base font-semibold text-gray-900 mb-3 md:mb-4">
+        <div className="px-4 py-4 md:px-6 md:py-5 bg-[#FAFAFA] border-t border-[#D1D5DB]">
+          <h4 className="text-sm md:text-base font-semibold text-[#0B1F3A] mb-3 md:mb-4">
             Uploaded Documents ({transactionData.uploadedDocuments.length})
           </h4>
-          <ul className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-200 shadow-sm">
+          <ul className="bg-white border border-[#D1D5DB] rounded-lg divide-y divide-[#D1D5DB]">
             {transactionData.uploadedDocuments.slice(0, 4).map((doc, index) => (
               <li key={index} className="px-3 py-2 md:px-4 md:py-3 flex items-center justify-between text-xs md:text-sm hover:bg-gray-50">
                 <div className="w-0 flex-1 flex items-center">
-                  <FileText className="flex-shrink-0 h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+                  <FileText className="flex-shrink-0 h-4 w-4 md:h-5 md:w-5 text-[#C8A14F]" />
                   <span className="ml-2 flex-1 w-0 truncate text-gray-700">{doc}</span>
                 </div>
                 <div className="ml-4 flex-shrink-0">
-                  <button className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
+                  <button className="font-medium text-[#0B1F3A] hover:text-[#C8A14F] transition-colors">
                     View
                   </button>
                 </div>
@@ -636,17 +891,17 @@ const Step7Summary: React.FC<Step7Props> = ({
           </ul>
         </div>
         
-        <div className="px-4 py-4 md:px-6 md:py-5 bg-blue-50 border-t border-blue-200">
-          <h4 className="text-sm md:text-base font-semibold text-gray-900 mb-3">
+        <div className="px-4 py-4 md:px-6 md:py-5 bg-[#0B1F3A]/[0.02] border-t border-[#D1D5DB]">
+          <h4 className="text-sm md:text-base font-semibold text-[#0B1F3A] mb-3">
             Data Protection & Privacy
           </h4>
           <div className="flex items-start">
-            <Shield className="h-4 w-4 md:h-5 md:w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <Shield className="h-4 w-4 md:h-5 md:w-5 text-[#0B1F3A] mt-0.5 flex-shrink-0" />
             <div className="ml-3">
-              <p className="text-xs md:text-sm text-gray-700">
+              <p className="text-xs md:text-sm text-gray-600">
                 All your data is encrypted at rest and in transit. We comply with data protection regulations including GDPR and the Data Protection Act 2018. Your information will be stored securely and only used for processing your transaction.
               </p>
-              <button className="mt-2 text-xs text-blue-600 hover:text-blue-800 flex items-center">
+              <button className="mt-2 text-xs text-[#C8A14F] hover:text-[#0B1F3A] flex items-center transition-colors">
                 <Lock className="h-3 w-3 mr-1" />
                 View Privacy Policy
               </button>
@@ -656,64 +911,159 @@ const Step7Summary: React.FC<Step7Props> = ({
       </div>
 
       {/* Conveyancer Dashboard Link Section — conveyancer mode only */}
-      {mode === 'conveyancer' && <div className="bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-4 md:p-6 mb-6 md:mb-8 shadow-lg">
-        <div className="flex items-start">
-          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-purple-100 flex items-center justify-center mr-3 md:mr-4 flex-shrink-0">
-            <Users className="h-5 w-5 md:h-6 md:w-6 text-purple-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg md:text-xl font-bold text-purple-800 mb-2">Conveyancer Dashboard Access</h3>
-            <p className="text-sm md:text-base text-purple-700 mb-4">
-              Share this live dashboard link with your conveyancer to track transaction progress and generate legal documents.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={copyConveyancerLink}
-                className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                <Share2 className="h-4 w-4 mr-2" />
-                {conveyancerLinkCopied ? 'Link Copied!' : 'Copy Conveyancer Link'}
-              </button>
-              
-              <button
-                onClick={openConveyancerDashboard}
-                className="inline-flex items-center px-4 py-2 border border-purple-300 text-purple-700 bg-white rounded-lg hover:bg-purple-50 transition-colors"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Open Dashboard
-              </button>
+      {mode === 'conveyancer' && <div className="bg-white border border-[#D1D5DB] rounded-2xl overflow-hidden mb-6 md:mb-8 shadow-[0px_6px_12px_rgba(0,0,0,0.08)]">
+        <div className="bg-[#0B1F3A] px-5 py-5 md:px-8 md:py-6 relative overflow-hidden">
+          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+          <div className="relative flex items-center gap-3">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#C8A14F]/20 flex items-center justify-center flex-shrink-0 ring-2 ring-[#C8A14F]/30">
+              <Users className="h-5 w-5 md:h-6 md:w-6 text-[#C8A14F]" />
             </div>
-            
-            <div className="mt-3 bg-white bg-opacity-70 rounded-lg p-3 border border-purple-200">
-              <p className="text-xs text-purple-700">
-                <strong>Features:</strong> Live transaction tracking • AI document generation • Both buyer & seller information • Real-time progress updates
+            <div>
+              <h3 className="font-serif text-lg md:text-xl font-bold text-white tracking-tight">Conveyancer Dashboard Access</h3>
+              <p className="text-sm text-gray-300 mt-0.5">
+                Share this live dashboard link to track progress and generate legal documents.
               </p>
             </div>
+          </div>
+        </div>
+        <div className="h-0.5 bg-gradient-to-r from-[#C8A14F] via-[#C8A14F]/60 to-transparent"></div>
+        <div className="px-5 py-4 md:px-8 md:py-5">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={copyConveyancerLink}
+              className="inline-flex items-center px-4 py-2.5 bg-[#0B1F3A] text-white rounded-lg hover:bg-[#0B1F3A]/90 transition-colors font-medium text-sm"
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              {conveyancerLinkCopied ? 'Link Copied!' : 'Copy Conveyancer Link'}
+            </button>
+
+            <button
+              onClick={openConveyancerDashboard}
+              className="inline-flex items-center px-4 py-2.5 border border-[#D1D5DB] text-[#0B1F3A] bg-white rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Open Dashboard
+            </button>
+          </div>
+
+          <div className="mt-4 bg-[#0B1F3A]/[0.02] rounded-lg p-3 border border-[#D1D5DB]">
+            <p className="text-xs text-gray-600">
+              <strong className="text-[#0B1F3A]">Features:</strong> Live transaction tracking • AI document generation • Both buyer & seller information • Real-time progress updates
+            </p>
           </div>
         </div>
       </div>}
 
       {/* AI Document Generation — conveyancer mode */}
       {mode === 'conveyancer' && (
-        <div className="bg-white rounded-2xl shadow-xl border mb-6 md:mb-8 overflow-hidden">
-          <div className="px-4 py-4 md:px-6 md:py-5 bg-gradient-to-r from-purple-600 to-indigo-600">
-            <div className="flex items-center">
-              <Sparkles className="h-5 w-5 md:h-6 md:w-6 text-white mr-2 md:mr-3" />
+        <div className="bg-white rounded-2xl shadow-[0px_6px_12px_rgba(0,0,0,0.08)] border border-[#D1D5DB] mb-6 md:mb-8 overflow-hidden">
+          <div className="px-4 py-4 md:px-6 md:py-5 bg-[#0B1F3A] relative overflow-hidden">
+            <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+            <div className="relative flex items-center">
+              <div className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-[#C8A14F]/20 flex items-center justify-center mr-3 flex-shrink-0">
+                <Sparkles className="h-5 w-5 md:h-5 md:w-5 text-[#C8A14F]" />
+              </div>
               <div>
-                <h3 className="text-base md:text-lg font-bold text-white">AI Document Generation</h3>
-                <p className="text-xs md:text-sm text-purple-100 mt-0.5">Generate legal documents from the transaction details entered so far</p>
+                <h3 className="font-serif text-base md:text-lg font-bold text-white tracking-tight">AI Document Generation</h3>
+                <p className="text-xs md:text-sm text-gray-300 mt-0.5">Generate legal documents from the transaction details entered so far</p>
               </div>
             </div>
           </div>
+          <div className="h-0.5 bg-gradient-to-r from-[#C8A14F] via-[#C8A14F]/60 to-transparent"></div>
 
           <div className="px-4 py-4 md:px-6 md:py-5">
+            {/* Generate All / Stop / Download Pack controls */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                {!isGeneratingAll ? (
+                  <button
+                    onClick={generateAllDocuments}
+                    disabled={isGeneratingDoc}
+                    className="px-4 py-2 bg-[#0B1F3A] text-white rounded-lg hover:bg-[#0B1F3A]/90 transition-all shadow-md text-sm font-medium inline-flex items-center disabled:opacity-50"
+                  >
+                    <PlayCircle className="h-4 w-4 mr-2" />
+                    Generate All Documents
+                  </button>
+                ) : (
+                  <button
+                    onClick={stopGeneration}
+                    className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-md text-sm font-medium inline-flex items-center animate-pulse"
+                  >
+                    <StopCircle className="h-4 w-4 mr-2" />
+                    Stop Generation
+                  </button>
+                )}
+                {Object.keys(generatedDocuments).length > 0 && !isGeneratingAll && (
+                  <button
+                    onClick={handleDownloadPack}
+                    disabled={isDownloadingPack || isGeneratingDoc}
+                    className="px-4 py-2 bg-[#C8A14F] text-white rounded-lg hover:bg-[#C8A14F]/90 transition-all shadow-md text-sm font-medium inline-flex items-center disabled:opacity-50"
+                  >
+                    {isDownloadingPack ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Packaging...</>
+                    ) : (
+                      <><FolderDown className="h-4 w-4 mr-2" />Download Pack ({Object.keys(generatedDocuments).length})</>
+                    )}
+                  </button>
+                )}
+              </div>
+              {isGeneratingAll && (
+                <span className="text-xs text-[#0B1F3A] font-medium">
+                  {currentQueueIndex + 1} of {generationQueue.length} documents
+                </span>
+              )}
+            </div>
+
+            {/* Sequential progress bar */}
+            {isGeneratingAll && (
+              <div className="mb-4 bg-[#0B1F3A]/[0.03] border border-[#D1D5DB] rounded-xl p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-[#0B1F3A]">Document Generation Progress</span>
+                  <span className="text-xs text-[#0B1F3A]/70">
+                    {Object.keys(generatedDocuments).length} / {DOC_TYPES.length} complete
+                  </span>
+                </div>
+                <div className="flex gap-1">
+                  {DOC_TYPES.map((doc, idx) => (
+                    <div
+                      key={doc.id}
+                      className={`h-2 flex-1 rounded-full transition-all duration-500 ${
+                        generatedDocuments[doc.id]
+                          ? 'bg-emerald-500'
+                          : idx === currentQueueIndex && isGeneratingDoc
+                          ? 'bg-[#C8A14F] animate-pulse'
+                          : 'bg-gray-200'
+                      }`}
+                      title={doc.label}
+                    />
+                  ))}
+                </div>
+                <div className="flex justify-between mt-1.5">
+                  {DOC_TYPES.map((doc) => (
+                    <span
+                      key={doc.id}
+                      className={`text-[9px] font-medium text-center flex-1 ${
+                        generatedDocuments[doc.id]
+                          ? 'text-emerald-600'
+                          : doc.id === selectedDocType && isGeneratingDoc
+                          ? 'text-[#C8A14F]'
+                          : 'text-gray-400'
+                      }`}
+                    >
+                      {doc.short}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Document type pills */}
             <div className="flex flex-wrap gap-2 mb-4">
               {DOC_TYPES.map((doc) => (
                 <button
                   key={doc.id}
                   onClick={() => {
+                    if (isGeneratingAll) return; // Don't switch tabs during batch generation
                     setSelectedDocType(doc.id);
                     if (generatedDocuments[doc.id]) {
                       setActiveDocument(generatedDocuments[doc.id]);
@@ -725,36 +1075,57 @@ const Step7Summary: React.FC<Step7Props> = ({
                   }}
                   className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                     selectedDocType === doc.id
-                      ? 'bg-purple-100 text-purple-800 border-2 border-purple-400'
+                      ? 'bg-[#0B1F3A]/10 text-[#0B1F3A] border-2 border-[#0B1F3A]/30'
                       : 'bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200'
-                  }`}
+                  } ${isGeneratingAll ? 'cursor-default' : ''}`}
                 >
                   {doc.short}
-                  {generatedDocuments[doc.id] && (
+                  {generatedDocuments[doc.id] ? (
                     <CheckCircle className="h-3 w-3 text-emerald-500 ml-1" />
-                  )}
+                  ) : doc.id === selectedDocType && isGeneratingDoc ? (
+                    <Loader2 className="h-3 w-3 text-[#C8A14F] ml-1 animate-spin" />
+                  ) : null}
                 </button>
               ))}
             </div>
 
             {/* Generate / Status area */}
             {!generatedDocuments[selectedDocType] ? (
-              <div className="text-center py-6 bg-gradient-to-br from-purple-50 via-white to-indigo-50 rounded-xl border border-purple-100">
-                <Sparkles className="h-8 w-8 text-purple-500 mx-auto mb-3" />
+              <div className="text-center py-6 bg-[#0B1F3A]/[0.02] rounded-xl border border-[#D1D5DB]">
+                <Sparkles className="h-8 w-8 text-[#C8A14F] mx-auto mb-3" />
                 <p className="text-sm text-gray-600 mb-4 max-w-md mx-auto">
                   Generate a {DOC_TYPES.find(d => d.id === selectedDocType)?.label} using the transaction information entered. Missing details will be marked for completion.
                 </p>
-                <button
-                  onClick={() => generateDocument(selectedDocType)}
-                  disabled={isGeneratingDoc}
-                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md text-sm font-medium inline-flex items-center disabled:opacity-50"
-                >
-                  {isGeneratingDoc ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating...</>
-                  ) : (
-                    <><Sparkles className="h-4 w-4 mr-2" />Generate with AI</>
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => {
+                      const controller = new AbortController();
+                      abortControllerRef.current = controller;
+                      generateDocument(selectedDocType, controller.signal).finally(() => {
+                        abortControllerRef.current = null;
+                      });
+                    }}
+                    disabled={isGeneratingDoc || isGeneratingAll}
+                    className="px-5 py-2.5 bg-[#0B1F3A] text-white rounded-lg hover:bg-[#0B1F3A]/90 transition-all shadow-md text-sm font-medium inline-flex items-center disabled:opacity-50"
+                  >
+                    {isGeneratingDoc ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating...</>
+                    ) : (
+                      <><Sparkles className="h-4 w-4 mr-2" />Generate with AI</>
+                    )}
+                  </button>
+                  {(isGeneratingDoc && !isGeneratingAll) && (
+                    <button
+                      onClick={() => {
+                        abortControllerRef.current?.abort();
+                        setIsGeneratingDoc(false);
+                      }}
+                      className="px-4 py-2.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-all text-sm font-medium inline-flex items-center"
+                    >
+                      <StopCircle className="h-4 w-4 mr-1.5" />Stop
+                    </button>
                   )}
-                </button>
+                </div>
               </div>
             ) : (
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
@@ -773,7 +1144,7 @@ const Step7Summary: React.FC<Step7Props> = ({
                   <div className="flex space-x-2">
                     <button
                       onClick={() => generateDocument(selectedDocType)}
-                      disabled={isGeneratingDoc}
+                      disabled={isGeneratingDoc || isGeneratingAll}
                       className="px-2.5 py-1.5 text-xs bg-white border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 disabled:opacity-50"
                     >
                       Regenerate
@@ -796,7 +1167,7 @@ const Step7Summary: React.FC<Step7Props> = ({
                     </button>
                     <button
                       onClick={handleDocDownload}
-                      className="px-2.5 py-1.5 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 inline-flex items-center"
+                      className="px-2.5 py-1.5 text-xs bg-[#0B1F3A]/5 text-[#0B1F3A] rounded-lg hover:bg-[#0B1F3A]/10 inline-flex items-center"
                     >
                       <Download className="h-3.5 w-3.5 mr-1" />PDF
                     </button>
@@ -825,7 +1196,7 @@ const Step7Summary: React.FC<Step7Props> = ({
           <button
             onClick={handleSubmitTransaction}
             disabled={isSubmitting}
-            className={`w-full py-3 px-6 border-2 border-transparent rounded-xl text-base font-semibold shadow-lg text-white bg-green-600 hover:bg-green-700 transition-colors ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`w-full py-3.5 px-6 border-2 border-transparent rounded-xl text-base font-semibold shadow-[0px_6px_12px_rgba(0,0,0,0.08)] text-white bg-[#0B1F3A] hover:bg-[#0B1F3A]/90 transition-colors ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {isSubmitting ? (
               <><Loader2 className="inline-block mr-2 h-5 w-5 animate-spin" />Submitting...</>
@@ -850,7 +1221,7 @@ const Step7Summary: React.FC<Step7Props> = ({
           onClick={copyReferenceNumber}
           className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-gray-300 rounded-lg text-sm md:text-base font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors"
         >
-          <Clipboard className="mr-1 md:mr-2 h-4 w-4 text-blue-600" />
+          <Clipboard className="mr-1 md:mr-2 h-4 w-4 text-[#C8A14F]" />
           {copied ? 'Copied!' : 'Copy Reference'}
         </button>
         
@@ -858,7 +1229,7 @@ const Step7Summary: React.FC<Step7Props> = ({
           <>
             <button
               onClick={handleDownloadSummary}
-              className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-transparent rounded-lg text-sm md:text-base font-medium shadow-md text-white bg-primary hover:bg-primary-dark transition-colors"
+              className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-transparent rounded-lg text-sm md:text-base font-medium shadow-md text-white bg-[#0B1F3A] hover:bg-[#0B1F3A]/90 transition-colors"
             >
               <Download className="mr-1 md:mr-2 h-4 w-4" />
               Download Summary
@@ -868,53 +1239,55 @@ const Step7Summary: React.FC<Step7Props> = ({
               onClick={() => setShowRoleModal(true)}
               className="sm:ml-auto inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-gray-300 rounded-lg text-sm md:text-base font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors"
             >
-              <Users className="mr-1 md:mr-2 h-4 w-4 text-blue-600" />
+              <Users className="mr-1 md:mr-2 h-4 w-4 text-[#C8A14F]" />
               View as...
             </button>
           </>
         )}
       </div>
 
-      <div className="mt-6 md:mt-8 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-4 md:p-6 shadow-md border border-blue-200">
-        <div className="flex">
-          <div className="flex-shrink-0">
-            <CheckCircle className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
+      <div className="mt-6 md:mt-8 bg-white rounded-2xl overflow-hidden border border-[#D1D5DB] shadow-[0px_6px_12px_rgba(0,0,0,0.08)]">
+        <div className="bg-[#0B1F3A] px-5 py-4 md:px-6 md:py-5 relative overflow-hidden">
+          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+          <div className="relative flex items-center gap-3">
+            <CheckCircle className="h-5 w-5 md:h-6 md:w-6 text-[#C8A14F] flex-shrink-0" />
+            <h3 className="font-serif text-base md:text-lg font-bold text-white tracking-tight">Next Steps</h3>
           </div>
-          <div className="ml-3 md:ml-4">
-            <h3 className="text-base md:text-lg font-semibold text-blue-900">Next Steps</h3>
-            <p className="text-xs md:text-base text-blue-800 mt-1 md:mt-2">
-              Our team will review your submission and contact you within 2 business days. 
-              Remember to obtain tax clearance, letter of compliance (where necessary), 
-              and pay rates clearance to finalize your transaction.
+        </div>
+        <div className="h-0.5 bg-gradient-to-r from-[#C8A14F] via-[#C8A14F]/60 to-transparent"></div>
+        <div className="px-5 py-4 md:px-6 md:py-5">
+          <p className="text-xs md:text-sm text-gray-600 leading-relaxed">
+            Our team will review your submission and contact you within 2 business days.
+            Remember to obtain tax clearance, letter of compliance (where necessary),
+            and pay rates clearance to finalize your transaction.
+          </p>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4">
+            <div className="bg-[#0B1F3A]/[0.02] p-3 rounded-lg border border-[#D1D5DB] flex flex-col items-center">
+              <span className="text-xs font-medium text-gray-500 mb-1">Your Documents</span>
+              <div className="flex items-center">
+                <div className="w-3 h-3 rounded-full bg-emerald-500 mr-1.5"></div>
+                <span className="text-sm font-medium text-emerald-700">Complete</span>
+              </div>
+            </div>
+            <div className="bg-[#0B1F3A]/[0.02] p-3 rounded-lg border border-[#D1D5DB] flex flex-col items-center">
+              <span className="text-xs font-medium text-gray-500 mb-1">Compliance Checks</span>
+              <div className="flex items-center">
+                <div className="w-3 h-3 rounded-full bg-[#C8A14F] mr-1.5"></div>
+                <span className="text-sm font-medium text-[#C8A14F]">In Progress</span>
+              </div>
+            </div>
+            <div className="bg-[#0B1F3A]/[0.02] p-3 rounded-lg border border-[#D1D5DB] flex flex-col items-center">
+              <span className="text-xs font-medium text-gray-500 mb-1">External Clearances</span>
+              <div className="flex items-center">
+                <div className="w-3 h-3 rounded-full bg-gray-300 mr-1.5"></div>
+                <span className="text-sm font-medium text-gray-600">Pending</span>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 bg-[#0B1F3A]/[0.02] p-3 md:p-4 rounded-lg border border-[#D1D5DB]">
+            <p className="text-xs md:text-sm text-gray-600">
+              Estimated completion time: <span className="font-medium text-[#0B1F3A]">3-4 weeks</span>
             </p>
-            <div className="mt-3 md:mt-4 grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4">
-              <div className="bg-white p-3 rounded-lg border border-blue-200 flex flex-col items-center">
-                <span className="text-xs font-medium text-gray-600 mb-1">Your Documents</span>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
-                  <span className="text-sm font-medium text-green-700">Complete</span>
-                </div>
-              </div>
-              <div className="bg-white p-3 rounded-lg border border-blue-200 flex flex-col items-center">
-                <span className="text-xs font-medium text-gray-600 mb-1">Compliance Checks</span>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-amber-500 mr-1"></div>
-                  <span className="text-sm font-medium text-amber-700">In Progress</span>
-                </div>
-              </div>
-              <div className="bg-white p-3 rounded-lg border border-blue-200 flex flex-col items-center">
-                <span className="text-xs font-medium text-gray-600 mb-1">External Clearances</span>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-gray-300 mr-1"></div>
-                  <span className="text-sm font-medium text-gray-700">Pending</span>
-                </div>
-              </div>
-            </div>
-            <div className="mt-3 md:mt-4 bg-white p-3 md:p-4 rounded-lg border border-blue-200">
-              <p className="text-xs md:text-sm text-gray-600">
-                Estimated completion time: <span className="font-medium text-blue-700">3-4 weeks</span>
-              </p>
-            </div>
           </div>
         </div>
       </div>
@@ -924,12 +1297,20 @@ const Step7Summary: React.FC<Step7Props> = ({
         isOpen={showDocViewer}
         isStreaming={isGeneratingDoc}
         content={streamingContent || activeDocument || ''}
-        onClose={() => setShowDocViewer(false)}
+        onClose={() => {
+          if (isGeneratingAll) stopGeneration();
+          setShowDocViewer(false);
+        }}
         onDownload={handleDocDownload}
         onPrint={handleDocPrint}
+        onStop={isGeneratingDoc ? stopGeneration : undefined}
         caseNumber={transactionReferenceId}
         buyerName={transactionData.hasAgent ? transactionData.agentName : 'Buyer'}
         sellerName="Seller"
+        documentTitle={DOC_TYPES.find(d => d.id === selectedDocType)?.label}
+        firmName={firmName}
+        lawyerName={lawyerName}
+        queueProgress={isGeneratingAll ? { current: currentQueueIndex + 1, total: generationQueue.length } : null}
       />
 
       {/* Role-Based View Modal */}
@@ -953,14 +1334,14 @@ const Step7Summary: React.FC<Step7Props> = ({
               <div className="grid grid-cols-1 gap-3 mb-5">
                 <button
                   className={`flex items-center p-4 rounded-lg border-2 ${
-                    selectedRole === 'conveyancer' 
-                      ? 'border-blue-500 bg-blue-50' 
-                      : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                    selectedRole === 'conveyancer'
+                      ? 'border-[#0B1F3A] bg-[#0B1F3A]/5'
+                      : 'border-gray-200 hover:border-[#0B1F3A]/30 hover:bg-gray-50'
                   }`}
                   onClick={() => setSelectedRole('conveyancer')}
                 >
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                    <FileText className="h-5 w-5 text-blue-600" />
+                  <div className="w-10 h-10 bg-[#0B1F3A]/5 rounded-full flex items-center justify-center mr-3">
+                    <FileText className="h-5 w-5 text-[#0B1F3A]" />
                   </div>
                   <div className="flex-1 text-left">
                     <h4 className="text-sm font-medium text-gray-900">Conveyancer</h4>
@@ -970,14 +1351,14 @@ const Step7Summary: React.FC<Step7Props> = ({
                 
                 <button
                   className={`flex items-center p-4 rounded-lg border-2 ${
-                    selectedRole === 'agent' 
-                      ? 'border-blue-500 bg-blue-50' 
-                      : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                    selectedRole === 'agent'
+                      ? 'border-[#0B1F3A] bg-[#0B1F3A]/5'
+                      : 'border-gray-200 hover:border-[#0B1F3A]/30 hover:bg-gray-50'
                   }`}
                   onClick={() => setSelectedRole('agent')}
                 >
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                    <Users className="h-5 w-5 text-blue-600" />
+                  <div className="w-10 h-10 bg-[#0B1F3A]/5 rounded-full flex items-center justify-center mr-3">
+                    <Users className="h-5 w-5 text-[#0B1F3A]" />
                   </div>
                   <div className="flex-1 text-left">
                     <h4 className="text-sm font-medium text-gray-900">Estate Agent</h4>
@@ -996,7 +1377,7 @@ const Step7Summary: React.FC<Step7Props> = ({
                 }}
                 disabled={!selectedRole}
                 className={`w-full py-2.5 px-4 rounded-lg text-sm font-medium ${
-                  selectedRole ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  selectedRole ? 'bg-[#0B1F3A] text-white hover:bg-[#0B1F3A]/90' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                 } transition-colors`}
               >
                 Continue

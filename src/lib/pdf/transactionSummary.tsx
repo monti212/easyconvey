@@ -1,18 +1,81 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 
+const colors = {
+  primary: '#1a1a2e',
+  accent: '#4a3f8a',
+  gold: '#c9a84c',
+  goldLight: '#e6d59e',
+  gray: '#666666',
+  grayLight: '#999999',
+  grayBorder: '#d4d4d4',
+  white: '#ffffff',
+};
+
 const styles = StyleSheet.create({
-  page: { padding: 40, fontSize: 10, fontFamily: 'Helvetica' },
-  header: { marginBottom: 20, textAlign: 'center' },
-  title: { fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
-  subtitle: { fontSize: 12, color: '#666' },
+  page: { paddingTop: 60, paddingBottom: 70, paddingHorizontal: 50, fontSize: 10, fontFamily: 'Helvetica' },
+  // Header
+  pageHeader: {
+    position: 'absolute',
+    top: 20,
+    left: 50,
+    right: 50,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.grayBorder,
+  },
+  pageHeaderFirm: {
+    fontSize: 7,
+    fontFamily: 'Helvetica-Bold',
+    color: colors.accent,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  pageHeaderRef: {
+    fontSize: 7,
+    fontFamily: 'Helvetica',
+    color: colors.grayLight,
+  },
+  // Title block
+  titleBlock: { textAlign: 'center', marginBottom: 24 },
+  title: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 3 },
+  subtitle: { fontSize: 9, color: colors.grayLight, marginTop: 4, letterSpacing: 2, textTransform: 'uppercase' },
+  timestamp: { fontSize: 8, color: colors.grayLight, marginTop: 6 },
+  // Sections
   section: { marginBottom: 16 },
-  sectionTitle: { fontSize: 12, fontWeight: 'bold', marginBottom: 8, borderBottomWidth: 1, borderBottomColor: '#ccc', paddingBottom: 4 },
-  row: { flexDirection: 'row', marginBottom: 4 },
-  label: { width: '40%', fontWeight: 'bold', color: '#444' },
-  value: { width: '60%' },
-  footer: { position: 'absolute', bottom: 30, left: 40, right: 40, textAlign: 'center', fontSize: 8, color: '#999' },
-  divider: { borderBottomWidth: 1, borderBottomColor: '#eee', marginVertical: 10 },
+  sectionTitle: {
+    fontSize: 11,
+    fontFamily: 'Helvetica-Bold',
+    color: colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    marginBottom: 8,
+    paddingBottom: 4,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.grayBorder,
+  },
+  row: { flexDirection: 'row', marginBottom: 5 },
+  label: { width: '38%', fontFamily: 'Helvetica-Bold', fontSize: 9, color: '#555' },
+  value: { width: '62%', fontSize: 10, color: '#333' },
+  // Footer
+  pageFooter: {
+    position: 'absolute',
+    bottom: 25,
+    left: 50,
+    right: 50,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: colors.grayBorder,
+  },
+  footerText: { fontSize: 7, fontFamily: 'Helvetica', color: colors.grayLight },
+  divider: { borderBottomWidth: 0.5, borderBottomColor: '#eee', marginVertical: 10 },
+  disclaimer: { fontSize: 8, color: '#888', textAlign: 'center', marginTop: 12 },
 });
 
 interface TransactionSummaryProps {
@@ -28,6 +91,8 @@ interface TransactionSummaryProps {
   agentCompany?: string;
   uploadedDocuments?: string[];
   generatedAt?: string;
+  firmName?: string;
+  lawyerName?: string;
 }
 
 export default function TransactionSummaryPDF(props: TransactionSummaryProps) {
@@ -44,15 +109,23 @@ export default function TransactionSummaryPDF(props: TransactionSummaryProps) {
     agentCompany = '',
     uploadedDocuments = [],
     generatedAt = new Date().toISOString(),
+    firmName = 'Minchin & Kelly',
+    lawyerName = 'Conveyancer',
   } = props;
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Transaction Summary Report</Text>
-          <Text style={styles.subtitle}>Minchin & Kelly - Botswana Property Conveyancing</Text>
-          <Text style={{ fontSize: 9, color: '#999', marginTop: 4 }}>
+        {/* Running header */}
+        <View style={styles.pageHeader} fixed>
+          <Text style={styles.pageHeaderFirm}>{firmName}</Text>
+          <Text style={styles.pageHeaderRef}>Ref: {transactionId}</Text>
+        </View>
+
+        <View style={styles.titleBlock}>
+          <Text style={styles.title}>Transaction Summary</Text>
+          <Text style={styles.subtitle}>Property Conveyancing &middot; Republic of Botswana</Text>
+          <Text style={styles.timestamp}>
             Generated: {new Date(generatedAt).toLocaleString()}
           </Text>
         </View>
@@ -83,22 +156,28 @@ export default function TransactionSummaryPDF(props: TransactionSummaryProps) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Uploaded Documents ({uploadedDocuments.length})</Text>
           {uploadedDocuments.length === 0 ? (
-            <Text style={{ color: '#999' }}>No documents uploaded</Text>
+            <Text style={{ color: '#999', fontSize: 9 }}>No documents uploaded</Text>
           ) : (
             uploadedDocuments.map((doc, i) => (
-              <Text key={i} style={{ marginBottom: 2 }}>- {doc}</Text>
+              <Text key={i} style={{ marginBottom: 3, fontSize: 9, color: '#444' }}>{'\u2022'} {doc}</Text>
             ))
           )}
         </View>
 
         <View style={styles.divider} />
-        <Text style={{ fontSize: 9, color: '#666', textAlign: 'center' }}>
+        <Text style={styles.disclaimer}>
           This is an automatically generated summary. It does not constitute a legal document.
         </Text>
 
-        <Text style={styles.footer}>
-          Minchin & Kelly - Powered by OrionX | All rights reserved {new Date().getFullYear()}
-        </Text>
+        {/* Running footer */}
+        <View style={styles.pageFooter} fixed>
+          <Text style={styles.footerText}>
+            Prepared by {firmName} | {lawyerName}
+          </Text>
+          <Text style={styles.footerText}>
+            {new Date().getFullYear()} | All rights reserved
+          </Text>
+        </View>
       </Page>
     </Document>
   );

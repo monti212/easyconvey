@@ -43,12 +43,15 @@ interface ConveyancerDashboardProps {
   onBack: () => void;
 }
 
-type DocumentType = 'deed_of_sale' | 'transfer_duty' | 'power_of_attorney' | 'affidavit' | 'bond_registration' | 'compliance_certificate';
+type DocumentType = 'deed_of_sale' | 'deed_of_transfer' | 'transfer_duty' | 'power_of_attorney' | 'declaration_of_purchase' | 'affidavit' | 'bond_registration' | 'compliance_certificate' | 'missing_information';
 
 const DOCUMENT_TYPES: { id: DocumentType; label: string; description: string }[] = [
+  { id: 'missing_information', label: 'Missing Information Checklist', description: 'Transaction readiness review — flags missing data and documents' },
   { id: 'deed_of_sale', label: 'Deed of Sale & Transfer', description: 'Full conveyancing agreement between buyer and seller' },
+  { id: 'deed_of_transfer', label: 'Deed of Transfer (Registry)', description: 'Actual transfer document registered at the Deeds Registry' },
   { id: 'transfer_duty', label: 'Transfer Duty Declaration', description: 'Transfer Duty Act (Cap 53:01) declaration form' },
-  { id: 'power_of_attorney', label: 'Power of Attorney', description: 'Authority to act on behalf of a party in the transfer' },
+  { id: 'power_of_attorney', label: 'Power of Attorney to Transfer', description: 'POA to give transfer and Declaration of Seller' },
+  { id: 'declaration_of_purchase', label: 'Declaration of Purchaser', description: 'Statutory declaration by the buyer/purchaser' },
   { id: 'affidavit', label: 'Affidavit', description: 'Sworn statement supporting the property transaction' },
   { id: 'bond_registration', label: 'Bond Registration', description: 'Mortgage bond registration document for the property' },
   { id: 'compliance_certificate', label: 'Compliance Certificate', description: 'Municipal and regulatory compliance declaration' },
@@ -344,6 +347,8 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
           sellerName={currentTransaction?.sellerName || 'Seller'}
           propertyPrice={currentTransaction?.propertyPrice || '0'}
           generatedContent={generatedDocument}
+          firmName={authOrg?.name}
+          lawyerName={orgUser ? `${orgUser.first_name || ''} ${orgUser.last_name || ''}`.trim() : undefined}
         />
       ).toBlob();
     } catch {
@@ -928,6 +933,8 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         caseNumber={currentTransaction?.caseNumber || transactionId}
         buyerName={currentTransaction?.buyerName || 'Buyer'}
         sellerName={currentTransaction?.sellerName || 'Seller'}
+        firmName={authOrg?.name}
+        lawyerName={orgUser ? `${orgUser.first_name || ''} ${orgUser.last_name || ''}`.trim() : undefined}
       />
 
       {/* Error Popup Modal */}

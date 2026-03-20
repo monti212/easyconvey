@@ -74,8 +74,14 @@ const ConveyancerLogin: React.FC<ConveyancerLoginProps> = ({ onBack }) => {
 
     try {
       if (isSignUp) {
-        await signUp(email, password, { first_name: firstName, last_name: lastName });
-        setSignUpSuccess(true);
+        await signUp(email, password, { first_name: firstName, last_name: lastName }, organizationType, loginRole);
+        // Try auto-sign-in — if email confirmation is disabled, this will work immediately
+        try {
+          await signIn(email, password);
+        } catch {
+          // If sign-in fails (email not confirmed yet), show verification screen
+          setSignUpSuccess(true);
+        }
       } else {
         await signIn(email, password);
       }

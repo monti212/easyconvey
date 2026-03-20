@@ -4,7 +4,7 @@ import {
   Search,
   BarChart3,
   FileText,
-  Building,
+  Inbox,
   Filter,
   Bell,
   Settings,
@@ -158,9 +158,9 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
     },
     {
       id: 'banks',
-      name: 'Bank Applications',
-      icon: Building,
-      description: 'Financial institution matters',
+      name: 'Inbox',
+      icon: Inbox,
+      description: 'Received files & info from agents and banks',
       count: bankApplications.filter(app => app.status === 'submitted').length
     },
     {
@@ -286,8 +286,9 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
         
         {activeTab === 'status' && (
           <MatterStatusSection
-            searchTerm={searchTerm}
-            onSearch={setSearchTerm}
+            cases={cases}
+            orgId={orgId}
+            onViewTransaction={onViewTransaction}
           />
         )}
         

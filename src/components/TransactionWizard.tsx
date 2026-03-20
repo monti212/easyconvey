@@ -34,8 +34,12 @@ interface TransactionWizardProps {
   sharedTransactionData?: SharedTransactionData;
   mode?: 'conveyancer' | 'client';
   clientToken?: string;
+  clientCaseId?: string;
+  clientRole?: 'buyer' | 'seller';
   onClientSubmitComplete?: () => void;
   onComplete?: () => void;
+  lawFirms?: { id: string; name: string }[];
+  onSendToLawFirm?: (firmId: string, firmName: string) => void;
 }
 
 const TransactionWizard: React.FC<TransactionWizardProps> = ({
@@ -45,8 +49,12 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   sharedTransactionData,
   mode = 'conveyancer',
   clientToken,
+  clientCaseId,
+  clientRole,
   onClientSubmitComplete,
   onComplete,
+  lawFirms,
+  onSendToLawFirm,
 }) => {
   const { updateTransactionProgress, updateTransaction, markTransactionComplete } = useTransactions();
   const { orgUser, organization } = useAuth();
@@ -217,10 +225,33 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       const stepNames = getNavigationSteps().map(step => step.name);
       const currentStepName = getCurrentStepName();
       const totalSteps = stepNames.length;
-      
+
       updateTransactionProgress(transactionId, currentStep, currentStepName, totalSteps);
     }
   }, [currentStep, transactionId]);
+
+  // Track client step progress via activity log (skip initial mount)
+  const stepStartTimeRef = useRef<number>(Date.now());
+  const isFirstStepRender = useRef(true);
+  useEffect(() => {
+    if (mode !== 'client' || !clientToken || !clientCaseId || !clientRole) return;
+    if (isFirstStepRender.current) {
+      isFirstStepRender.current = false;
+      stepStartTimeRef.current = Date.now();
+      return;
+    }
+    const durationSeconds = Math.round((Date.now() - stepStartTimeRef.current) / 1000);
+    casesService.trackLinkActivity({
+      token: clientToken,
+      case_id: clientCaseId,
+      role: clientRole,
+      event_type: 'step_viewed',
+      step_number: currentStep,
+      step_name: getCurrentStepName(),
+      duration_seconds: durationSeconds > 0 ? durationSeconds : undefined,
+    });
+    stepStartTimeRef.current = Date.now();
+  }, [currentStep, mode, clientToken, clientCaseId, clientRole]);
 
   const nextStep = () => {
     // If on Agent Info step (1)
@@ -546,6 +577,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             clientToken={clientToken}
             onClientSubmitComplete={onClientSubmitComplete}
             onComplete={onComplete}
+            firmName={organization?.name}
+            lawyerName={orgUser ? `${orgUser.first_name || ''} ${orgUser.last_name || ''}`.trim() : undefined}
+            lawFirms={lawFirms}
+            onSendToLawFirm={onSendToLawFirm}
           />
         );
       case 8: // Company Details

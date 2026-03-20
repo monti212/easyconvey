@@ -62,6 +62,14 @@ export default function ClientWizard({ token, role, onComplete }: ClientWizardPr
         }
         setCaseData(result.case_);
         setStatus('valid');
+        // Track link opened
+        casesService.trackLinkActivity({
+          token,
+          case_id: result.case_.id,
+          role: result.role as 'buyer' | 'seller',
+          event_type: 'link_opened',
+          metadata: { userAgent: navigator.userAgent, timestamp: new Date().toISOString() },
+        });
       } catch {
         setStatus('invalid');
         setErrorMessage('Unable to validate this link. Please try again later.');
@@ -133,6 +141,8 @@ export default function ClientWizard({ token, role, onComplete }: ClientWizardPr
           transactionId={caseData?.case_number || token}
           mode="client"
           clientToken={token}
+          clientCaseId={caseData?.id}
+          clientRole={role}
           onClientSubmitComplete={() => {
             setStatus('submitted');
             onComplete();

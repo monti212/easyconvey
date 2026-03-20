@@ -7,13 +7,59 @@ export async function signInWithEmail(email: string, password: string) {
   return data;
 }
 
-export async function signUpWithEmail(email: string, password: string, metadata?: { first_name?: string; last_name?: string }) {
+export async function signUpWithEmail(
+  email: string,
+  password: string,
+  metadata?: { first_name?: string; last_name?: string },
+  organizationType?: string,
+  loginRole?: string,
+) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: { data: metadata },
   });
   if (error) throw error;
+
+  // Auto-provision organization and membership for the new user
+  if (data.user) {
+    try {
+      const fullName = [metadata?.first_name, metadata?.last_name].filter(Boolean).join(' ') || email;
+      const orgType = organizationType || 'conveyancer';
+      const role = loginRole || 'super_admin';
+
+      // Create organization
+      const { data: org, error: orgError } = await supabase
+        .from('organizations')
+        .insert({
+          name: `${fullName}'s Organization`,
+          type: orgType,
+        })
+        .select()
+        .single();
+
+      if (orgError) throw orgError;
+
+      // Create organization_users membership
+      const { error: memberError } = await supabase
+        .from('organization_users')
+        .insert({
+          organization_id: org.id,
+          email,
+          first_name: metadata?.first_name || '',
+          last_name: metadata?.last_name || '',
+          role,
+          is_active: true,
+          auth_user_id: data.user.id,
+        });
+
+      if (memberError) throw memberError;
+    } catch (provisionError) {
+      console.error('Failed to auto-provision organization:', provisionError);
+      // Don't block signup — user can be linked manually later
+    }
+  }
+
   return data;
 }
 

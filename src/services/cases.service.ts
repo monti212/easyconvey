@@ -117,7 +117,7 @@ export async function createCaseWithTokens(
 export async function getCaseByToken(token: string): Promise<{ case_: Case; role: string; expired: boolean; used: boolean } | null> {
   const { data, error } = await supabase
     .from('case_share_tokens')
-    .select('*, case:cases(*)')
+    .select('*, case:cases(*, organization:organizations(*))')
     .eq('token', token)
     .single();
 
@@ -150,4 +150,55 @@ export async function getTokensForCase(caseId: string): Promise<CaseShareToken[]
     .order('role');
   if (error) throw error;
   return (data || []) as CaseShareToken[];
+}
+
+export async function getTokensForOrg(organizationId: string): Promise<CaseShareToken[]> {
+  const { data, error } = await supabase
+    .from('case_share_tokens')
+    .select('*')
+    .in('case_id', supabase.from('cases').select('id').eq('organization_id', organizationId) as any)
+    .order('created_at', { ascending: false });
+  if (error) return [];
+  return (data || []) as CaseShareToken[];
+}
+
+// --- Link activity tracking ---
+
+export interface LinkActivity {
+  id: string;
+  token: string;
+  case_id: string;
+  role: 'buyer' | 'seller';
+  event_type: 'link_opened' | 'step_viewed' | 'step_completed' | 'submitted';
+  step_number?: number;
+  step_name?: string;
+  duration_seconds?: number;
+  metadata?: any;
+  created_at: string;
+}
+
+export async function trackLinkActivity(activity: Omit<LinkActivity, 'id' | 'created_at'>): Promise<void> {
+  const { error } = await supabase.from('case_link_activity').insert(activity);
+  if (error) console.warn('Activity tracking unavailable:', error.message);
+}
+
+export async function getLinkActivityForCase(caseId: string): Promise<LinkActivity[]> {
+  const { data, error } = await supabase
+    .from('case_link_activity')
+    .select('*')
+    .eq('case_id', caseId)
+    .order('created_at', { ascending: true });
+  if (error) return [];
+  return (data || []) as LinkActivity[];
+}
+
+export async function getAllLinkActivity(organizationId: string): Promise<LinkActivity[]> {
+  const { data, error } = await supabase
+    .from('case_link_activity')
+    .select('*')
+    .in('case_id', supabase.from('cases').select('id').eq('organization_id', organizationId) as any)
+    .order('created_at', { ascending: false })
+    .limit(500);
+  if (error) return [];
+  return (data || []) as LinkActivity[];
 }
