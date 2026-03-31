@@ -218,15 +218,15 @@ app.post('/api/send-share-link', async (req, res) => {
           'Authorization': `Bearer ${resendKey}`,
         },
         body: JSON.stringify({
-          from: process.env.RESEND_FROM_EMAIL || 'EasyConvey <noreply@easyconvey.co.bw>',
+          from: process.env.RESEND_FROM_EMAIL || 'Minchin & Kelly <noreply@minchinandkelly.co.bw>',
           to: [email],
-          subject: `You've been invited to a property transaction on EasyConvey`,
+          subject: `You've been invited to a property transaction on Minchin & Kelly`,
           html: `
             <h2>Property Transaction Invitation</h2>
             <p>You have been invited to participate in a property ${transactionType} transaction${hasPricing ? ' with pricing details included' : ''}.</p>
             <p>Transaction ID: <strong>${transactionId}</strong></p>
-            <p><a href="${link}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">Start Your Transaction</a></p>
-            <p style="color:#666;font-size:12px;margin-top:24px;">Easy Convey - Botswana Property Conveyancing Platform</p>
+            <p><a href="${link}" style="display:inline-block;padding:12px 24px;background:#0B1F3A;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">Start Your Transaction</a></p>
+            <p style="color:#666;font-size:12px;margin-top:24px;">Minchin & Kelly — Botswana Property Conveyancing</p>
           `,
         }),
       });

@@ -18,11 +18,14 @@ import {
   MapPin,
   User,
   FileText,
+  AlertCircle,
 } from 'lucide-react';
 import { Loan, Case, Organization, OrganizationUser } from '../../types/database';
 import { useLoans } from '../../hooks/useLoans';
 import { useCases } from '../../hooks/useCases';
 import { useOrganizationsByType } from '../../hooks/useOrganization';
+import * as casesService from '../../services/cases.service';
+import * as communicationsService from '../../services/communications.service';
 import LoadingSpinner from '../ui/LoadingSpinner';
 
 interface FinancialInstitutionDashboardProps {
@@ -85,10 +88,14 @@ function SendTransactionModal({
   loans,
   onClose,
   onSubmit,
+  sending,
+  sendError,
 }: {
   loans: Loan[];
   onClose: () => void;
   onSubmit: (data: any) => void;
+  sending?: boolean;
+  sendError?: string | null;
 }) {
   const approvedLoans = loans.filter(l => l.status === 'approved');
   const { orgs: conveyancerOrgs } = useOrganizationsByType('conveyancer');
@@ -111,7 +118,7 @@ function SendTransactionModal({
     if (Object.keys(newErrors).length > 0) return;
     onSubmit({
       loanId: selectedLoan,
-      conveyancerFirm: selectedFirm,
+      conveyancerFirmId: selectedFirm,
       propertyAddress,
       transactionType,
       specialInstructions,
@@ -161,7 +168,7 @@ function SendTransactionModal({
             >
               <option value="">Select a firm...</option>
               {conveyancerOrgs.map(o => (
-                <option key={o.id} value={o.name}>{o.name}</option>
+                <option key={o.id} value={o.id}>{o.name}</option>
               ))}
             </select>
             {errors.firm && <p className="text-xs text-red-500 mt-1">{errors.firm}</p>}
@@ -220,19 +227,28 @@ function SendTransactionModal({
             </div>
           )}
 
+          {sendError && (
+            <div className="flex items-center gap-2 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg">
+              <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+              <p className="text-xs text-red-700">{sendError}</p>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+              disabled={sending}
+              className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2.5 bg-[#C8A14F] text-white rounded-lg text-sm font-medium hover:bg-[#b8923f] transition-colors"
+              disabled={sending}
+              className="flex-1 px-4 py-2.5 bg-[#C8A14F] text-white rounded-lg text-sm font-medium hover:bg-[#b8923f] transition-colors disabled:opacity-50"
             >
-              Send to Law Firm
+              {sending ? 'Sending...' : 'Send to Law Firm'}
             </button>
           </div>
         </form>
@@ -292,16 +308,49 @@ const FinancialInstitutionDashboard: React.FC<FinancialInstitutionDashboardProps
     return { total, complete, inProgress, pending, totalValue, approvedReady };
   }, [transactions, loans]);
 
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
   const handleSendTransaction = async (data: any) => {
     const loan = loans.find(l => l.id === data.loanId);
-    if (loan) {
-      try {
-        await updateLoan(loan.id, { status: 'disbursed' });
-      } catch (err) {
-        console.error('Failed to update loan:', err);
-      }
+    if (!loan) return;
+
+    setSending(true);
+    setSendError(null);
+
+    try {
+      // 1. Create a case under the conveyancer's organization
+      const { case_, buyerToken, sellerToken } = await casesService.createCaseWithTokens({
+        organization_id: data.conveyancerFirmId,
+        case_type: data.transactionType,
+        client_name: loan.applicant_name,
+        status: 'initiated',
+        priority: 'medium',
+        documents: [],
+        notes: data.specialInstructions || undefined,
+      });
+
+      // 2. Link the loan to the new case and mark as disbursed
+      await updateLoan(loan.id, { status: 'disbursed', case_id: case_.id });
+
+      // 3. Send a communication to the conveyancer firm
+      await communicationsService.sendMessage({
+        sender_organization_id: organization.id,
+        sender_user_id: user.id,
+        recipient_organization_id: data.conveyancerFirmId,
+        subject: `New transaction: ${loan.applicant_name} — ${case_.case_number}`,
+        message: `A new ${data.transactionType} transaction has been submitted for ${loan.applicant_name}.\n\nLoan: ${loan.application_number}\nAmount: P ${loan.loan_amount.toLocaleString()}\nProperty: ${data.propertyAddress}\n\n${data.specialInstructions ? `Instructions: ${data.specialInstructions}` : ''}`,
+        case_id: case_.id,
+        loan_id: loan.id,
+      });
+
+      setShowSendModal(false);
+    } catch (err) {
+      console.error('Failed to send transaction:', err);
+      setSendError('Failed to send transaction. Please try again.');
+    } finally {
+      setSending(false);
     }
-    setShowSendModal(false);
   };
 
   if (loansLoading || casesLoading) {
@@ -410,8 +459,10 @@ const FinancialInstitutionDashboard: React.FC<FinancialInstitutionDashboardProps
       {showSendModal && (
         <SendTransactionModal
           loans={loans}
-          onClose={() => setShowSendModal(false)}
+          onClose={() => { setShowSendModal(false); setSendError(null); }}
           onSubmit={handleSendTransaction}
+          sending={sending}
+          sendError={sendError}
         />
       )}
     </div>

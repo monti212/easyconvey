@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
-import { 
-  DollarSign, 
-  TrendingUp, 
-  Clock, 
-  CheckCircle, 
-  Receipt, 
-  Download, 
-  Upload, 
-  Eye, 
+import React, { useState, useRef } from 'react';
+import {
+  DollarSign,
+  TrendingUp,
+  Clock,
+  CheckCircle,
+  Receipt,
+  Download,
+  Upload,
+  Eye,
   X,
   AlertCircle,
   CreditCard,
@@ -39,6 +39,9 @@ const CommissionTracker: React.FC<CommissionTrackerProps> = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'pending' | 'ready' | 'paid'>('overview');
   const [showInvoiceUpload, setShowInvoiceUpload] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
+  const [invoiceSubmitting, setInvoiceSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatCurrency = (amount: number) => `P ${amount.toLocaleString()}`;
 
@@ -380,25 +383,69 @@ const CommissionTracker: React.FC<CommissionTrackerProps> = ({
                 Transaction: <strong>{selectedTransaction.transaction_number}</strong><br />
                 Commission: <strong>{formatCurrency(selectedTransaction.commission_amount)}</strong>
               </p>
-              
+
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mb-4">
-                <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-600">Upload your commission invoice</p>
-                <input type="file" className="hidden" accept=".pdf,.jpg,.png" />
-                <button className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                  Select File
+                {invoiceFile ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <FileText className="h-6 w-6 text-green-600" />
+                    <span className="text-sm font-medium text-gray-900">{invoiceFile.name}</span>
+                    <button
+                      onClick={() => setInvoiceFile(null)}
+                      className="text-gray-400 hover:text-red-500 ml-2"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">Upload your commission invoice</p>
+                  </>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.jpg,.png"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) setInvoiceFile(file);
+                  }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  {invoiceFile ? 'Change File' : 'Select File'}
                 </button>
               </div>
-              
+
               <div className="flex space-x-3">
                 <button
-                  onClick={() => setShowInvoiceUpload(false)}
+                  onClick={() => {
+                    setShowInvoiceUpload(false);
+                    setInvoiceFile(null);
+                  }}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                 >
                   Cancel
                 </button>
-                <button className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                  Submit Invoice
+                <button
+                  disabled={!invoiceFile || invoiceSubmitting}
+                  onClick={async () => {
+                    if (!invoiceFile) return;
+                    setInvoiceSubmitting(true);
+                    // File upload would go here via storageService.uploadFile
+                    // For now, just close the modal with success
+                    setTimeout(() => {
+                      setInvoiceSubmitting(false);
+                      setShowInvoiceUpload(false);
+                      setInvoiceFile(null);
+                    }, 500);
+                  }}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  {invoiceSubmitting ? 'Submitting...' : 'Submit Invoice'}
                 </button>
               </div>
             </div>

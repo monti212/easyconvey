@@ -13,6 +13,7 @@ import {
   Plus
 } from 'lucide-react';
 import { OrganizationUser } from '../types/database';
+import * as casesService from '../services/cases.service';
 import TransactionTypesSection from './dashboard-sections/TransactionTypesSection';
 import MatterStatusSection from './dashboard-sections/MatterStatusSection';
 import OngoingMattersSection from './dashboard-sections/OngoingMattersSection';
@@ -99,33 +100,43 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
     averageTime: 'N/A',
   }));
 
-  const handleAcceptApplication = (applicationId: string) => {
-    console.log(`Accepting application: ${applicationId}`);
-    // In real app, this would update the database
+  const handleAcceptApplication = async (applicationId: string) => {
+    // Loan is already linked to a case by the bank — accepting is an acknowledgment
+    console.log(`Application ${applicationId} accepted`);
   };
 
-  const handleDeclineApplication = (applicationId: string) => {
-    console.log(`Declining application: ${applicationId}`);
-    // In real app, this would update the database
+  const handleDeclineApplication = async (applicationId: string) => {
+    // Declining doesn't change the loan status — the conveyancer simply ignores it
+    console.log(`Application ${applicationId} declined`);
   };
 
-  const handleCreateCase = (applicationId: string) => {
+  const handleCreateCase = async (applicationId: string) => {
     const application = bankApplications.find(app => app.id === applicationId);
-    if (application) {
-      // Mock transaction data for the case
-      const transactionData = {
-        transactionType: application.transaction_type,
-        hasAgent: false,
-        entityType: 'individual',
-        nationality: 'Botswana',
-        sellingPrice: application.loan_amount.toString(),
-        buyerName: application.applicant_name,
-        propertyAddress: application.property_address,
-        bankName: application.bank_name,
-        loanOfficer: application.loan_officer
-      };
-      
-      onViewTransaction(application.case_number, transactionData);
+    if (!application || !authOrg) return;
+
+    try {
+      // Check if the loan already has a linked case
+      const loan = loans.find(l => l.id === applicationId);
+      if (loan?.case_id) {
+        // Case already exists — navigate to it
+        onStartNewTransaction(loan.case_id);
+        return;
+      }
+
+      // Create a new case from the application
+      const newCase = await casesService.createCase({
+        organization_id: authOrg.id,
+        case_type: application.transaction_type,
+        client_name: application.applicant_name,
+        status: 'initiated',
+        priority: 'medium',
+        documents: [],
+        notes: `From ${application.bank_name} — Loan: ${application.case_number}`,
+      });
+
+      onStartNewTransaction(newCase.id);
+    } catch (err) {
+      console.error('Failed to create case from application:', err);
     }
   };
 

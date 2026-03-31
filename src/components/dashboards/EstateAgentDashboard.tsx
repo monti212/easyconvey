@@ -20,6 +20,8 @@ import { useProperties } from '../../hooks/useProperties';
 import { useCases } from '../../hooks/useCases';
 import { useOrganizationsByType } from '../../hooks/useOrganization';
 import { useTransactions } from '../../App';
+import * as casesService from '../../services/cases.service';
+import * as communicationsService from '../../services/communications.service';
 import TransactionWizard from '../TransactionWizard';
 import LoadingSpinner from '../ui/LoadingSpinner';
 
@@ -206,8 +208,31 @@ const EstateAgentDashboard: React.FC<EstateAgentDashboardProps> = ({
             mode="conveyancer"
             onComplete={() => setShowWizard(false)}
             lawFirms={conveyancerOrgs.map(o => ({ id: o.id, name: o.name }))}
-            onSendToLawFirm={(firmId, firmName) => {
-              console.log(`Transaction sent to law firm: ${firmName} (${firmId})`);
+            onSendToLawFirm={async (firmId, firmName) => {
+              try {
+                // Create a case under the conveyancer's organization
+                const { case_ } = await casesService.createCaseWithTokens({
+                  organization_id: firmId,
+                  case_type: 'buying',
+                  client_name: 'Via Estate Agent',
+                  status: 'initiated',
+                  priority: 'medium',
+                  documents: [],
+                  notes: `Submitted by ${organization.name} (Estate Agent)`,
+                });
+
+                // Send a communication to the conveyancer firm
+                await communicationsService.sendMessage({
+                  sender_organization_id: organization.id,
+                  sender_user_id: user.id,
+                  recipient_organization_id: firmId,
+                  subject: `New transaction from ${organization.name} — ${case_.case_number}`,
+                  message: `A new property transaction has been submitted by ${organization.name}.\n\nCase: ${case_.case_number}\nAgent: ${user.first_name} ${user.last_name}`,
+                  case_id: case_.id,
+                });
+              } catch (err) {
+                console.error('Failed to send to law firm:', err);
+              }
             }}
           />
         </div>

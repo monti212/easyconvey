@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Inbox,
   X,
@@ -386,8 +386,58 @@ const mockInboxItems: InboxItem[] = [
   },
 ];
 
-const BankApplicationsSection: React.FC<BankApplicationsSectionProps> = () => {
-  const [items, setItems] = useState<InboxItem[]>(mockInboxItems);
+function applicationsToInboxItems(applications: any[]): InboxItem[] {
+  return applications.map((app: any) => ({
+    id: app.id,
+    source_type: 'bank' as const,
+    source_name: app.bank_name || 'Unknown Bank',
+    source_contact: app.loan_officer || 'Unassigned',
+    source_email: app.applicant_email || '',
+    subject: `${app.transaction_type === 'buying' ? 'Purchase' : 'Sale'} Transaction — ${app.applicant_name}`,
+    message: `Loan application ${app.case_number} for P ${(app.loan_amount || 0).toLocaleString()} at ${app.property_address}.${app.special_instructions ? `\n\nInstructions: ${app.special_instructions}` : ''}`,
+    case_number: app.case_number || app.id,
+    property_address: app.property_address || 'Address pending',
+    applicant_name: app.applicant_name || 'Unknown',
+    attachments: [],
+    is_read: app.status === 'accepted',
+    is_starred: false,
+    is_archived: false,
+    received_at: app.submitted_at || new Date().toISOString(),
+    category: 'instruction' as const,
+    party_details: {
+      buyer: {
+        name: app.applicant_name || '',
+        email: app.applicant_email || '',
+        phone: '',
+        id_number: '',
+        address: '',
+        nationality: '',
+        marital_status: '',
+      },
+      seller: { name: '', email: '', phone: '', id_number: '', address: '' },
+      property: {
+        address: app.property_address || '',
+        erf_number: '',
+        title_deed_number: '',
+        purchase_price: `P ${(app.loan_amount || 0).toLocaleString()}`,
+        transfer_duty: '',
+      },
+    },
+  }));
+}
+
+const BankApplicationsSection: React.FC<BankApplicationsSectionProps> = ({ applications, onAcceptApplication, onDeclineApplication, onCreateCase }) => {
+  const realItems = applicationsToInboxItems(applications);
+  const initialItems = realItems.length > 0 ? realItems : mockInboxItems;
+  const [items, setItems] = useState<InboxItem[]>(initialItems);
+
+  // Sync items when applications prop changes
+  useEffect(() => {
+    const updated = applicationsToInboxItems(applications);
+    if (updated.length > 0) {
+      setItems(updated);
+    }
+  }, [applications]);
   const [filterSource, setFilterSource] = useState<'all' | 'bank' | 'estate_agent'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterRead, setFilterRead] = useState<string>('all');

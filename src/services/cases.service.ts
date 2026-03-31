@@ -115,19 +115,17 @@ export async function createCaseWithTokens(
 }
 
 export async function getCaseByToken(token: string): Promise<{ case_: Case; role: string; expired: boolean; used: boolean } | null> {
-  const { data, error } = await supabase
-    .from('case_share_tokens')
-    .select('*, case:cases(*, organization:organizations(*))')
-    .eq('token', token)
-    .single();
+  // Use a SECURITY DEFINER RPC so anonymous users can look up case data
+  // via share token without needing direct RLS access to cases/organizations.
+  const { data, error } = await supabase.rpc('get_case_by_share_token', { p_token: token });
 
   if (error || !data) return null;
 
   return {
     case_: data.case as Case,
     role: data.role,
-    expired: new Date(data.expires_at) < new Date(),
-    used: !!data.used_at,
+    expired: data.expired,
+    used: data.used,
   };
 }
 
