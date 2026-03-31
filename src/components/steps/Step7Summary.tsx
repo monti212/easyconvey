@@ -6,6 +6,7 @@ import TransactionSummaryPDF from '../../lib/pdf/transactionSummary';
 import DeedOfSalePDF from '../../lib/pdf/deedOfSale';
 import DocumentStreamViewer from '../DocumentStreamViewer';
 import * as casesService from '../../services/cases.service';
+import type { Case } from '../../types/database';
 import JSZip from 'jszip';
 
 interface Step7Props {
@@ -126,17 +127,18 @@ const Step7Summary: React.FC<Step7Props> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [caseRecord, setCaseRecord] = useState<any>(null);
+  const [caseRecord, setCaseRecord] = useState<Case | null>(null);
 
   useEffect(() => {
+    let active = true;
     async function fetchCaseData() {
       try {
         if (mode === 'conveyancer' && transactionId) {
           const record = await casesService.getCase(transactionId);
-          setCaseRecord(record);
+          if (active) setCaseRecord(record);
         } else if (mode === 'client' && clientToken) {
           const result = await casesService.getCaseByToken(clientToken);
-          if (result && !result.expired) {
+          if (active && result && !result.expired) {
             setCaseRecord(result.case_);
           }
         }
@@ -145,6 +147,7 @@ const Step7Summary: React.FC<Step7Props> = ({
       }
     }
     fetchCaseData();
+    return () => { active = false; };
   }, [mode, transactionId, clientToken]);
 
   // AI Document Generation state
@@ -164,6 +167,43 @@ const Step7Summary: React.FC<Step7Props> = ({
   const stopRequestedRef = useRef(false);
   const [isDownloadingPack, setIsDownloadingPack] = useState(false);
 
+  const buildPartyDetails = useCallback((data: any) => {
+    if (!data) return null;
+    const name = data.hasAgent ? data.agentName
+      : data.entityType === 'company' ? data.companyName
+      : data.entityType === 'trust' ? data.trustName
+      : data.entityType === 'estate' ? data.deceasedName
+      : data.entityType === 'society' ? data.societyName
+      : data.clientName || 'Not specified';
+    return {
+      clientName: name,
+      entityType: data.entityType || 'Individual',
+      gender: data.gender || 'Not specified',
+      nationality: data.nationality || 'Not specified',
+      maritalStatus: data.maritalStatus || 'Not specified',
+      idNumber: data.agentIdPassport || data.idNumber || 'To be verified',
+      phone: data.agentContact || data.phone || 'On file',
+      email: data.agentEmail || data.email || 'On file',
+      isFirstTimeBuyer: data.isFirstTimeBuyer || false,
+      hasAgent: data.hasAgent,
+      agentName: data.agentName,
+      agentCompany: data.agentCompany,
+      agentContact: data.agentContact,
+      agentEmail: data.agentEmail,
+      agentRegNumber: data.agentRegNumber,
+      commissionType: data.commissionType,
+      commissionValue: data.commissionValue,
+      sellingPrice: data.sellingPrice,
+      valuationAmount: data.valuationAmount,
+      uploadedDocuments: data.uploadedDocuments,
+      hasBond: data.hasBond,
+      companyName: data.companyName,
+      registrationNumber: data.registrationNumber,
+      trustName: data.trustName,
+      trustNumber: data.trustNumber,
+    };
+  }, []);
+
   const generateDocument = useCallback(async (docType: DocumentType, signal?: AbortSignal) => {
     setIsGeneratingDoc(true);
     setSelectedDocType(docType);
@@ -174,43 +214,6 @@ const Step7Summary: React.FC<Step7Props> = ({
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-
-      const buildPartyDetails = (data: any): any => {
-        if (!data) return null;
-        const name = data.hasAgent ? data.agentName
-          : data.entityType === 'company' ? data.companyName
-          : data.entityType === 'trust' ? data.trustName
-          : data.entityType === 'estate' ? data.deceasedName
-          : data.entityType === 'society' ? data.societyName
-          : data.clientName || 'Not specified';
-        return {
-          clientName: name,
-          entityType: data.entityType || 'Individual',
-          gender: data.gender || 'Not specified',
-          nationality: data.nationality || 'Not specified',
-          maritalStatus: data.maritalStatus || 'Not specified',
-          idNumber: data.agentIdPassport || data.idNumber || 'To be verified',
-          phone: data.agentContact || data.phone || 'On file',
-          email: data.agentEmail || data.email || 'On file',
-          isFirstTimeBuyer: data.isFirstTimeBuyer || false,
-          hasAgent: data.hasAgent,
-          agentName: data.agentName,
-          agentCompany: data.agentCompany,
-          agentContact: data.agentContact,
-          agentEmail: data.agentEmail,
-          agentRegNumber: data.agentRegNumber,
-          commissionType: data.commissionType,
-          commissionValue: data.commissionValue,
-          sellingPrice: data.sellingPrice,
-          valuationAmount: data.valuationAmount,
-          uploadedDocuments: data.uploadedDocuments,
-          hasBond: data.hasBond,
-          companyName: data.companyName,
-          registrationNumber: data.registrationNumber,
-          trustName: data.trustName,
-          trustNumber: data.trustNumber,
-        };
-      };
 
       const currentPartyDetails = buildPartyDetails(transactionData);
       const isBuyer = transactionData.transactionType !== 'selling';
@@ -223,12 +226,12 @@ const Step7Summary: React.FC<Step7Props> = ({
       if (isBuyer) {
         buyerDetails = currentPartyDetails;
         buyerName = currentPartyDetails?.clientName || 'Not specified';
-        sellerDetails = caseRecord?.seller_data ? buildPartyDetails(caseRecord.seller_data) : null;
+        sellerDetails = buildPartyDetails(caseRecord?.seller_data);
         sellerName = sellerDetails?.clientName || 'Not specified';
       } else {
         sellerDetails = currentPartyDetails;
         sellerName = currentPartyDetails?.clientName || 'Not specified';
-        buyerDetails = caseRecord?.buyer_data ? buildPartyDetails(caseRecord.buyer_data) : null;
+        buyerDetails = buildPartyDetails(caseRecord?.buyer_data);
         buyerName = buyerDetails?.clientName || 'Not specified';
       }
 
@@ -330,7 +333,7 @@ const Step7Summary: React.FC<Step7Props> = ({
     } finally {
       setIsGeneratingDoc(false);
     }
-  }, [transactionData, transactionReferenceId]);
+  }, [transactionData, transactionReferenceId, caseRecord, buildPartyDetails]);
 
   // Generate all documents sequentially
   const generateAllDocuments = useCallback(async () => {
