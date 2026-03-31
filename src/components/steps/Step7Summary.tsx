@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ArrowLeft, CheckCircle, Clipboard, Download, FileText, Users, Clock, Banknote, UserCircle, Building, Lock, Shield, ExternalLink, Share2, Loader2, Sparkles, Eye, Printer, StopCircle, PlayCircle, FolderDown, Send, Building2 } from 'lucide-react';
 import { useTransactions } from '../../App';
 import { pdf } from '@react-pdf/renderer';
@@ -126,6 +126,26 @@ const Step7Summary: React.FC<Step7Props> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [caseRecord, setCaseRecord] = useState<any>(null);
+
+  useEffect(() => {
+    async function fetchCaseData() {
+      try {
+        if (mode === 'conveyancer' && transactionId) {
+          const record = await casesService.getCase(transactionId);
+          setCaseRecord(record);
+        } else if (mode === 'client' && clientToken) {
+          const result = await casesService.getCaseByToken(clientToken);
+          if (result && !result.expired) {
+            setCaseRecord(result.case_);
+          }
+        }
+      } catch {
+        // Graceful fallback: document generation still works with partial data
+      }
+    }
+    fetchCaseData();
+  }, [mode, transactionId, clientToken]);
 
   // AI Document Generation state
   const [selectedDocType, setSelectedDocType] = useState<DocumentType>('deed_of_sale');
@@ -154,40 +174,63 @@ const Step7Summary: React.FC<Step7Props> = ({
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const clientName = transactionData.hasAgent ? transactionData.agentName
-        : transactionData.entityType === 'company' ? (transactionData as any).companyName
-        : transactionData.entityType === 'trust' ? (transactionData as any).trustName
-        : transactionData.entityType === 'estate' ? (transactionData as any).deceasedName
-        : transactionData.entityType === 'society' ? (transactionData as any).societyName
-        : 'Not specified';
 
-      const buyerDetails = {
-        clientName,
-        entityType: transactionData.entityType || 'Individual',
-        gender: transactionData.gender || 'Not specified',
-        nationality: transactionData.nationality || 'Not specified',
-        maritalStatus: transactionData.maritalStatus || 'Not specified',
-        idNumber: transactionData.agentIdPassport || 'To be verified',
-        phone: transactionData.agentContact || 'On file',
-        email: transactionData.agentEmail || 'On file',
-        isFirstTimeBuyer: transactionData.isFirstTimeBuyer || false,
-        hasAgent: transactionData.hasAgent,
-        agentName: transactionData.agentName,
-        agentCompany: transactionData.agentCompany,
-        agentContact: transactionData.agentContact,
-        agentEmail: transactionData.agentEmail,
-        agentRegNumber: transactionData.agentRegNumber,
-        commissionType: transactionData.commissionType,
-        commissionValue: transactionData.commissionValue,
-        sellingPrice: transactionData.sellingPrice,
-        valuationAmount: transactionData.valuationAmount,
-        uploadedDocuments: transactionData.uploadedDocuments,
-        hasBond: transactionData.hasBond,
-        companyName: (transactionData as any).companyName,
-        registrationNumber: (transactionData as any).registrationNumber,
-        trustName: (transactionData as any).trustName,
-        trustNumber: (transactionData as any).trustNumber,
+      const buildPartyDetails = (data: any): any => {
+        if (!data) return null;
+        const name = data.hasAgent ? data.agentName
+          : data.entityType === 'company' ? data.companyName
+          : data.entityType === 'trust' ? data.trustName
+          : data.entityType === 'estate' ? data.deceasedName
+          : data.entityType === 'society' ? data.societyName
+          : data.clientName || 'Not specified';
+        return {
+          clientName: name,
+          entityType: data.entityType || 'Individual',
+          gender: data.gender || 'Not specified',
+          nationality: data.nationality || 'Not specified',
+          maritalStatus: data.maritalStatus || 'Not specified',
+          idNumber: data.agentIdPassport || data.idNumber || 'To be verified',
+          phone: data.agentContact || data.phone || 'On file',
+          email: data.agentEmail || data.email || 'On file',
+          isFirstTimeBuyer: data.isFirstTimeBuyer || false,
+          hasAgent: data.hasAgent,
+          agentName: data.agentName,
+          agentCompany: data.agentCompany,
+          agentContact: data.agentContact,
+          agentEmail: data.agentEmail,
+          agentRegNumber: data.agentRegNumber,
+          commissionType: data.commissionType,
+          commissionValue: data.commissionValue,
+          sellingPrice: data.sellingPrice,
+          valuationAmount: data.valuationAmount,
+          uploadedDocuments: data.uploadedDocuments,
+          hasBond: data.hasBond,
+          companyName: data.companyName,
+          registrationNumber: data.registrationNumber,
+          trustName: data.trustName,
+          trustNumber: data.trustNumber,
+        };
       };
+
+      const currentPartyDetails = buildPartyDetails(transactionData);
+      const isBuyer = transactionData.transactionType !== 'selling';
+
+      let buyerDetails: any;
+      let sellerDetails: any;
+      let buyerName: string;
+      let sellerName: string;
+
+      if (isBuyer) {
+        buyerDetails = currentPartyDetails;
+        buyerName = currentPartyDetails?.clientName || 'Not specified';
+        sellerDetails = caseRecord?.seller_data ? buildPartyDetails(caseRecord.seller_data) : null;
+        sellerName = sellerDetails?.clientName || 'Not specified';
+      } else {
+        sellerDetails = currentPartyDetails;
+        sellerName = currentPartyDetails?.clientName || 'Not specified';
+        buyerDetails = caseRecord?.buyer_data ? buildPartyDetails(caseRecord.buyer_data) : null;
+        buyerName = buyerDetails?.clientName || 'Not specified';
+      }
 
       const response = await fetch(`${supabaseUrl}/functions/v1/generate-conveyancing-document`, {
         method: 'POST',
@@ -197,9 +240,9 @@ const Step7Summary: React.FC<Step7Props> = ({
           documentType: docType,
           propertyPrice: transactionData.sellingPrice ? `P ${parseInt(transactionData.sellingPrice).toLocaleString()}` : 'Not specified',
           buyerDetails,
-          sellerDetails: null,
-          buyerName: clientName,
-          sellerName: 'Not specified',
+          sellerDetails,
+          buyerName,
+          sellerName,
           documentPaths: (transactionData.documentFilePaths || []).map(fp => ({ path: fp.path, bucket: fp.bucket })),
           documentImages: (transactionData.documentDataUrls || []).map(d => ({ dataUrl: d.dataUrl, name: d.name, docType: d.docType })),
           stream: true,
