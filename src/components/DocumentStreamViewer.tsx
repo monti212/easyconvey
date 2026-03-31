@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { FileText, Sparkles, Download, Printer, CheckCircle, Copy, Check, StopCircle } from 'lucide-react';
 
 interface DocumentStreamViewerProps {
@@ -200,8 +201,13 @@ const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
                 prose-strong:text-gray-900 prose-strong:font-semibold
                 prose-ol:pl-6 prose-ul:pl-6
                 prose-hr:border-gray-300
+                prose-table:w-full prose-table:border-collapse prose-table:text-[12px]
+                prose-thead:bg-[#1a1a2e] prose-thead:text-white
+                prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-semibold prose-th:text-[11px] prose-th:uppercase prose-th:tracking-wide
+                prose-td:px-3 prose-td:py-2 prose-td:border prose-td:border-gray-200 prose-td:text-[12px] prose-td:align-top
+                prose-tr:even:bg-gray-50
               ">
-                <ReactMarkdown>{content}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
               </article>
 
               {/* Streaming cursor */}

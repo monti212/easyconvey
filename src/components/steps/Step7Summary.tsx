@@ -120,10 +120,21 @@ const Step7Summary: React.FC<Step7Props> = ({
     }).format(date);
   };
 
-  const transactionReferenceId = React.useMemo(() => 
-    transactionId || Math.random().toString(36).substring(2, 10).toUpperCase(), 
+  const transactionReferenceId = React.useMemo(() =>
+    transactionId || Math.random().toString(36).substring(2, 10).toUpperCase(),
     [transactionId]
   );
+
+  // Derive display names for buyer and seller based on current party's role and case record
+  const isBuyerRole = transactionData.transactionType !== 'selling';
+  const currentPartyDisplayName = transactionData.hasAgent
+    ? transactionData.agentName
+    : (transactionData as any).companyName || (transactionData as any).trustName || 'Party';
+  const counterpartyDisplayName = isBuyerRole
+    ? (caseRecord?.seller_data?.clientName || caseRecord?.seller_data?.agentName || 'Seller')
+    : (caseRecord?.buyer_data?.clientName || caseRecord?.buyer_data?.agentName || 'Buyer');
+  const resolvedBuyerName = isBuyerRole ? currentPartyDisplayName : counterpartyDisplayName;
+  const resolvedSellerName = isBuyerRole ? counterpartyDisplayName : currentPartyDisplayName;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -393,8 +404,8 @@ const Step7Summary: React.FC<Step7Props> = ({
           blob = await pdf(
             <DeedOfSalePDF
               transactionId={transactionReferenceId}
-              buyerName={transactionData.hasAgent ? transactionData.agentName : 'Buyer'}
-              sellerName="Seller"
+              buyerName={resolvedBuyerName}
+              sellerName={resolvedSellerName}
               propertyPrice={transactionData.sellingPrice || '0'}
               generatedContent={content}
               documentTitle={docTitle}
@@ -432,8 +443,8 @@ const Step7Summary: React.FC<Step7Props> = ({
       blob = await pdf(
         <DeedOfSalePDF
           transactionId={transactionReferenceId}
-          buyerName={transactionData.hasAgent ? transactionData.agentName : 'Buyer'}
-          sellerName="Seller"
+          buyerName={resolvedBuyerName}
+          sellerName={resolvedSellerName}
           propertyPrice={transactionData.sellingPrice || '0'}
           generatedContent={content}
           documentTitle={docTitle}
@@ -561,8 +572,8 @@ const Step7Summary: React.FC<Step7Props> = ({
         <TransactionSummaryPDF
           transactionId={transactionId || 'UNKNOWN'}
           transactionType={transactionData.transactionType}
-          buyerName={transactionData.hasAgent ? transactionData.agentName : 'Buyer'}
-          sellerName="Seller"
+          buyerName={resolvedBuyerName}
+          sellerName={resolvedSellerName}
           propertyPrice={transactionData.sellingPrice}
           nationality={transactionData.nationality}
           entityType={transactionData.entityType}
@@ -1351,8 +1362,8 @@ const Step7Summary: React.FC<Step7Props> = ({
         onPrint={handleDocPrint}
         onStop={isGeneratingDoc ? stopGeneration : undefined}
         caseNumber={transactionReferenceId}
-        buyerName={transactionData.hasAgent ? transactionData.agentName : 'Buyer'}
-        sellerName="Seller"
+        buyerName={resolvedBuyerName}
+        sellerName={resolvedSellerName}
         documentTitle={DOC_TYPES.find(d => d.id === selectedDocType)?.label}
         firmName={firmName}
         lawyerName={lawyerName}
