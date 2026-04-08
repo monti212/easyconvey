@@ -447,7 +447,7 @@ const MatterStatusSection: React.FC<MatterStatusProps> = ({ cases, orgId, onView
       sellerDetails: c.seller_data || null,
       buyerName: c.buyer_data?.clientName || c.client_name,
       sellerName: c.seller_data?.clientName || 'Not specified',
-      uploadedDocuments: c.documents || [],
+      uploadedDocuments: c.buyer_data?.uploadedDocuments || [],
       propertyAddress: c.property?.address || '',
     });
   };

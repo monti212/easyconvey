@@ -167,7 +167,7 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         status: caseRecord?.status === 'in_progress' ? 'In Progress' : caseRecord?.status === 'completed' ? 'Completed' : 'Documents Uploaded',
         progress: caseRecord?.status === 'completed' ? 100 : (bd && sd ? 75 : 50),
         submissionDate: caseRecord?.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-        buyerDocuments: bd?.uploadedDocuments || caseRecord?.documents || [],
+        buyerDocuments: bd?.uploadedDocuments || [],
         sellerDocuments: sd?.uploadedDocuments || [],
         buyerDetails: bd,
         sellerDetails: sd,
