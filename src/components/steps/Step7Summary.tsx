@@ -127,6 +127,10 @@ const Step7Summary: React.FC<Step7Props> = ({
     [transactionId]
   );
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [caseRecord, setCaseRecord] = useState<Case | null>(null);
+
   // Derive display names for buyer and seller based on current party's role and case record
   const isBuyerRole = transactionData.transactionType !== 'selling';
   const currentPartyDisplayName = transactionData.hasAgent
@@ -137,10 +141,6 @@ const Step7Summary: React.FC<Step7Props> = ({
     : (caseRecord?.buyer_data?.clientName || caseRecord?.buyer_data?.agentName || 'Buyer');
   const resolvedBuyerName = isBuyerRole ? currentPartyDisplayName : counterpartyDisplayName;
   const resolvedSellerName = isBuyerRole ? counterpartyDisplayName : currentPartyDisplayName;
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [caseRecord, setCaseRecord] = useState<Case | null>(null);
 
   useEffect(() => {
     let active = true;
