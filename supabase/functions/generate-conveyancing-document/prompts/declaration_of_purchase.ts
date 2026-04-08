@@ -6,32 +6,42 @@ export function getDeclarationOfPurchaseConfig(transactionBlock: string): Docume
 
 CRITICAL INSTRUCTIONS:
 - Generate a COMPLETE Declaration of Purchaser following the standard Botswana Deeds Registry format
+- The document must read as continuous formal legal prose — NOT broken into numbered section headings
+- Do NOT use markdown section headings (no ### headers). The document flows as one continuous declaration
 - Use the EXACT formal legal language and structure used in Botswana conveyancing practice
 - Use actual party details provided — do NOT use placeholder names or bracketed placeholders
+- If a data point is not available, write "To be confirmed" — never output a bracket placeholder
 - Property descriptions must use the formal CERTAIN / SITUATE / MEASURING / WHICH PROPERTY / SUBJECT TO format
 - All amounts must be stated in figures AND words (e.g., "P300,000.00 (Three Hundred Thousand Pula)")
 - Reference Certificate of Registered Title numbers where available from uploaded documents
+- Signature lines use dots (.....................................) not underscores
 
-MARITAL STATUS HANDLING (CRITICAL — apply the correct format based on marital status):
+ENTITY TYPE HANDLING (CRITICAL):
+- If the purchaser is an INDIVIDUAL:
+  → "I, the undersigned, [FULL NAME] (Born on the [DOB]) [marital status block] (the "Purchaser"), do solemnly and sincerely declare that..."
+- If the purchaser is a COMPANY (Pty Ltd):
+  → "I, the undersigned, [DIRECTOR NAME] in my capacity as Director of [COMPANY NAME (PROPRIETARY) LIMITED] duly authorised thereto by virtue of a Resolution of the Board of Directors passed at [CITY] on the [DATE] (the "Purchaser"), do solemnly and sincerely declare that..."
+  → A Board Resolution and Affidavit of Shareholding MUST be appended after the main declaration
+- If the purchaser is a TRUST:
+  → "I, the undersigned, [TRUSTEE NAME] in my capacity as Trustee of [TRUST NAME] duly authorised thereto (the "Purchaser"), do solemnly and sincerely declare that..."
+
+MARITAL STATUS HANDLING (CRITICAL — apply the correct format for BOTH buyer and seller):
 - If "married_in" or "Married in Community of Property":
   → Include spouse full name, born (maiden name), date of birth
-  → State "Married in community of property to [SPOUSE NAME]"
-  → State "Which marriage is governed by the Laws of Botswana"
-  → Both spouses may need to sign or consent
+  → "Married in community of property to [SPOUSE FULL NAME] (Born [MAIDEN NAME] on the [DOB])"
+  → "Which marriage is governed by the Laws of Botswana"
 - If "married_out" or "Married Out of Community of Property":
-  → Include spouse full name, born (maiden name), date of birth
-  → State "Married out of community of property to [SPOUSE NAME]"
+  → Same format but "Married out of community of property to..."
   → Reference the Antenuptial Contract
-- If "single" or "Single":
-  → State "Unmarried"
-- If "divorced" or "Divorced":
-  → State "Divorced"
-  → Reference Divorce Decree if available
-- If "widowed" or "Widowed":
-  → State "Widow/Widower of the late [DECEASED SPOUSE NAME]"
-  → Reference Death Certificate if available
-- If spouse details are not available from form data, extract them from uploaded documents (marriage certificates, IDs)
-- If marital status indicates married but NO spouse details can be found, write "Spouse details: To be confirmed" — do NOT leave it blank or skip the spouse section
+- If "single" or "Single": → "Unmarried"
+- If "divorced" or "Divorced": → "Divorced"
+- If "widowed" or "Widowed": → "Widow/Widower of the late [DECEASED SPOUSE NAME]"
+- If spouse details are not available, extract them from uploaded documents
+- If marital status indicates married but NO spouse details can be found, write "Spouse details: To be confirmed"
+
+SELLER DETAILS:
+- The seller block must ALSO include full name, date of birth, and full marital status block (same rules as above)
+- This is critical — the seller section is not just a name, it includes DOB and marital details
 
 DOCUMENT EXTRACTION (HIGHEST PRIORITY):
 - If document images are attached, extract ALL relevant information (names, ID numbers, property descriptions, title deed references)
@@ -43,84 +53,146 @@ DOCUMENT EXTRACTION (HIGHEST PRIORITY):
 ${transactionBlock}
 
 ═══════════════════════════════════════
-REQUIRED DOCUMENT STRUCTURE — FOLLOW THIS EXACT FORMAT:
+REQUIRED DOCUMENT FORMAT — FOLLOW THIS EXACT STRUCTURE:
 ═══════════════════════════════════════
+
+The document must follow this precise format. It flows as continuous formal prose. Do NOT use markdown section headings (no ### headers). Use bold (**text**) for names and key amounts only.
+
+---
 
 # DECLARATION OF PURCHASER
 
 I, the undersigned,
 
 **[PURCHASER FULL NAME IN CAPS]**
-(Born on the [date of birth])
-[Include marital status block — see MARITAL STATUS HANDLING rules in instructions]
+[If individual: "(Born on the [date])" then marital status block per rules above]
+[If company director: "in my capacity as Director of" then company name, "duly authorised thereto by virtue of a Resolution of the Board of Directors passed at [City] on the [date]"]
+(the "Purchaser"),
 
-(the "Purchaser")
+do solemnly and sincerely declare that the sum of
 
-do solemnly and sincerely declare that:
+**[PRICE IN FIGURES] ([PRICE IN WORDS])**
 
-### 1. PURCHASE DETAILS
-
-I have purchased from
+is the full and entire purchase money given or to be given by the Purchaser to
 
 **[SELLER FULL NAME IN CAPS]**
+(Born on the [date])
+[Seller marital status block — MUST include spouse details if married]
 (the "Seller")
 
-the following property, that is to say:
+for the following property, that is to say:
 
-CERTAIN: [full legal description of the land/property];
+CERTAIN:\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0piece of land being [full legal description];
 
-SITUATE: in the [Administrative District];
+SITUATE:\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0in the [Administrative District];
 
-MEASURING: [extent in hectares or square metres, in figures and words];
+MEASURING:\u00a0\u00a0\u00a0\u00a0[extent in hectares or square metres, in figures and words];
 
-SUBJECT TO all such conditions as the aforesaid Deed will more fully point out;
+SUBJECT TO\u00a0\u00a0\u00a0\u00a0all such conditions as the aforesaid Deed will more fully point out;
 
-WHICH PROPERTY: is held under Certificate of Registered Title No. [number] dated [date] made in favour of [registered owner name].
+WHICH PROPERTY:\u00a0\u00a0\u00a0\u00a0is held under Certificate of Registered Title No. [number] dated [date] made in favour of **[REGISTERED OWNER NAME IN CAPS]**.
 
-### 2. PURCHASE PRICE
+AND I declare that I bought the same from the said Seller on the [date of sale] and not before, and that I have not, nor has any person to my knowledge on my account given, nor is there by me or on my behalf to be given, any other valuable consideration for or in respect of, or in connection with the alienation to me of the said property save and except certain charges or payments which fall under or come within one or more of the heads or items of charges or payments following:
 
-The sum of **[PRICE IN FIGURES] ([PRICE IN WORDS])** is the full and entire purchase price which I have agreed to pay to the Seller for the said property, and I purchased the said property on the [date of sale] and not before.
+1\u00a0\u00a0\u00a0\u00a0The costs of any survey of the said property which shall have been made prior to and for the purpose of the said sale and of any survey of such property which may be made after the sale and the cost of all diagrams and sub-division and of the plan of the property exhibited at the time of the sale;
 
-### 3. CONSIDERATION
+2\u00a0\u00a0\u00a0\u00a0The charges made by the Auctioneer for the conditions of the sale;
 
-There is not any agreement, condition, or understanding between the said Seller and myself, whereby I have paid or am to pay to or to any other person whomsoever for or in respect of or in connection with the purchase of the said Property, any sum of money over and above the aforesaid sum, save and except certain charges or payments which fall under or costs within one or more of the heads or items of charges or payments following:
+3\u00a0\u00a0\u00a0\u00a0The commission, if any, paid by the Purchaser to any auctioneer, broker, or agent, by or through whom the sale of the property may have been effected, not exceeding five per centum of the amount of the purchase money;
 
-1. The costs of any survey of the said property which shall have been made prior to and for the purpose of the said sale and of any survey of such property which may be made after the sale and the cost of all diagrams and sub-division and of the plan of the property exhibited at the time of the sale;
+4\u00a0\u00a0\u00a0\u00a0The auction duty, if any, payable upon the said sale;
 
-2. The charges made by the Auctioneer for the conditions of the sale;
+5\u00a0\u00a0\u00a0\u00a0The transfer duty payable thereon;
 
-3. The commission, if any, paid by me to any auctioneer, broker, or agent, by or through whom the sale of the property may have been effected, not exceeding five per centum of the amount of the purchase money;
+6\u00a0\u00a0\u00a0\u00a0The cost of all deeds necessary for effecting transfer of the property and of the mortgage deed, if any, and of all necessary stamps;
 
-4. The auction duty, if any, payable upon the said sale;
+7\u00a0\u00a0\u00a0\u00a0The charges of conveyancers and agents incurred in effecting the transfer of the said property;
 
-5. The transfer duty payable thereon;
+8\u00a0\u00a0\u00a0\u00a0The quitrent, if any, which shall be payable upon the property sold to any committee, consistory or any other body for religious, educational or charitable purposes, not being rent already due and in arrear at the time of such sale;
 
-6. The cost of all deeds necessary for effecting transfer of the property and of the mortgage deed, if any, and of all necessary stamps;
-
-7. The charges of conveyancers and agents incurred in effecting the transfer of the said property;
-
-8. The quitrent, if any, which shall be payable upon the property sold to any committee, consistory or any other body for religious, educational or charitable purposes, not being rent already due and in arrear at the time of such sale;
-
-9. The quitrent, if any, payable to Government upon the property sold.
-
-### 4. FURTHER DECLARATIONS
-
-AND, I declare further that I have not paid nor am I to pay, nor has any other person paid, nor is any other person to pay, for my use or benefit, or at my instance and request, any valuable consideration beside the said sum of **[PRICE IN FIGURES] ([PRICE IN WORDS])** save and except in so far as any of the charges above specified are to be paid by me and which might be held, or taken to be, payable for the Seller or on the Seller's behalf.
-
-AND I declare further that I am the only person who has purchased the said Property from the Seller.
-
-[If first-time buyer: AND I declare that this is my first purchase of immovable property in Botswana and I am accordingly entitled to any first-time buyer exemptions or concessions applicable under the Transfer Duty Act (Cap 53:01).]
-
-[If the purchaser is a company/entity: AND I declare that I am duly authorised to make this declaration on behalf of **[COMPANY NAME]** in my capacity as [Director/Authorised Representative] and that the said company is duly registered and in good standing.]
+9\u00a0\u00a0\u00a0\u00a0The quitrent, if any, payable to Government upon the property sold.
 
 AND I make this solemn declaration conscientiously, believing the same to be true.
 
-\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0______________________________
+\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0....................................
 \u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0**[PURCHASER FULL NAME IN CAPS]**
 
 DECLARED BEFORE ME AT **[CITY/TOWN]** ON THIS _______ DAY OF _________________ [YEAR]
 
-\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0______________________________
+\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0....................................
+\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0**COMMISSIONER OF OATHS**
+
+---
+
+[IF AND ONLY IF the purchaser is a COMPANY — append these two additional pages:]
+
+**PAGE 2 — BOARD RESOLUTION:**
+
+RESOLUTION OF A MEETING OF THE BOARD OF DIRECTORS OF **[COMPANY NAME (PROPRIETARY) LIMITED]** PASSED AT **[CITY]** ON THE [DATE]
+
+RESOLVED THAT:
+
+1\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0The Company purchase from
+
+**[SELLER FULL NAME IN CAPS]**
+(Born on the [date])
+[Seller marital status block]
+
+for a purchase price of
+
+**[PRICE IN FIGURES] ([PRICE IN WORDS])**
+
+the following property:
+
+CERTAIN:\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0[full legal description — must match the declaration];
+
+SITUATE:\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0in the [Administrative District];
+
+MEASURING:\u00a0\u00a0\u00a0\u00a0[extent];
+
+WHICH PROPERTY:\u00a0\u00a0\u00a0\u00a0is held under Certificate of Registered Title No. [number] dated [date] made in favour of **[REGISTERED OWNER NAME IN CAPS]**.
+
+SUBJECT TO\u00a0\u00a0\u00a0\u00a0all such conditions as the aforesaid Deed will more fully point out;
+
+2\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0**[DIRECTOR NAME IN CAPS]** in his/her capacity as **Director** of the company is hereby authorised to sign all such documents as may be necessary to give effect to this Resolution.
+
+Certified a True Copy
+
+\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0.......................................
+\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0DIRECTOR
+
+---
+
+**PAGE 3 — AFFIDAVIT OF SHAREHOLDING:**
+
+# AFFIDAVIT OF SHARE HOLDING
+
+I, the undersigned,
+
+**[DIRECTOR NAME IN CAPS]**
+in my capacity as Director of
+**[COMPANY NAME (PROPRIETARY) LIMITED]**
+duly authorised thereto by virtue of a Resolution
+of the Board of Directors passed at **[City]**
+on the [date]
+
+hereby make oath and say that the entire issued share capital of the Purchaser is owned by the following persons as set out below -
+
+| Names of Shareholder | Nationality | Number of Shares Held |
+|---|---|---|
+| [Shareholder 1 Name, Address] | [Nationality] | [Number] |
+| [Shareholder 2 Name, Address] | [Nationality] | [Number] |
+
+The said shares are beneficially held by the said persons.
+
+AND I make this solemn declaration conscientiously, believing the same to be true.
+
+\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026..
+\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0**[DIRECTOR NAME IN CAPS]**
+
+THUS SWORN TO AND SIGNED BY THE DEPONENT BEFORE ME AT **[CITY]** ON THIS _______ DAY OF _________________ [YEAR], THE DEPONENT HAVING ACKNOWLEDGED THE CONTENTS OF THIS AFFIDAVIT.
+
+\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026...\u2026\u2026\u2026\u2026\u2026\u2026\u2026.
 \u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0**COMMISSIONER OF OATHS**
 
 ---
@@ -128,10 +200,11 @@ DECLARED BEFORE ME AT **[CITY/TOWN]** ON THIS _______ DAY OF _________________ [
 CRITICAL REMINDERS:
 - Replace ALL placeholders with actual data from the transaction details and uploaded documents
 - If a data point is not available, write "To be confirmed" — never output a bracket placeholder
-- The 9 numbered items are STANDARD and must always be included verbatim
-- Apply the correct marital status format based on the buyer's marital status
-- If the purchaser is a company (Pty Ltd), the declaration should be made by an authorised representative
-- Include the first-time buyer declaration if applicable
-- Property description must match the seller's Declaration exactly`,
+- The 9 numbered items in the declaration are STANDARD and must always be included verbatim — do not paraphrase them
+- Apply the correct marital status format for BOTH buyer AND seller
+- The Board Resolution and Affidavit of Shareholding are ONLY included when the purchaser is a company entity
+- Property description must be identical across all sections (declaration, resolution)
+- Do NOT use markdown section headings (### 1. PURCHASE DETAILS etc.) — the document flows as continuous prose
+- Signature lines use dots (.....................................) not underscores`,
   };
 }
