@@ -45,6 +45,7 @@ interface Step7Props {
   clientToken?: string;
   onClientSubmitComplete?: () => void;
   onComplete?: () => void;
+  onFinalSubmit?: () => Promise<void>;
   firmName?: string;
   lawyerName?: string;
   lawFirms?: { id: string; name: string }[];
@@ -73,6 +74,7 @@ const Step7Summary: React.FC<Step7Props> = ({
   clientToken,
   onClientSubmitComplete,
   onComplete,
+  onFinalSubmit,
   firmName = 'Minchin & Kelly',
   lawyerName = 'Conveyancer',
   lawFirms,
@@ -534,6 +536,10 @@ const Step7Summary: React.FC<Step7Props> = ({
     } else {
       if (transactionId) {
         markTransactionComplete(transactionId);
+      }
+      // Persist completed status to Supabase
+      if (onFinalSubmit) {
+        await onFinalSubmit();
       }
       setIsSubmitted(true);
     }

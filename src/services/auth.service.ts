@@ -13,6 +13,7 @@ export async function signUpWithEmail(
   metadata?: { first_name?: string; last_name?: string },
   organizationType?: string,
   loginRole?: string,
+  organizationName?: string,
 ) {
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -21,42 +22,30 @@ export async function signUpWithEmail(
   });
   if (error) throw error;
 
-  // Auto-provision organization and membership for the new user
+  // Provision org + membership via SECURITY DEFINER RPC so it works
+  // regardless of whether email confirmation is required.
   if (data.user) {
-    try {
-      const fullName = [metadata?.first_name, metadata?.last_name].filter(Boolean).join(' ') || email;
-      const orgType = organizationType || 'conveyancer';
-      const role = loginRole || 'super_admin';
+    const firstName = metadata?.first_name || '';
+    const lastName  = metadata?.last_name  || '';
+    const fullName  = [firstName, lastName].filter(Boolean).join(' ') || email;
+    const orgName   = organizationName?.trim() || `${fullName}'s Organization`;
+    const orgType   = organizationType || 'conveyancer';
+    const role      = loginRole       || 'super_admin';
 
-      // Create organization
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: `${fullName}'s Organization`,
-          type: orgType,
-        })
-        .select()
-        .single();
+    const { data: result, error: rpcError } = await supabase.rpc('provision_new_user', {
+      p_auth_user_id: data.user.id,
+      p_email:        email,
+      p_first_name:   firstName,
+      p_last_name:    lastName,
+      p_org_name:     orgName,
+      p_org_type:     orgType,
+      p_role:         role,
+    });
 
-      if (orgError) throw orgError;
-
-      // Create organization_users membership
-      const { error: memberError } = await supabase
-        .from('organization_users')
-        .insert({
-          organization_id: org.id,
-          email,
-          first_name: metadata?.first_name || '',
-          last_name: metadata?.last_name || '',
-          role,
-          is_active: true,
-          auth_user_id: data.user.id,
-        });
-
-      if (memberError) throw memberError;
-    } catch (provisionError) {
-      console.error('Failed to auto-provision organization:', provisionError);
-      // Don't block signup — user can be linked manually later
+    if (rpcError) {
+      console.error('provision_new_user RPC error:', rpcError);
+    } else if (result && !(result as any).success) {
+      console.error('provision_new_user returned failure:', (result as any).error);
     }
   }
 

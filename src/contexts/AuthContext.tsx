@@ -16,7 +16,7 @@ interface AuthState {
 
 interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, metadata?: { first_name?: string; last_name?: string }, organizationType?: string, loginRole?: string) => Promise<void>;
+  signUp: (email: string, password: string, metadata?: { first_name?: string; last_name?: string }, organizationType?: string, loginRole?: string, organizationName?: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   selectOrganization: (orgUser: OrganizationUser & { organization: Organization }) => void;
@@ -128,10 +128,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, metadata?: { first_name?: string; last_name?: string }, organizationType?: string, loginRole?: string) => {
+  const signUp = async (email: string, password: string, metadata?: { first_name?: string; last_name?: string }, organizationType?: string, loginRole?: string, organizationName?: string) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
-      await authService.signUpWithEmail(email, password, metadata, organizationType, loginRole);
+      await authService.signUpWithEmail(email, password, metadata, organizationType, loginRole, organizationName);
     } catch (err: any) {
       setState(prev => ({ ...prev, loading: false, error: err.message }));
       throw err;

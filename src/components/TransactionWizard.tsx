@@ -178,7 +178,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     }
   };
 
-  const persistToSupabase = async (data: typeof transactionData) => {
+  const persistToSupabase = async (data: typeof transactionData, stepOverride?: number) => {
     try {
       // Derive client name from entity type
       const clientName = data.hasAgent ? data.agentName
@@ -188,30 +188,38 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         : data.entityType === 'society' ? data.societyName
         : 'Client';
 
+      // Derive case_type: use bond if hasBond, otherwise the transaction type
+      const caseType = data.hasBond ? 'bond' : (data.transactionType || 'buying');
+
+      const step = stepOverride ?? currentStep;
+      const stepName = getCurrentStepName();
+      const docPayload = [{ wizardData: data, savedAt: new Date().toISOString(), currentStep: step, stepName }];
+
       if (!supabaseCaseId.current) {
         // Create new case in Supabase
         const created = await casesService.createCase({
           organization_id: organization!.id,
-          case_type: data.transactionType || 'buying',
+          case_type: caseType,
           client_name: clientName || 'Client',
           client_email: data.agentEmail || undefined,
           client_phone: data.agentContact || undefined,
           conveyancer_id: orgUser?.id,
           status: 'initiated',
           priority: data.isFirstTimeBuyer ? 'high' : 'medium',
-          documents: [{ wizardData: data, savedAt: new Date().toISOString() }],
+          documents: docPayload,
           notes: transactionId || undefined,
         });
         supabaseCaseId.current = created.id;
       } else {
-        // Update existing case
+        // Update existing case — progress status to in_progress once past step 1
         await casesService.updateCase(supabaseCaseId.current, {
-          case_type: data.transactionType || 'buying',
+          case_type: caseType,
           client_name: clientName || 'Client',
           client_email: data.agentEmail || undefined,
           client_phone: data.agentContact || undefined,
+          status: step > 1 ? 'in_progress' : undefined,
           priority: data.isFirstTimeBuyer ? 'high' : 'medium',
-          documents: [{ wizardData: data, savedAt: new Date().toISOString() }],
+          documents: docPayload,
         });
       }
     } catch (err) {
@@ -219,7 +227,18 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     }
   };
 
-  // Update progress when step changes
+  const persistCompletion = async () => {
+    if (!supabaseCaseId.current) return;
+    try {
+      await casesService.updateCaseStatus(supabaseCaseId.current, 'completed');
+      // Also persist final wizard data
+      await persistToSupabase(transactionData, 7);
+    } catch (err) {
+      console.error('Failed to mark case as completed in Supabase:', err);
+    }
+  };
+
+  // Update progress when step changes and persist to Supabase
   useEffect(() => {
     if (transactionId) {
       const stepNames = getNavigationSteps().map(step => step.name);
@@ -227,6 +246,11 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       const totalSteps = stepNames.length;
 
       updateTransactionProgress(transactionId, currentStep, currentStepName, totalSteps);
+    }
+
+    // Auto-save step progress to Supabase on each step transition
+    if (mode === 'conveyancer' && organization?.id && supabaseCaseId.current) {
+      persistToSupabase(transactionData, currentStep);
     }
   }, [currentStep, transactionId]);
 
@@ -577,6 +601,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             clientToken={clientToken}
             onClientSubmitComplete={onClientSubmitComplete}
             onComplete={onComplete}
+            onFinalSubmit={persistCompletion}
             firmName={organization?.name}
             lawyerName={orgUser ? `${orgUser.first_name || ''} ${orgUser.last_name || ''}`.trim() : undefined}
             lawFirms={lawFirms}
