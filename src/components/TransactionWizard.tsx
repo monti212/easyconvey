@@ -596,6 +596,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           <Step7Summary
             transactionData={transactionData}
             transactionId={transactionId}
+            supabaseCaseId={supabaseCaseId.current}
             onPrevious={previousStep}
             mode={mode}
             clientToken={clientToken}

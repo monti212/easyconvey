@@ -92,6 +92,72 @@ export async function getCaseDocuments(caseId: string): Promise<CaseDocument[]> 
   return (data || []) as CaseDocument[];
 }
 
+// --- Generated documents (AI document persistence) ---
+
+export interface GeneratedDocument {
+  id: string;
+  case_id: string;
+  document_type: string;
+  document_name: string;
+  content: string;
+  status: 'generating' | 'completed' | 'failed';
+  error_message?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getGeneratedDocuments(caseId: string): Promise<GeneratedDocument[]> {
+  const { data, error } = await supabase
+    .from('generated_documents')
+    .select('*')
+    .eq('case_id', caseId)
+    .order('created_at');
+  if (error) {
+    console.warn('generated_documents table may not exist yet:', error.message);
+    return [];
+  }
+  return (data || []) as GeneratedDocument[];
+}
+
+export async function upsertGeneratedDocument(
+  caseId: string,
+  documentType: string,
+  documentName: string,
+  content: string,
+  status: 'generating' | 'completed' | 'failed',
+  errorMessage?: string,
+): Promise<GeneratedDocument | null> {
+  const { data, error } = await supabase
+    .from('generated_documents')
+    .upsert(
+      {
+        case_id: caseId,
+        document_type: documentType,
+        document_name: documentName,
+        content,
+        status,
+        error_message: errorMessage || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'case_id,document_type' }
+    )
+    .select('*')
+    .single();
+  if (error) {
+    console.warn('Failed to upsert generated document:', error.message);
+    return null;
+  }
+  return data as GeneratedDocument;
+}
+
+export async function deleteGeneratedDocument(caseId: string, documentType: string): Promise<void> {
+  await supabase
+    .from('generated_documents')
+    .delete()
+    .eq('case_id', caseId)
+    .eq('document_type', documentType);
+}
+
 // --- Share token functions ---
 
 function generateToken(): string {

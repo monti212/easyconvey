@@ -40,6 +40,7 @@ interface Step7Props {
     documentDataUrls?: { dataUrl: string; name: string; docType: string }[];
   };
   transactionId: string | null;
+  supabaseCaseId?: string | null;
   onPrevious: () => void;
   mode?: 'conveyancer' | 'client';
   clientToken?: string;
@@ -69,6 +70,7 @@ const DOC_TYPES: { id: DocumentType; label: string; short: string }[] = [
 const Step7Summary: React.FC<Step7Props> = ({
   transactionData,
   transactionId,
+  supabaseCaseId,
   onPrevious,
   mode = 'conveyancer',
   clientToken,
@@ -171,6 +173,7 @@ const Step7Summary: React.FC<Step7Props> = ({
   const [streamingContent, setStreamingContent] = useState('');
   const [showDocViewer, setShowDocViewer] = useState(false);
   const [docError, setDocError] = useState<string | null>(null);
+  const [docsLoaded, setDocsLoaded] = useState(false);
 
   // Sequential generation state
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
@@ -179,6 +182,33 @@ const Step7Summary: React.FC<Step7Props> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const stopRequestedRef = useRef(false);
   const [isDownloadingPack, setIsDownloadingPack] = useState(false);
+
+  // Load previously generated documents from DB on mount
+  useEffect(() => {
+    if (!supabaseCaseId || mode !== 'conveyancer') return;
+    let active = true;
+    async function loadSavedDocs() {
+      try {
+        const saved = await casesService.getGeneratedDocuments(supabaseCaseId!);
+        if (!active || saved.length === 0) return;
+        const docs: Record<string, string> = {};
+        for (const doc of saved) {
+          if (doc.status === 'completed' && doc.content) {
+            docs[doc.document_type] = doc.content;
+          }
+        }
+        if (Object.keys(docs).length > 0) {
+          setGeneratedDocuments(prev => ({ ...docs, ...prev }));
+        }
+      } catch {
+        // Table may not exist yet — graceful fallback
+      } finally {
+        if (active) setDocsLoaded(true);
+      }
+    }
+    loadSavedDocs();
+    return () => { active = false; };
+  }, [supabaseCaseId, mode]);
 
   const buildPartyDetails = useCallback((data: any) => {
     if (!data) return null;
@@ -217,6 +247,12 @@ const Step7Summary: React.FC<Step7Props> = ({
     };
   }, []);
 
+  // Persist a generated document to Supabase (fire-and-forget for background save)
+  const saveDocToDb = useCallback((docType: string, docName: string, content: string, status: 'generating' | 'completed' | 'failed', errorMsg?: string) => {
+    if (!supabaseCaseId || mode !== 'conveyancer') return;
+    casesService.upsertGeneratedDocument(supabaseCaseId, docType, docName, content, status, errorMsg).catch(() => {});
+  }, [supabaseCaseId, mode]);
+
   const generateDocument = useCallback(async (docType: DocumentType, signal?: AbortSignal) => {
     setIsGeneratingDoc(true);
     setSelectedDocType(docType);
@@ -224,6 +260,11 @@ const Step7Summary: React.FC<Step7Props> = ({
     setStreamingContent('');
     setActiveDocument(null);
     setShowDocViewer(true);
+
+    const docName = DOC_TYPES.find(d => d.id === docType)?.label || docType;
+
+    // Mark as generating in DB so other sessions can see it's in progress
+    saveDocToDb(docType, docName, '', 'generating');
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -317,6 +358,7 @@ const Step7Summary: React.FC<Step7Props> = ({
               setActiveDocument(fullText);
               setStreamingContent(fullText);
               setGeneratedDocuments(prev => ({ ...prev, [docType]: fullText }));
+              saveDocToDb(docType, docName, fullText, 'completed');
             }
             throw new DOMException('Aborted', 'AbortError');
           }
@@ -327,6 +369,8 @@ const Step7Summary: React.FC<Step7Props> = ({
           setActiveDocument(fullText);
           setStreamingContent(fullText);
           setGeneratedDocuments(prev => ({ ...prev, [docType]: fullText }));
+          // Persist completed document to DB
+          saveDocToDb(docType, docName, fullText, 'completed');
         }
       } else {
         const data = await response.json();
@@ -334,6 +378,7 @@ const Step7Summary: React.FC<Step7Props> = ({
         setActiveDocument(text);
         setStreamingContent(text);
         setGeneratedDocuments(prev => ({ ...prev, [docType]: text }));
+        saveDocToDb(docType, docName, text, 'completed');
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -341,12 +386,14 @@ const Step7Summary: React.FC<Step7Props> = ({
         return;
       }
       console.error('Error generating document:', error);
-      setDocError(error instanceof Error ? error.message : 'Failed to generate document.');
+      const errMsg = error instanceof Error ? error.message : 'Failed to generate document.';
+      setDocError(errMsg);
       setShowDocViewer(false);
+      saveDocToDb(docType, docName, '', 'failed', errMsg);
     } finally {
       setIsGeneratingDoc(false);
     }
-  }, [transactionData, transactionReferenceId, caseRecord, buildPartyDetails]);
+  }, [transactionData, transactionReferenceId, caseRecord, buildPartyDetails, saveDocToDb]);
 
   // Generate all documents sequentially
   const generateAllDocuments = useCallback(async () => {
