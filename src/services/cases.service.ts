@@ -22,11 +22,16 @@ export async function createCase(data: Partial<Case> & { organization_id: string
 export async function getCase(id: string): Promise<Case> {
   const { data, error } = await supabase
     .from('cases')
-    .select('*, conveyancer:organization_users!cases_conveyancer_id_fkey(*), property:properties(*), organization:organizations(*)')
+    .select('*, conveyancer:organization_users!cases_conveyancer_id_fkey(*), property:properties(*), organization:organizations!cases_organization_id_fkey(*)')
     .eq('id', id)
     .single();
   if (error) throw error;
-  return data as Case;
+  const c = data as Case;
+  // Sanitize documents — may contain wizard state objects instead of string arrays
+  c.documents = Array.isArray(c.documents)
+    ? c.documents.filter((d: any) => typeof d === 'string')
+    : [];
+  return c;
 }
 
 export async function getCasesByOrg(organizationId: string): Promise<Case[]> {
@@ -36,7 +41,13 @@ export async function getCasesByOrg(organizationId: string): Promise<Case[]> {
     .eq('organization_id', organizationId)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return (data || []) as Case[];
+  // Sanitize documents field — it may contain wizard state objects instead of string arrays
+  return ((data || []) as Case[]).map(c => ({
+    ...c,
+    documents: Array.isArray(c.documents)
+      ? c.documents.filter((d: any) => typeof d === 'string')
+      : [],
+  }));
 }
 
 export async function updateCase(id: string, updates: Partial<Case>): Promise<Case> {
