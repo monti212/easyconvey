@@ -22,7 +22,7 @@ export async function createCase(data: Partial<Case> & { organization_id: string
 export async function getCase(id: string): Promise<Case> {
   const { data, error } = await supabase
     .from('cases')
-    .select('*, conveyancer:organization_users(*), property:properties(*), organization:organizations(*)')
+    .select('*, conveyancer:organization_users!cases_conveyancer_id_fkey(*), property:properties(*), organization:organizations(*)')
     .eq('id', id)
     .single();
   if (error) throw error;
@@ -32,7 +32,7 @@ export async function getCase(id: string): Promise<Case> {
 export async function getCasesByOrg(organizationId: string): Promise<Case[]> {
   const { data, error } = await supabase
     .from('cases')
-    .select('*, conveyancer:organization_users(*), property:properties(*)')
+    .select('*, conveyancer:organization_users!cases_conveyancer_id_fkey(*), property:properties(*)')
     .eq('organization_id', organizationId)
     .order('created_at', { ascending: false });
   if (error) throw error;

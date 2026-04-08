@@ -6,11 +6,8 @@ import {
   Building,
   ChevronRight,
   Eye,
-  Clock,
-  CheckCircle,
   Search,
   ArrowRight,
-  User
 } from 'lucide-react';
 import ConveyancerTransactionWizard from './ConveyancerTransactionWizard';
 import type { Case } from '../../types/database';
@@ -71,72 +68,22 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
     }
   ];
 
-  // Guaranteed demo case linked to real backend data
-  const demoCaseId = 'b2c3d4e5-f6a7-8901-bcde-f12345678901';
-  const demoCase: Case = {
-    id: demoCaseId,
-    organization_id: '6d00e962-c65e-4bb8-808c-70d2910b45fa',
-    conveyancer_id: '04d51ca8-76bb-4c40-abfd-07fe959af627',
-    property_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    case_number: 'EC26-DEMO',
-    case_type: 'normal_transfer',
-    client_name: 'Thabo Molefe',
-    client_email: 'thabo.molefe@gmail.com',
-    client_phone: '+267 72 345 678',
-    status: 'in_progress' as const,
-    priority: 'high' as const,
-    documents: [
-      'Title Deed', 'ID Document (Buyer)', 'ID Document (Seller)',
-      'Proof of Address (Buyer)', 'Proof of Address (Seller)',
-      'Bank Statement', 'Rates Clearance Certificate',
-      'Marriage Certificate (ANC)', 'Valuation Report'
-    ],
-    notes: 'Complete case — all buyer/seller info submitted, documents verified. Ready for conveyancer agreement generation.',
-    buyer_data: {
-      clientName: 'Thabo Molefe', entityType: 'individual', gender: 'male',
-      nationality: 'Botswana', maritalStatus: 'married_out', transactionType: 'buying',
-      sellingPrice: '2850000', valuationAmount: '2900000', isFirstTimeBuyer: false,
-      hasAgent: true, agentName: 'Jane Wilson', agentCompany: 'Premium Properties Ltd',
-      agentContact: '+267 71 234 567', agentEmail: 'jane@properties.bw',
-      uploadedDocuments: ['ID Document', 'Proof of Address', 'Bank Statement', 'Marriage Certificate (ANC)'],
-    },
-    seller_data: {
-      clientName: 'Keitumetse Radebe', entityType: 'individual', gender: 'female',
-      nationality: 'Botswana', maritalStatus: 'single', transactionType: 'selling',
-      sellingPrice: '2850000',
-      uploadedDocuments: ['ID Document', 'Proof of Address', 'Title Deed', 'Rates Clearance Certificate'],
-    },
-    buyer_status: 'completed',
-    seller_status: 'completed',
-    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    property: {
-      id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      organization_id: '6d00e962-c65e-4bb8-808c-70d2910b45fa',
-      title: 'Plot 4521, Extension 12, Gaborone',
-      property_type: 'residential',
-      price: 2850000,
-      address: 'Plot 4521, Extension 12, Gaborone, Botswana',
-      status: 'under_offer',
-      created_at: '',
-      updated_at: '',
-    },
-  };
+  // Use only real cases from the database
+  const allCases = useMemo(() => cases, [cases]);
 
-  // Merge demo case with DB cases (avoid duplicates)
-  const allCases = useMemo(() => {
-    const dbCases = cases.filter(c => c.id !== demoCaseId);
-    return [demoCase, ...dbCases];
-  }, [cases]);
-
-  // Only show cases with recognized statuses (exclude wizard step statuses like "Step 1: Agent Information")
+  // Show all cases with recognized statuses (including completed)
   const recognizedStatuses = ['initiated', 'in_progress', 'completed', 'cancelled', 'submitted_to_conveyancer'];
 
   const activeCases = useMemo(
     () => allCases
-      .filter(c => recognizedStatuses.includes(c.status) && c.status !== 'completed' && c.status !== 'cancelled')
+      .filter(c => recognizedStatuses.includes(c.status))
       .sort((a, b) => {
-        // High priority first, then by most recently updated
+        // Active cases first (initiated/in_progress), then completed, then cancelled
+        const statusOrder: Record<string, number> = { in_progress: 0, initiated: 1, submitted_to_conveyancer: 2, completed: 3, cancelled: 4 };
+        const sa = statusOrder[a.status] ?? 2;
+        const sb = statusOrder[b.status] ?? 2;
+        if (sa !== sb) return sa - sb;
+        // Within same status: high priority first, then by most recently updated
         const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
         const pa = priorityOrder[a.priority] ?? 1;
         const pb = priorityOrder[b.priority] ?? 1;
