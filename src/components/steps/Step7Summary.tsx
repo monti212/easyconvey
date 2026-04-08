@@ -6,6 +6,7 @@ import TransactionSummaryPDF from '../../lib/pdf/transactionSummary';
 import DeedOfSalePDF from '../../lib/pdf/deedOfSale';
 import DocumentStreamViewer from '../DocumentStreamViewer';
 import * as casesService from '../../services/cases.service';
+import { supabase } from '../../lib/supabase';
 import type { Case } from '../../types/database';
 import JSZip from 'jszip';
 
@@ -289,9 +290,15 @@ const Step7Summary: React.FC<Step7Props> = ({
         buyerName = buyerDetails?.clientName || 'Not specified';
       }
 
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(`${supabaseUrl}/functions/v1/generate-conveyancing-document`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': anonKey,
+          'Authorization': `Bearer ${session?.access_token || anonKey}`,
+        },
         body: JSON.stringify({
           transactionId: transactionReferenceId,
           documentType: docType,

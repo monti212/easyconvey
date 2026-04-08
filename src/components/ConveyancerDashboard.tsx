@@ -32,6 +32,7 @@ import { useAuth } from '../hooks/useAuth';
 import { pdf } from '@react-pdf/renderer';
 import DeedOfSalePDF from '../lib/pdf/deedOfSale';
 import * as casesService from '../services/cases.service';
+import { supabase } from '../lib/supabase';
 import type { CaseDocument } from '../services/cases.service';
 import type { CaseShareToken } from '../types/database';
 import DocumentStreamViewer from './DocumentStreamViewer';
@@ -225,9 +226,15 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(`${supabaseUrl}/functions/v1/generate-conveyancing-document`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': anonKey,
+          'Authorization': `Bearer ${session?.access_token || anonKey}`,
+        },
         body: JSON.stringify({
           transactionId,
           documentType: typeToGenerate,
