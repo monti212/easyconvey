@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Upload, CheckCircle, AlertCircle, Share2, FileText, Eye, X, AlertTriangle, FileType } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Upload, CheckCircle, AlertCircle, Share2, FileText, Eye, X, AlertTriangle, FileType, Sparkles } from 'lucide-react';
 import * as storageService from '../../services/storage.service';
 import { convertToPdf } from '../../lib/convertToPdf';
 
@@ -13,8 +13,16 @@ interface Step6Props {
   transactionType: string;
   originalTransactionId?: string;
   isSharedTransaction?: boolean;
-  currentTransactionData?: any; // Current transaction data for sharing
-  onUpdate: (data: { uploadedDocuments?: string[]; otherPartyDocuments?: string[]; documentFilePaths?: { path: string; bucket: string; name: string; type: string }[]; documentDataUrls?: { dataUrl: string; name: string; docType: string }[] }) => void;
+  currentTransactionData?: any;
+  onUpdate: (data: {
+    uploadedDocuments?: string[];
+    otherPartyDocuments?: string[];
+    documentFilePaths?: { path: string; bucket: string; name: string; type: string }[];
+    documentDataUrls?: { dataUrl: string; name: string; docType: string }[];
+    extractedClientName?: string;
+    extractedIdNumber?: string;
+    extractedDateOfBirth?: string;
+  }) => void;
   onNext: () => void;
   onPrevious: () => void;
   onSharedLink?: (transactionId: string, transactionType: string, sharedPricing?: any) => void;
@@ -45,6 +53,7 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
   const [fullRequiredDocuments, setFullRequiredDocuments] = useState<string[]>([]);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle');
   const [storageWarnings, setStorageWarnings] = useState<string[]>([]);
+  const [ocrResults, setOcrResults] = useState<Record<string, { fullName?: string; idNumber?: string; dateOfBirth?: string; documentType?: string }>>({});
 
   // Convert a File to a base64 data URL for direct AI vision processing
   const fileToDataUrl = (file: File): Promise<string> => {
@@ -143,6 +152,11 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
     setIsUploading(false);
   };
 
+  const isIdDocument = (docType: string) => {
+    const lower = docType.toLowerCase();
+    return lower.includes('id') || lower.includes('passport') || lower.includes('identity') || lower.includes('residence permit');
+  };
+
   const handleSingleUpload = (docType: string) => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const originalFile = e.target.files?.[0];
     if (!originalFile) return;
@@ -150,7 +164,6 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
     const docSlug = docType.replace(/\s+/g, '-');
     const singleDataUrls: { dataUrl: string; name: string; docType: string }[] = [];
 
-    // Capture original as base64 if image (for direct AI vision processing)
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(originalFile.name);
     if (isImage) {
       try {
@@ -159,7 +172,6 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
       } catch { /* ignore */ }
     }
 
-    // Auto-convert images to PDF
     const file = await convertToPdf(originalFile);
     const newFileName = `${docType.replace(/\s+/g, '_')}.pdf`;
 
@@ -167,7 +179,6 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
 
     try {
       const singlePaths: { path: string; bucket: string; name: string; type: string }[] = [];
-      // Try to upload to Supabase Storage
       try {
         const result = await storageService.uploadFile(file, 'public', 'documents', docSlug, 'documents');
         singlePaths.push({ path: result.path, bucket: 'documents', name: originalFile.name, type: docSlug });
@@ -180,9 +191,27 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
       }
 
       const newUploads = [...uploadedDocuments, newFileName];
-      onUpdate({ uploadedDocuments: newUploads, documentFilePaths: singlePaths, documentDataUrls: singleDataUrls });
+      const updatePayload: Parameters<typeof onUpdate>[0] = { uploadedDocuments: newUploads, documentFilePaths: singlePaths, documentDataUrls: singleDataUrls };
 
-      // Try AI quality analysis
+      // OCR identity documents
+      if (isIdDocument(docType)) {
+        try {
+          const formData = new FormData();
+          formData.append('file', originalFile);
+          const idRes = await fetch('/api/analyze-id', { method: 'POST', body: formData });
+          if (idRes.ok) {
+            const idData = await idRes.json();
+            setOcrResults(prev => ({ ...prev, [newFileName]: idData }));
+            if (idData.fullName && idData.fullName !== 'Unknown') updatePayload.extractedClientName = idData.fullName;
+            if (idData.idNumber && idData.idNumber !== 'Unknown') updatePayload.extractedIdNumber = idData.idNumber;
+            if (idData.dateOfBirth && idData.dateOfBirth !== 'Unknown') updatePayload.extractedDateOfBirth = idData.dateOfBirth;
+          }
+        } catch { /* OCR failure is non-blocking */ }
+      }
+
+      onUpdate(updatePayload);
+
+      // AI quality analysis
       const newQuality = { ...documentQuality };
       try {
         const response = await fetch('/api/analyze-document', {
@@ -201,7 +230,6 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
       }
       setDocumentQuality(newQuality);
     } catch {
-      // Fallback — accept file anyway
       const newUploads = [...uploadedDocuments, newFileName];
       onUpdate({ uploadedDocuments: newUploads });
     } finally {
@@ -566,27 +594,45 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
                   </div>
                   
                   {isUploaded && (
-                    <div className="mt-2 ml-8 text-xs text-gray-500 flex items-center">
-                      <span className="truncate mr-2">{docName}</span>
-                      <button className="text-blue-600 hover:text-blue-800 flex items-center">
-                        <Eye className="h-3 w-3 mr-1" />
-                        View
-                      </button>
-                      <button 
-                        className="text-red-600 hover:text-red-800 flex items-center ml-2"
-                        onClick={() => {
-                          const newDocs = uploadedDocuments.filter(d => d !== docName);
-                          onUpdate({ uploadedDocuments: newDocs });
-                          
-                          // Remove quality info
-                          const newQuality = { ...documentQuality };
-                          delete newQuality[docName];
-                          setDocumentQuality(newQuality);
-                        }}
-                      >
-                        <X className="h-3 w-3 mr-1" />
-                        Remove
-                      </button>
+                    <div className="mt-2 ml-8">
+                      <div className="text-xs text-gray-500 flex items-center">
+                        <span className="truncate mr-2">{docName}</span>
+                        <button className="text-blue-600 hover:text-blue-800 flex items-center">
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </button>
+                        <button
+                          className="text-red-600 hover:text-red-800 flex items-center ml-2"
+                          onClick={() => {
+                            const newDocs = uploadedDocuments.filter(d => d !== docName);
+                            onUpdate({ uploadedDocuments: newDocs });
+                            const newQuality = { ...documentQuality };
+                            delete newQuality[docName];
+                            setDocumentQuality(newQuality);
+                            const newOcr = { ...ocrResults };
+                            delete newOcr[docName];
+                            setOcrResults(newOcr);
+                          }}
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Remove
+                        </button>
+                      </div>
+                      {/* OCR extracted data */}
+                      {ocrResults[docName] && (ocrResults[docName].fullName || ocrResults[docName].idNumber) && (
+                        <div className="mt-1.5 p-2 bg-blue-50 rounded border border-blue-200 flex items-start gap-1.5">
+                          <Sparkles className="h-3 w-3 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <span className="text-xs font-semibold text-blue-700">Auto-extracted: </span>
+                            {ocrResults[docName].fullName && ocrResults[docName].fullName !== 'Unknown' && (
+                              <span className="text-xs text-blue-800 mr-2">{ocrResults[docName].fullName}</span>
+                            )}
+                            {ocrResults[docName].idNumber && ocrResults[docName].idNumber !== 'Unknown' && (
+                              <span className="text-xs text-blue-600">ID: {ocrResults[docName].idNumber}</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </li>

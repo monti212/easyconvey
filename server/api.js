@@ -128,8 +128,13 @@ app.post('/api/analyze-deed', upload.single('file'), async (req, res) => {
 - hasCaveats (boolean): whether caveats/restrictions are detected
 - hasBonds (boolean): whether existing bonds/mortgages are detected
 - hasSubdivisions (boolean): whether subdivision mentions are found
-- ownerName (string): extracted owner name or "Unknown"
-- plotNumber (string): extracted plot/erf number or "Unknown"
+- ownerName (string): full registered owner name extracted from the deed, or "Unknown"
+- plotNumber (string): plot/erf/stand number extracted from the deed, or "Unknown"
+- propertyAddress (string): full property address or location description, or "Unknown"
+- propertyDescription (string): legal description of property (e.g. "Certain piece of land situate..."), or "Unknown"
+- administrativeDistrict (string): district or town the property is in, or "Unknown"
+- extent (string): size/extent of the property (e.g. "450 square metres"), or "Unknown"
+- titleDeedNumber (string): certificate of registered title number, or "Unknown"
 - errors (array of strings): any issues found with the document
 
 Return ONLY valid JSON, no markdown or explanation.`;
@@ -160,6 +165,52 @@ Return ONLY valid JSON, no markdown or explanation.`;
   } catch (error) {
     console.error('Error analyzing deed:', error);
     res.status(error.status || 500).json({ error: 'Failed to analyze deed', details: error.message });
+  }
+});
+
+// Analyze ID / Passport / identity document via pdf-parse + GPT
+app.post('/api/analyze-id', upload.single('file'), async (req, res) => {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'OpenAI API key not configured' });
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+  try {
+    let extractedText = '';
+    if (req.file.mimetype === 'application/pdf') {
+      try {
+        const pdfParse = (await import('pdf-parse')).default;
+        const pdfData = await pdfParse(req.file.buffer);
+        extractedText = pdfData.text || '';
+      } catch (err) {
+        console.warn('pdf-parse failed for ID doc:', err.message);
+      }
+    }
+    if (!extractedText) {
+      extractedText = `File: ${req.file.originalname}, Size: ${req.file.size} bytes, Type: ${req.file.mimetype}`;
+    }
+
+    const instructions = `You are an identity document analyst. Extract data from the provided document text (ID card, passport, or similar) and return a JSON object with:
+- fullName (string): full legal name on the document, or "Unknown"
+- idNumber (string): ID number, passport number, or national registration number, or "Unknown"
+- dateOfBirth (string): date of birth in format YYYY-MM-DD, or "Unknown"
+- nationality (string): nationality listed, or "Unknown"
+- gender (string): "male", "female", or "unknown"
+- expiryDate (string): document expiry date if present, or "Unknown"
+- documentType (string): "National ID", "Passport", "Residence Permit", or "Unknown"
+
+Return ONLY valid JSON, no markdown or explanation.`;
+
+    const content = await callOpenAI(apiKey, instructions, `Analyze this identity document:\n\n${extractedText.substring(0, 4000)}`, { temperature: 0.1 });
+
+    try {
+      const cleanJson = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      res.json(JSON.parse(cleanJson));
+    } catch {
+      res.json({ fullName: 'Unknown', idNumber: 'Unknown', dateOfBirth: 'Unknown', nationality: 'Unknown', gender: 'unknown', expiryDate: 'Unknown', documentType: 'Unknown' });
+    }
+  } catch (error) {
+    console.error('Error analyzing ID:', error);
+    res.status(error.status || 500).json({ error: 'Failed to analyze document', details: error.message });
   }
 });
 

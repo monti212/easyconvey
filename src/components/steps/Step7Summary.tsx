@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { ArrowLeft, CheckCircle, Clipboard, Download, FileText, Users, Clock, Banknote, UserCircle, Building, Lock, Shield, ExternalLink, Share2, Loader2, Sparkles, Eye, Printer, StopCircle, PlayCircle, FolderDown, Send, Building2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clipboard, Download, FileText, Users, Clock, Banknote, UserCircle, Building, Lock, Shield, ExternalLink, Share2, Loader2, Sparkles, Eye, Printer, StopCircle, PlayCircle, FolderDown, Send, Building2, FileDown } from 'lucide-react';
+import { downloadAsWord } from '../../lib/downloadAsWord';
 import { useTransactions } from '../../App';
 import { pdf } from '@react-pdf/renderer';
 import TransactionSummaryPDF from '../../lib/pdf/transactionSummary';
@@ -518,6 +519,21 @@ const Step7Summary: React.FC<Step7Props> = ({
     URL.revokeObjectURL(url);
   };
 
+  const handleDocDownloadWord = useCallback(async () => {
+    const content = activeDocument || generatedDocuments[selectedDocType];
+    if (!content) return;
+    const docTitle = DOC_TYPES.find(d => d.id === selectedDocType)?.label || 'Legal Document';
+    await downloadAsWord(
+      content,
+      docTitle,
+      `${selectedDocType}-${transactionReferenceId}.docx`,
+      firmName,
+      transactionReferenceId,
+      resolvedBuyerName,
+      resolvedSellerName,
+    );
+  }, [activeDocument, generatedDocuments, selectedDocType, transactionReferenceId, firmName, resolvedBuyerName, resolvedSellerName]);
+
   const handleDocPrint = () => {
     const content = activeDocument || generatedDocuments[selectedDocType];
     if (!content) return;
@@ -982,9 +998,18 @@ const Step7Summary: React.FC<Step7Props> = ({
         </div>
         
         <div className="px-4 py-4 md:px-6 md:py-5 bg-[#FAFAFA] border-t border-[#D1D5DB]">
-          <h4 className="text-sm md:text-base font-semibold text-[#0B1F3A] mb-3 md:mb-4">
-            Uploaded Documents ({transactionData.uploadedDocuments.length})
-          </h4>
+          <div className="flex items-center justify-between mb-3 md:mb-4">
+            <h4 className="text-sm md:text-base font-semibold text-[#0B1F3A]">
+              Uploaded Documents ({transactionData.uploadedDocuments.length})
+            </h4>
+            <button
+              onClick={onPrevious}
+              className="text-xs text-[#C8A14F] hover:text-[#0B1F3A] font-medium flex items-center gap-1 transition-colors"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Edit Documents
+            </button>
+          </div>
           <ul className="bg-white border border-[#D1D5DB] rounded-lg divide-y divide-[#D1D5DB]">
             {transactionData.uploadedDocuments.slice(0, 4).map((doc, index) => (
               <li key={index} className="px-3 py-2 md:px-4 md:py-3 flex items-center justify-between text-xs md:text-sm hover:bg-gray-50">
@@ -1287,6 +1312,12 @@ const Step7Summary: React.FC<Step7Props> = ({
                     >
                       <Download className="h-3.5 w-3.5 mr-1" />PDF
                     </button>
+                    <button
+                      onClick={handleDocDownloadWord}
+                      className="px-2.5 py-1.5 text-xs bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 inline-flex items-center"
+                    >
+                      <FileDown className="h-3.5 w-3.5 mr-1" />Word
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1418,6 +1449,7 @@ const Step7Summary: React.FC<Step7Props> = ({
           setShowDocViewer(false);
         }}
         onDownload={handleDocDownload}
+        onDownloadWord={handleDocDownloadWord}
         onPrint={handleDocPrint}
         onStop={isGeneratingDoc ? stopGeneration : undefined}
         caseNumber={transactionReferenceId}

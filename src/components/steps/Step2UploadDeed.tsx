@@ -10,13 +10,20 @@ interface Step2Props {
   skippedDeedUpload: boolean;
   transactionType: string;
   onUpdate: (data: {
-    documentUploaded: boolean;
-    documentValid: boolean;
+    documentUploaded?: boolean;
+    documentValid?: boolean;
     hasBond?: boolean;
     bondDocument?: string;
-    skippedDeedUpload: boolean;
+    skippedDeedUpload?: boolean;
     documentFilePaths?: { path: string; bucket: string; name: string; type: string }[];
     documentDataUrls?: { dataUrl: string; name: string; docType: string }[];
+    extractedOwnerName?: string;
+    extractedPlotNumber?: string;
+    extractedPropertyAddress?: string;
+    extractedPropertyDescription?: string;
+    extractedTitleDeedNumber?: string;
+    extractedAdministrativeDistrict?: string;
+    extractedExtent?: string;
   }) => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -42,6 +49,15 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
   const [bondDocument, setBondDocument] = useState<string | null>(null);
   const [bondDocumentType, setBondDocumentType] = useState<string | null>(null);
   const [analysisUnavailable, setAnalysisUnavailable] = useState(false);
+  const [extractedFields, setExtractedFields] = useState<{
+    ownerName?: string;
+    plotNumber?: string;
+    propertyAddress?: string;
+    propertyDescription?: string;
+    titleDeedNumber?: string;
+    administrativeDistrict?: string;
+    extent?: string;
+  }>({});
 
   // Check if the user is selling to determine if deed upload is mandatory
   const isSelling = transactionType === 'selling';
@@ -112,12 +128,29 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
           const isValid = result.isValid !== false;
 
           if (isValid) {
+            const ocr = {
+              ownerName: result.ownerName !== 'Unknown' ? result.ownerName : undefined,
+              plotNumber: result.plotNumber !== 'Unknown' ? result.plotNumber : undefined,
+              propertyAddress: result.propertyAddress !== 'Unknown' ? result.propertyAddress : undefined,
+              propertyDescription: result.propertyDescription !== 'Unknown' ? result.propertyDescription : undefined,
+              titleDeedNumber: result.titleDeedNumber !== 'Unknown' ? result.titleDeedNumber : undefined,
+              administrativeDistrict: result.administrativeDistrict !== 'Unknown' ? result.administrativeDistrict : undefined,
+              extent: result.extent !== 'Unknown' ? result.extent : undefined,
+            };
+            setExtractedFields(ocr);
             onUpdate({
               documentUploaded: true,
               documentValid: true,
               skippedDeedUpload: false,
               documentFilePaths: filePaths,
               documentDataUrls: dataUrls,
+              extractedOwnerName: ocr.ownerName,
+              extractedPlotNumber: ocr.plotNumber,
+              extractedPropertyAddress: ocr.propertyAddress,
+              extractedPropertyDescription: ocr.propertyDescription,
+              extractedTitleDeedNumber: ocr.titleDeedNumber,
+              extractedAdministrativeDistrict: ocr.administrativeDistrict,
+              extractedExtent: ocr.extent,
             });
             setErrorMessage('');
             setLandType(result.landType || 'Unknown');
@@ -340,7 +373,56 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
                 
                 {/* AI Analysis Results */}
                 <div className="mt-4 bg-white rounded-lg p-3 border border-green-200">
-                  <h4 className="text-sm font-medium text-primary mb-2">AI Analysis Results:</h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-medium text-primary">AI Analysis Results</h4>
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Auto-populated</span>
+                  </div>
+
+                  {/* OCR Extracted Fields */}
+                  {(extractedFields.ownerName || extractedFields.plotNumber || extractedFields.propertyAddress || extractedFields.titleDeedNumber) && (
+                    <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
+                      <p className="text-xs font-semibold text-blue-800 mb-1.5">Extracted from Deed:</p>
+                      <ul className="space-y-1">
+                        {extractedFields.ownerName && (
+                          <li className="text-xs flex items-start">
+                            <span className="w-36 text-gray-500 flex-shrink-0">Registered Owner:</span>
+                            <span className="font-semibold text-blue-800">{extractedFields.ownerName}</span>
+                          </li>
+                        )}
+                        {extractedFields.plotNumber && (
+                          <li className="text-xs flex items-start">
+                            <span className="w-36 text-gray-500 flex-shrink-0">Plot / Stand No:</span>
+                            <span className="font-semibold text-blue-800">{extractedFields.plotNumber}</span>
+                          </li>
+                        )}
+                        {extractedFields.titleDeedNumber && (
+                          <li className="text-xs flex items-start">
+                            <span className="w-36 text-gray-500 flex-shrink-0">Title Deed No:</span>
+                            <span className="font-semibold text-blue-800">{extractedFields.titleDeedNumber}</span>
+                          </li>
+                        )}
+                        {extractedFields.propertyAddress && (
+                          <li className="text-xs flex items-start">
+                            <span className="w-36 text-gray-500 flex-shrink-0">Property Address:</span>
+                            <span className="font-semibold text-blue-800">{extractedFields.propertyAddress}</span>
+                          </li>
+                        )}
+                        {extractedFields.administrativeDistrict && (
+                          <li className="text-xs flex items-start">
+                            <span className="w-36 text-gray-500 flex-shrink-0">District:</span>
+                            <span className="font-semibold text-blue-800">{extractedFields.administrativeDistrict}</span>
+                          </li>
+                        )}
+                        {extractedFields.extent && (
+                          <li className="text-xs flex items-start">
+                            <span className="w-36 text-gray-500 flex-shrink-0">Extent:</span>
+                            <span className="font-semibold text-blue-800">{extractedFields.extent}</span>
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+
                   <ul className="space-y-1">
                     <li className="text-xs md:text-sm flex items-center">
                       <span className="w-32 text-gray-500">Land Type:</span>
@@ -365,6 +447,22 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
                       </span>
                     </li>
                   </ul>
+
+                  {/* Change Deed button */}
+                  <button
+                    onClick={() => {
+                      onUpdate({ documentUploaded: false, documentValid: false, skippedDeedUpload: false });
+                      setExtractedFields({});
+                      setShowBondPrompt(false);
+                      setHasBond(null);
+                      setBondDocument(null);
+                      setBondDocumentType(null);
+                    }}
+                    className="mt-3 text-xs text-red-600 hover:text-red-800 flex items-center"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Remove &amp; re-upload deed
+                  </button>
                 </div>
                 
                 <div className="mt-4 bg-primary/5 p-3 rounded-lg border border-primary/10">

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { FileText, Sparkles, Download, Printer, CheckCircle, Copy, Check, StopCircle } from 'lucide-react';
+import { FileText, Sparkles, Download, Printer, CheckCircle, Copy, Check, StopCircle, FileDown } from 'lucide-react';
 
 interface DocumentStreamViewerProps {
   isOpen: boolean;
@@ -9,6 +9,7 @@ interface DocumentStreamViewerProps {
   content: string;
   onClose: () => void;
   onDownload: () => void;
+  onDownloadWord?: () => void;
   onPrint: () => void;
   onStop?: () => void;
   caseNumber: string;
@@ -26,6 +27,7 @@ const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
   content,
   onClose,
   onDownload,
+  onDownloadWord,
   onPrint,
   onStop,
   caseNumber,
@@ -127,6 +129,16 @@ const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
             >
               <Download className="h-4 w-4" />
             </button>
+            {onDownloadWord && (
+              <button
+                onClick={onDownloadWord}
+                disabled={isStreaming || !content}
+                className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30"
+                title="Download Word (.docx)"
+              >
+                <FileDown className="h-4 w-4" />
+              </button>
+            )}
             <button
               onClick={onPrint}
               disabled={isStreaming || !content}
