@@ -27,7 +27,7 @@ const Step5PersonalDetails: React.FC<Step5Props> = ({
 }) => {
   // Define the documents required based on nationality and marital status
   useEffect(() => {
-    const baseDocuments = ['Proof of Address'];
+    const baseDocuments = ['Proof of Address (Utility Bill or Affidavit)'];
     let additionalDocuments: string[] = [];
     
     // Nationality-based documents

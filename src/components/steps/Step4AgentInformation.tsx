@@ -13,7 +13,13 @@ interface Step4Props {
   commissionType: string;
   commissionValue: string;
   entityType: string;
-  sellingPrice?: string; // Added selling price to calculate commission amount
+  sellingPrice?: string;
+  sellerHasAgent?: boolean;
+  sellerAgentName?: string;
+  sellerAgentCompany?: string;
+  sellerAgentContact?: string;
+  sellerCommissionType?: string;
+  sellerCommissionValue?: string;
   onUpdate: (data: Partial<{
     hasAgent: boolean;
     agentName: string;
@@ -26,6 +32,12 @@ interface Step4Props {
     commissionType: string;
     commissionValue: string;
     entityType: string;
+    sellerHasAgent: boolean;
+    sellerAgentName: string;
+    sellerAgentCompany: string;
+    sellerAgentContact: string;
+    sellerCommissionType: string;
+    sellerCommissionValue: string;
   }>) => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -44,6 +56,12 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
   commissionValue,
   entityType,
   sellingPrice = "0",
+  sellerHasAgent = false,
+  sellerAgentName = '',
+  sellerAgentCompany = '',
+  sellerAgentContact = '',
+  sellerCommissionType = '',
+  sellerCommissionValue = '',
   onUpdate,
   onNext,
   onPrevious
@@ -97,26 +115,27 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
 
   const validateAgentInfo = () => {
     const newErrors: Record<string, string> = {};
-    
+
     if (hasAgent) {
-      // Simplified validation for agent information - just require name, contact and company
       if (!agentName.trim()) newErrors.agentName = "Agent name is required";
       if (!agentContact.trim()) newErrors.agentContact = "Contact number is required";
       if (!agentCompany.trim()) newErrors.agentCompany = "Company name is required";
-      
-      // Commission validation
+
       if (!commissionType) newErrors.commissionType = "Please select commission type";
-      if (!commissionValue.trim()) {
-        newErrors.commissionValue = "Commission value is required";
-      } else if (parseFloat(commissionValue) <= 0) {
-        newErrors.commissionValue = "Commission must be greater than zero";
-      } else if (commissionType === 'percentage' && parseFloat(commissionValue) > 100) {
-        newErrors.commissionValue = "Percentage cannot exceed 100%";
+      // Commission value only required when type is percentage or fixed (not N/A)
+      if (commissionType !== 'na') {
+        if (!commissionValue.trim()) {
+          newErrors.commissionValue = "Commission value is required";
+        } else if (parseFloat(commissionValue) <= 0) {
+          newErrors.commissionValue = "Commission must be greater than zero";
+        } else if (commissionType === 'percentage' && parseFloat(commissionValue) > 100) {
+          newErrors.commissionValue = "Percentage cannot exceed 100%";
+        }
       }
     } else {
       if (!entityType) newErrors.entityType = "Please select your entity type";
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -184,7 +203,7 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
       <div className="bg-background rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8">
         <fieldset>
           <legend className="text-lg md:text-xl font-semibold text-primary mb-4 md:mb-6 font-serif">
-            Is an estate agent participating in this transaction?
+            Buyer's Estate Agent
           </legend>
           <div className="flex flex-col sm:flex-row sm:space-x-6 space-y-4 sm:space-y-0">
             <label className={`flex-1 flex flex-col items-center p-4 md:p-6 border-2 rounded-xl cursor-pointer transition-all duration-300 ${
@@ -350,10 +369,10 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
               <div className="grid grid-cols-1 gap-4">
                 <div>
                   <span className="block text-sm font-medium text-gray-700 mb-2">Commission Type <span className="text-error">*</span></span>
-                  <div className="flex space-x-4">
+                  <div className="flex flex-wrap gap-3">
                     <label className={`flex items-center p-3 border-2 rounded-lg ${
-                      commissionType === 'percentage' 
-                        ? 'border-secondary bg-secondary/10' 
+                      commissionType === 'percentage'
+                        ? 'border-secondary bg-secondary/10'
                         : 'border-gray-300 hover:border-secondary'
                     } transition-colors cursor-pointer`}>
                       <input
@@ -368,10 +387,10 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
                         <span className="text-sm font-medium">Percentage</span>
                       </div>
                     </label>
-                    
+
                     <label className={`flex items-center p-3 border-2 rounded-lg ${
-                      commissionType === 'fixed' 
-                        ? 'border-secondary bg-secondary/10' 
+                      commissionType === 'fixed'
+                        ? 'border-secondary bg-secondary/10'
                         : 'border-gray-300 hover:border-secondary'
                     } transition-colors cursor-pointer`}>
                       <input
@@ -386,11 +405,28 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
                         <span className="text-sm font-medium">Fixed Amount</span>
                       </div>
                     </label>
+
+                    <label className={`flex items-center p-3 border-2 rounded-lg ${
+                      commissionType === 'na'
+                        ? 'border-secondary bg-secondary/10'
+                        : 'border-gray-300 hover:border-secondary'
+                    } transition-colors cursor-pointer`}>
+                      <input
+                        type="radio"
+                        name="commissionType"
+                        className="h-4 w-4 text-secondary focus:ring-secondary border-gray-300"
+                        checked={commissionType === 'na'}
+                        onChange={() => handleCommissionTypeChange('na')}
+                      />
+                      <div className="ml-2 flex items-center">
+                        <span className="text-sm font-medium">N/A</span>
+                      </div>
+                    </label>
                   </div>
                   {errors.commissionType && <p className="mt-1 text-xs text-error">{errors.commissionType}</p>}
                 </div>
                 
-                {commissionType && (
+                {commissionType && commissionType !== 'na' && (
                   <div>
                     <label htmlFor="commissionValue" className="block text-sm font-medium text-gray-700 mb-1">
                       {commissionType === 'percentage' ? 'Commission Percentage (%)' : 'Fixed Commission Amount (BWP)'} <span className="text-error">*</span>
@@ -631,6 +667,140 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
         )}
       </div>
 
+      {/* Seller's Estate Agent section */}
+      <div className="bg-background rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8">
+        <fieldset>
+          <legend className="text-lg md:text-xl font-semibold text-primary mb-4 md:mb-6 font-serif">
+            Seller's Estate Agent
+          </legend>
+          <div className="flex flex-col sm:flex-row sm:space-x-6 space-y-4 sm:space-y-0">
+            <label className={`flex-1 flex flex-col items-center p-4 md:p-6 border-2 rounded-xl cursor-pointer transition-all duration-300 ${
+              sellerHasAgent
+                ? 'border-secondary bg-white shadow-md'
+                : 'border-gray-300 bg-white/60 hover:bg-white hover:shadow-sm'
+            }`}>
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3 md:mb-4">
+                <User className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+              </div>
+              <span className="text-base md:text-lg font-medium mb-1 md:mb-2 text-primary">Yes</span>
+              <p className="text-xs md:text-sm text-gray-600 text-center mb-3 md:mb-4">Seller has an estate agent</p>
+              <input
+                type="radio"
+                name="sellerAgent"
+                checked={sellerHasAgent}
+                onChange={() => onUpdate({ sellerHasAgent: true })}
+                className="h-4 w-4 text-secondary focus:ring-secondary border-gray-300"
+              />
+            </label>
+
+            <label className={`flex-1 flex flex-col items-center p-4 md:p-6 border-2 rounded-xl cursor-pointer transition-all duration-300 ${
+              !sellerHasAgent
+                ? 'border-secondary bg-white shadow-md'
+                : 'border-gray-300 bg-white/60 hover:bg-white hover:shadow-sm'
+            }`}>
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3 md:mb-4">
+                <Users className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+              </div>
+              <span className="text-base md:text-lg font-medium mb-1 md:mb-2 text-primary">No</span>
+              <p className="text-xs md:text-sm text-gray-600 text-center mb-3 md:mb-4">Seller is handling this directly</p>
+              <input
+                type="radio"
+                name="sellerAgent"
+                checked={!sellerHasAgent}
+                onChange={() => onUpdate({ sellerHasAgent: false, sellerAgentName: '', sellerAgentCompany: '', sellerAgentContact: '', sellerCommissionType: '', sellerCommissionValue: '' })}
+                className="h-4 w-4 text-secondary focus:ring-secondary border-gray-300"
+              />
+            </label>
+          </div>
+
+          {sellerHasAgent && (
+            <div className="mt-6 space-y-4 bg-white rounded-xl p-4 border border-blue-200">
+              <h3 className="text-base font-medium text-primary font-serif">Seller's Agent Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Agent's Full Name</label>
+                  <div className="relative rounded-lg shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <User className="h-4 w-4 text-primary" />
+                    </div>
+                    <input
+                      type="text"
+                      value={sellerAgentName}
+                      onChange={e => onUpdate({ sellerAgentName: e.target.value })}
+                      className="focus:ring-primary focus:border-primary block w-full pl-10 py-2 text-sm border-border rounded-lg"
+                      placeholder="Agent name"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                  <div className="relative rounded-lg shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Building className="h-4 w-4 text-primary" />
+                    </div>
+                    <input
+                      type="text"
+                      value={sellerAgentCompany}
+                      onChange={e => onUpdate({ sellerAgentCompany: e.target.value })}
+                      className="focus:ring-primary focus:border-primary block w-full pl-10 py-2 text-sm border-border rounded-lg"
+                      placeholder="Agency company"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
+                  <div className="relative rounded-lg shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Phone className="h-4 w-4 text-primary" />
+                    </div>
+                    <input
+                      type="text"
+                      value={sellerAgentContact}
+                      onChange={e => onUpdate({ sellerAgentContact: e.target.value })}
+                      className="focus:ring-primary focus:border-primary block w-full pl-10 py-2 text-sm border-border rounded-lg"
+                      placeholder="+267 7X XXX XXX"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <span className="block text-sm font-medium text-gray-700 mb-2">Commission Type</span>
+                <div className="flex flex-wrap gap-3">
+                  {(['percentage', 'fixed', 'na'] as const).map(type => (
+                    <label key={type} className={`flex items-center p-3 border-2 rounded-lg ${
+                      sellerCommissionType === type ? 'border-secondary bg-secondary/10' : 'border-gray-300 hover:border-secondary'
+                    } transition-colors cursor-pointer`}>
+                      <input
+                        type="radio"
+                        name="sellerCommissionType"
+                        className="h-4 w-4 text-secondary focus:ring-secondary border-gray-300"
+                        checked={sellerCommissionType === type}
+                        onChange={() => onUpdate({ sellerCommissionType: type, sellerCommissionValue: '' })}
+                      />
+                      <span className="ml-2 text-sm font-medium capitalize">{type === 'na' ? 'N/A' : type === 'percentage' ? 'Percentage' : 'Fixed Amount'}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {sellerCommissionType && sellerCommissionType !== 'na' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {sellerCommissionType === 'percentage' ? 'Commission %' : 'Fixed Amount (BWP)'}
+                  </label>
+                  <input
+                    type="text"
+                    value={sellerCommissionValue}
+                    onChange={e => onUpdate({ sellerCommissionValue: e.target.value.replace(/[^0-9.]/g, '') })}
+                    className="focus:ring-primary focus:border-primary block w-full py-2 px-3 text-sm border-border rounded-lg"
+                    placeholder={sellerCommissionType === 'percentage' ? 'e.g. 5.5' : 'e.g. 50000'}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </fieldset>
+      </div>
+
       <div className="mt-8 md:mt-12 flex justify-between">
         <button
           onClick={onPrevious}
@@ -639,12 +809,12 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
           <ArrowLeft className="mr-1 md:mr-2 h-4 w-4" />
           Back
         </button>
-        
+
         <button
           onClick={handleNext}
           className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-transparent rounded-lg text-sm md:text-base font-medium shadow-md text-white bg-primary hover:bg-primary-dark transition-colors"
         >
-          Next
+          Next for Both
           <ArrowRight className="ml-1 md:ml-2 h-4 w-4" />
         </button>
       </div>

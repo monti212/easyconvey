@@ -374,7 +374,7 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
                     </div>
                     <div className="ml-3">
                       <p className="text-xs text-primary/80">
-                        Your document is securely stored with end-to-end encryption. We comply with data protection regulations including GDPR and Data Protection Act 2018.
+                        Your document is securely stored with end-to-end encryption. We comply with data protection regulations including GDPR and Data Protection Act 2024.
                       </p>
                     </div>
                   </div>

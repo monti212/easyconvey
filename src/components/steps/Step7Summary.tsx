@@ -54,7 +54,7 @@ interface Step7Props {
   onSendToLawFirm?: (firmId: string, firmName: string) => void;
 }
 
-type DocumentType = 'deed_of_sale' | 'deed_of_transfer' | 'transfer_duty' | 'power_of_attorney' | 'declaration_of_purchase' | 'affidavit' | 'bond_registration' | 'compliance_certificate' | 'missing_information';
+type DocumentType = 'deed_of_sale' | 'deed_of_transfer' | 'transfer_duty' | 'power_of_attorney' | 'declaration_of_purchase' | 'affidavit' | 'bond_registration' | 'missing_information';
 
 const DOC_TYPES: { id: DocumentType; label: string; short: string }[] = [
   { id: 'missing_information', label: 'Missing Information Checklist', short: 'Readiness Check' },
@@ -65,7 +65,6 @@ const DOC_TYPES: { id: DocumentType; label: string; short: string }[] = [
   { id: 'declaration_of_purchase', label: 'Declaration of Purchaser', short: 'Purchaser Dec.' },
   { id: 'affidavit', label: 'Affidavit', short: 'Affidavit' },
   { id: 'bond_registration', label: 'Bond Registration', short: 'Bond Reg.' },
-  { id: 'compliance_certificate', label: 'Compliance Certificate', short: 'Compliance' },
 ];
 
 const Step7Summary: React.FC<Step7Props> = ({
@@ -1016,7 +1015,7 @@ const Step7Summary: React.FC<Step7Props> = ({
             <Shield className="h-4 w-4 md:h-5 md:w-5 text-[#0B1F3A] mt-0.5 flex-shrink-0" />
             <div className="ml-3">
               <p className="text-xs md:text-sm text-gray-600">
-                All your data is encrypted at rest and in transit. We comply with data protection regulations including GDPR and the Data Protection Act 2018. Your information will be stored securely and only used for processing your transaction.
+                All your data is encrypted at rest and in transit. We comply with data protection regulations including GDPR and the Data Protection Act 2024. Your information will be stored securely and only used for processing your transaction.
               </p>
               <button className="mt-2 text-xs text-[#C8A14F] hover:text-[#0B1F3A] flex items-center transition-colors">
                 <Lock className="h-3 w-3 mr-1" />

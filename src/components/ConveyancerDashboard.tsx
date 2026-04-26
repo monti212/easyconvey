@@ -44,7 +44,7 @@ interface ConveyancerDashboardProps {
   onBack: () => void;
 }
 
-type DocumentType = 'deed_of_sale' | 'deed_of_transfer' | 'transfer_duty' | 'power_of_attorney' | 'declaration_of_purchase' | 'affidavit' | 'bond_registration' | 'compliance_certificate' | 'missing_information';
+type DocumentType = 'deed_of_sale' | 'deed_of_transfer' | 'transfer_duty' | 'power_of_attorney' | 'declaration_of_purchase' | 'affidavit' | 'bond_registration' | 'missing_information';
 
 const DOCUMENT_TYPES: { id: DocumentType; label: string; description: string }[] = [
   { id: 'missing_information', label: 'Missing Information Checklist', description: 'Transaction readiness review — flags missing data and documents' },
@@ -55,7 +55,6 @@ const DOCUMENT_TYPES: { id: DocumentType; label: string; description: string }[]
   { id: 'declaration_of_purchase', label: 'Declaration of Purchaser', description: 'Statutory declaration by the buyer/purchaser' },
   { id: 'affidavit', label: 'Affidavit', description: 'Sworn statement supporting the property transaction' },
   { id: 'bond_registration', label: 'Bond Registration', description: 'Mortgage bond registration document for the property' },
-  { id: 'compliance_certificate', label: 'Compliance Certificate', description: 'Municipal and regulatory compliance declaration' },
 ];
 
 const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({

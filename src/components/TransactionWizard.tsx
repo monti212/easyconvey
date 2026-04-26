@@ -81,6 +81,12 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     commissionType: '',
     commissionValue: '',
     entityType: '',
+    sellerHasAgent: false,
+    sellerAgentName: '',
+    sellerAgentCompany: '',
+    sellerAgentContact: '',
+    sellerCommissionType: '',
+    sellerCommissionValue: '',
     gender: '',
     nationality: '',
     maritalStatus: '',
@@ -515,9 +521,15 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             commissionValue={transactionData.commissionValue}
             entityType={transactionData.entityType}
             sellingPrice={transactionData.sellingPrice}
+            sellerHasAgent={transactionData.sellerHasAgent}
+            sellerAgentName={transactionData.sellerAgentName}
+            sellerAgentCompany={transactionData.sellerAgentCompany}
+            sellerAgentContact={transactionData.sellerAgentContact}
+            sellerCommissionType={transactionData.sellerCommissionType}
+            sellerCommissionValue={transactionData.sellerCommissionValue}
             onUpdate={updateTransactionData}
             onNext={nextStep}
-            onPrevious={() => {}} // No previous step for the first page
+            onPrevious={() => {}}
           />
         );
       case 2:
