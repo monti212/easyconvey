@@ -438,26 +438,29 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-[#0B1F3A] border-b border-[#0B1F3A]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-3">
               <button
                 onClick={onBack}
-                className="mr-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm font-medium mr-2"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-4 w-4" />
+                Back
               </button>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Conveyancer Dashboard</h1>
-                <p className="text-sm text-gray-600">Transaction Management & Document Generation</p>
+              <div className="h-8 w-8 rounded-lg bg-[#C8A14F] flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-serif font-bold text-sm">M</span>
               </div>
+              <span className="font-serif text-lg font-semibold text-white tracking-tight">
+                Minchin &amp; Kelly<span className="text-[#C8A14F]">.</span>
+              </span>
             </div>
-            <div className="flex items-center space-x-3">
-              <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full font-medium">
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 bg-white/10 text-[#C8A14F] text-xs rounded-full font-medium border border-[#C8A14F]/30">
                 Live Transaction
               </span>
-              <span className="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full font-medium">
+              <span className="px-3 py-1 bg-white/10 text-slate-300 text-xs rounded-full font-medium">
                 {currentTransaction.status}
               </span>
             </div>

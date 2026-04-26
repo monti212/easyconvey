@@ -188,17 +188,25 @@ const EstateAgentDashboard: React.FC<EstateAgentDashboardProps> = ({
   if (showWizard) {
     return (
       <div className="min-h-screen bg-[#F8F7F4]">
-        <header className="bg-[#0B1F3A]">
+        <header className="bg-[#0B1F3A] border-b border-[#0B1F3A]">
           <div className="max-w-[1400px] mx-auto px-6 lg:px-10">
-            <div className="flex items-center justify-between h-14">
-              <button
-                onClick={() => setShowWizard(false)}
-                className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </button>
-              <span className="text-sm font-medium text-[#C8A14F]">New Transaction</span>
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowWizard(false)}
+                  className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm font-medium mr-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </button>
+                <div className="h-8 w-8 rounded-lg bg-[#C8A14F] flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-serif font-bold text-sm">M</span>
+                </div>
+                <span className="font-serif text-lg font-semibold text-white tracking-tight">
+                  Minchin &amp; Kelly<span className="text-[#C8A14F]">.</span>
+                </span>
+              </div>
+              <span className="text-xs font-medium text-[#C8A14F] border border-[#C8A14F]/30 px-3 py-1 rounded-full">New Transaction</span>
             </div>
           </div>
         </header>
