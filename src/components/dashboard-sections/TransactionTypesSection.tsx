@@ -9,7 +9,6 @@ import {
   Search,
   ArrowRight,
 } from 'lucide-react';
-import ConveyancerTransactionWizard from './ConveyancerTransactionWizard';
 import type { Case } from '../../types/database';
 
 interface TransactionType {
@@ -25,16 +24,17 @@ interface TransactionTypesProps {
   onSearch: (term: string) => void;
   cases: Case[];
   onViewTransaction: (transactionId: string, transactionData: any) => void;
+  onStartNewTransaction?: () => void;
 }
 
 const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
   searchTerm,
   onSearch,
   cases,
-  onViewTransaction
+  onViewTransaction,
+  onStartNewTransaction,
 }) => {
   const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [showNewTransaction, setShowNewTransaction] = useState(false);
   const [typeSearchTerm, setTypeSearchTerm] = useState('');
 
   const transactionTypeDefinitions: TransactionType[] = [
@@ -328,7 +328,7 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setShowNewTransaction(true);
+                      onStartNewTransaction?.();
                     }}
                     className={`px-4 py-2 bg-white ${colors.accent} rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium border border-current`}
                   >
@@ -373,10 +373,6 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
           </div>
         )}
 
-        <ConveyancerTransactionWizard
-          isOpen={showNewTransaction}
-          onClose={() => setShowNewTransaction(false)}
-        />
       </div>
     );
   }
