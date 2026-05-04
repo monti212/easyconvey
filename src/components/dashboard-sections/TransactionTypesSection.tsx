@@ -100,10 +100,12 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
   // type that best matches via substring, or fall back to normal_transfer
   const mapCaseToTypeId = (c: Case): string => {
     const ct = (c.case_type || '').toLowerCase();
+    // Transfer + bond cases go to their transfer category, not the bond bucket
     if (ct.includes('sectional')) return 'sectional_title';
     if (ct.includes('tribal')) return 'tribal_grant';
-    if (ct.includes('bond')) return 'bond';
-    // buying, selling, normal_transfer, or anything else → normal_transfer
+    // Standalone bond only (not combined with a transfer)
+    if (ct === 'bond') return 'bond';
+    // normal_transfer, normal_transfer_bond, buying, selling, or anything else
     return 'normal_transfer';
   };
 

@@ -310,6 +310,9 @@ const Step7Summary: React.FC<Step7Props> = ({
           documentPaths: (transactionData.documentFilePaths || []).map(fp => ({ path: fp.path, bucket: fp.bucket })),
           documentImages: (transactionData.documentDataUrls || []).map(d => ({ dataUrl: d.dataUrl, name: d.name, docType: d.docType })),
           stream: true,
+          // Transaction category for document generation routing
+          transactionCategory: (transactionData as any).transactionCategory || 'normal_transfer',
+          includeBondRegistration: (transactionData as any).includeBondRegistration || false,
           // OCR-extracted fields from deed upload — primary source for property data
           extractedOwnerName: (transactionData as any).extractedOwnerName || '',
           extractedPlotNumber: (transactionData as any).extractedPlotNumber || '',
@@ -873,7 +876,16 @@ const Step7Summary: React.FC<Step7Props> = ({
               </div>
               <div>
                 <dt className="text-xs md:text-sm font-medium text-gray-500">Transaction Type</dt>
-                <dd className="mt-1 text-base md:text-lg text-gray-900 font-medium capitalize">{transactionData.transactionType}</dd>
+                <dd className="mt-1 text-base md:text-lg text-gray-900 font-medium">
+                  {(transactionData as any).transactionCategory
+                    ? (transactionData as any).transactionCategory.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+                    : 'Normal Transfer'}
+                  {(transactionData as any).includeBondRegistration && (
+                    <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded-full font-medium">
+                      + Bond Registration
+                    </span>
+                  )}
+                </dd>
               </div>
             </div>
             

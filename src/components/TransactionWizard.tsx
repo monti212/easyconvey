@@ -62,6 +62,8 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   const [currentStep, setCurrentStep] = useState(1);
   const [transactionData, setTransactionData] = useState({
     transactionType: '',
+    transactionCategory: '', // normal_transfer | sectional_title | tribal_grant
+    includeBondRegistration: false,
     documentUploaded: false,
     documentValid: false,
     skippedDeedUpload: false,
@@ -206,8 +208,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         : data.entityType === 'society' ? data.societyName
         : 'Client';
 
-      // Derive case_type: use bond if hasBond, otherwise the transaction type
-      const caseType = data.hasBond ? 'bond' : (data.transactionType || 'buying');
+      // Derive case_type from transaction category; append bond if included
+      const caseType = data.transactionCategory
+        ? (data.includeBondRegistration ? `${data.transactionCategory}_bond` : data.transactionCategory)
+        : (data.hasBond ? 'bond' : (data.transactionType || 'normal_transfer'));
 
       const step = stepOverride ?? currentStep;
       const stepName = getCurrentStepName();
@@ -548,6 +552,8 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         return (
           <Step1TransactionType
             transactionType={transactionData.transactionType}
+            transactionCategory={transactionData.transactionCategory}
+            includeBondRegistration={transactionData.includeBondRegistration}
             nationality={transactionData.nationality}
             isFirstTimeBuyer={transactionData.isFirstTimeBuyer}
             onUpdate={updateTransactionData}

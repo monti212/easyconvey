@@ -62,6 +62,9 @@ serve(async (req: Request) => {
       documentPaths,
       documentImages,
       stream: wantStream,
+      // Transaction category
+      transactionCategory,
+      includeBondRegistration,
       // OCR-extracted fields from title deed scan
       extractedOwnerName,
       extractedPlotNumber,
@@ -176,6 +179,7 @@ serve(async (req: Request) => {
     // ─── Transaction details block (shared across all document types) ──
     const transactionBlock = `
 TRANSACTION REFERENCE: ${transactionId}
+TRANSACTION CATEGORY: ${transactionCategory || 'Normal Transfer'}${includeBondRegistration ? ' + Bond Registration' : ''}
 
 ${(extractedOwnerName || extractedPlotNumber || extractedPropertyAddress || extractedTitleDeedNumber) ? `═══════════════════════════════════════
 TITLE DEED — OCR EXTRACTED DATA (PRIMARY SOURCE — use this for property details):
