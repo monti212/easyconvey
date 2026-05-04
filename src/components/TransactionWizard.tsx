@@ -83,6 +83,9 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     commissionType: '',
     commissionValue: '',
     entityType: '',
+    clientName: '',
+    dateOfBirth: '',
+    idPassportNumber: '',
     sellerHasAgent: false,
     sellerAgentName: '',
     sellerAgentCompany: '',
@@ -597,6 +600,12 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             nationality={transactionData.nationality}
             maritalStatus={transactionData.maritalStatus}
             requiredDocuments={transactionData.requiredDocuments}
+            clientName={transactionData.clientName}
+            dateOfBirth={transactionData.dateOfBirth}
+            idPassportNumber={transactionData.idPassportNumber}
+            extractedClientName={transactionData.extractedClientName}
+            extractedIdNumber={transactionData.extractedIdNumber}
+            extractedDateOfBirth={transactionData.extractedDateOfBirth}
             onUpdate={updateTransactionData}
             onNext={nextStep}
             onPrevious={previousStep}

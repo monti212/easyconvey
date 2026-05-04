@@ -1,16 +1,26 @@
 import React, { useEffect } from 'react';
-import { ArrowLeft, ArrowRight, UserCircle, Globe, Heart, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, UserCircle, Globe, Heart, AlertCircle, CreditCard, Calendar } from 'lucide-react';
 
 interface Step5Props {
   gender: string;
   nationality: string;
   maritalStatus: string;
   requiredDocuments: string[];
+  clientName?: string;
+  dateOfBirth?: string;
+  idPassportNumber?: string;
+  // OCR pre-fill values
+  extractedClientName?: string;
+  extractedIdNumber?: string;
+  extractedDateOfBirth?: string;
   onUpdate: (data: Partial<{
     gender: string;
     nationality: string;
     maritalStatus: string;
     requiredDocuments: string[];
+    clientName: string;
+    dateOfBirth: string;
+    idPassportNumber: string;
   }>) => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -21,10 +31,22 @@ const Step5PersonalDetails: React.FC<Step5Props> = ({
   nationality,
   maritalStatus,
   requiredDocuments,
+  clientName = '',
+  dateOfBirth = '',
+  idPassportNumber = '',
+  extractedClientName = '',
+  extractedIdNumber = '',
+  extractedDateOfBirth = '',
   onUpdate,
   onNext,
   onPrevious
 }) => {
+  // Pre-fill from OCR extracted values if fields are empty
+  useEffect(() => {
+    if (extractedClientName && !clientName) onUpdate({ clientName: extractedClientName });
+    if (extractedIdNumber && !idPassportNumber) onUpdate({ idPassportNumber: extractedIdNumber });
+    if (extractedDateOfBirth && !dateOfBirth) onUpdate({ dateOfBirth: extractedDateOfBirth });
+  }, [extractedClientName, extractedIdNumber, extractedDateOfBirth]);
   // Define the documents required based on nationality and marital status
   useEffect(() => {
     const baseDocuments = ['Proof of Address (Utility Bill or Affidavit)'];
@@ -94,7 +116,7 @@ const Step5PersonalDetails: React.FC<Step5Props> = ({
     "Vietnamese", "Welsh", "Yemenite", "Zambian", "Zimbabwean"
   ];
 
-  const canProceed = gender && nationality && nationality !== "Select nationality" && maritalStatus;
+  const canProceed = clientName.trim() && gender && nationality && nationality !== "Select nationality" && maritalStatus;
 
   return (
     <div className="py-4 md:py-8 max-w-3xl mx-auto px-4">
@@ -106,6 +128,81 @@ const Step5PersonalDetails: React.FC<Step5Props> = ({
       </p>
 
       <div className="bg-background rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8 space-y-6 md:space-y-8">
+
+        {/* Full Legal Name */}
+        <div>
+          <label className="block text-base md:text-lg font-medium text-primary mb-3 font-serif">
+            <div className="flex items-center">
+              <UserCircle className="h-4 w-4 md:h-5 md:w-5 text-primary mr-2" />
+              Full Legal Name <span className="text-error ml-1">*</span>
+            </div>
+          </label>
+          {extractedClientName && extractedClientName !== clientName && (
+            <div className="mb-2 flex items-center gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+              <span className="font-semibold">Auto-extracted from document:</span>
+              <button
+                type="button"
+                onClick={() => onUpdate({ clientName: extractedClientName })}
+                className="underline hover:no-underline"
+              >
+                {extractedClientName}
+              </button>
+              <span className="text-blue-500">(click to use)</span>
+            </div>
+          )}
+          <input
+            type="text"
+            value={clientName}
+            onChange={e => onUpdate({ clientName: e.target.value })}
+            placeholder="e.g. Gaone Molefi"
+            className="block w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-primary focus:border-primary"
+          />
+          <p className="mt-1 text-xs text-gray-500">Enter the full name exactly as it appears on the ID document or title deed.</p>
+        </div>
+
+        {/* Date of Birth + ID/Passport Number */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <div>
+            <label className="block text-sm md:text-base font-medium text-primary mb-2 font-serif">
+              <div className="flex items-center">
+                <Calendar className="h-4 w-4 text-primary mr-2" />
+                Date of Birth
+              </div>
+            </label>
+            {extractedDateOfBirth && extractedDateOfBirth !== dateOfBirth && (
+              <div className="mb-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1">
+                Auto-extracted: <button type="button" className="underline" onClick={() => onUpdate({ dateOfBirth: extractedDateOfBirth })}>{extractedDateOfBirth}</button>
+              </div>
+            )}
+            <input
+              type="date"
+              value={dateOfBirth}
+              onChange={e => onUpdate({ dateOfBirth: e.target.value })}
+              className="block w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-primary focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="block text-sm md:text-base font-medium text-primary mb-2 font-serif">
+              <div className="flex items-center">
+                <CreditCard className="h-4 w-4 text-primary mr-2" />
+                ID / Passport Number
+              </div>
+            </label>
+            {extractedIdNumber && extractedIdNumber !== idPassportNumber && (
+              <div className="mb-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1">
+                Auto-extracted: <button type="button" className="underline" onClick={() => onUpdate({ idPassportNumber: extractedIdNumber })}>{extractedIdNumber}</button>
+              </div>
+            )}
+            <input
+              type="text"
+              value={idPassportNumber}
+              onChange={e => onUpdate({ idPassportNumber: e.target.value })}
+              placeholder="e.g. 123456789"
+              className="block w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-primary focus:border-primary"
+            />
+          </div>
+        </div>
+
         {/* Gender selection */}
         <div>
           <label className="block text-base md:text-lg font-medium text-primary mb-3 md:mb-4 font-serif">

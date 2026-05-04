@@ -213,19 +213,35 @@ const Step7Summary: React.FC<Step7Props> = ({
 
   const buildPartyDetails = useCallback((data: any) => {
     if (!data) return null;
-    const name = data.hasAgent ? data.agentName
-      : data.entityType === 'company' ? data.companyName
-      : data.entityType === 'trust' ? data.trustName
-      : data.entityType === 'estate' ? data.deceasedName
-      : data.entityType === 'society' ? data.societyName
-      : data.clientName || 'Not specified';
+    // Priority: explicitly entered clientName > OCR-extracted name > entity-derived name
+    const name = data.clientName?.trim()
+      || data.extractedClientName?.trim()
+      || (data.hasAgent ? data.agentName
+        : data.entityType === 'company' ? data.companyName
+        : data.entityType === 'trust' ? data.trustName
+        : data.entityType === 'estate' ? data.deceasedName
+        : data.entityType === 'society' ? data.societyName
+        : undefined)
+      || 'Not specified';
+
+    const idNum = data.idPassportNumber?.trim()
+      || data.extractedIdNumber?.trim()
+      || data.agentIdPassport?.trim()
+      || data.idNumber?.trim()
+      || 'To be confirmed';
+
+    const dob = data.dateOfBirth?.trim()
+      || data.extractedDateOfBirth?.trim()
+      || 'To be confirmed';
+
     return {
       clientName: name,
-      entityType: data.entityType || 'Individual',
+      dateOfBirth: dob,
+      idNumber: idNum,
+      entityType: data.entityType || 'individual',
       gender: data.gender || 'Not specified',
       nationality: data.nationality || 'Not specified',
       maritalStatus: data.maritalStatus || 'Not specified',
-      idNumber: data.agentIdPassport || data.idNumber || 'To be verified',
       phone: data.agentContact || data.phone || 'On file',
       email: data.agentEmail || data.email || 'On file',
       isFirstTimeBuyer: data.isFirstTimeBuyer || false,
@@ -310,6 +326,9 @@ const Step7Summary: React.FC<Step7Props> = ({
           documentPaths: (transactionData.documentFilePaths || []).map(fp => ({ path: fp.path, bucket: fp.bucket })),
           documentImages: (transactionData.documentDataUrls || []).map(d => ({ dataUrl: d.dataUrl, name: d.name, docType: d.docType })),
           stream: true,
+          // Conveyancer details — needed for deed of transfer "appeared before me" clause
+          conveyancerName: lawyerName || 'Conveyancer',
+          conveyancerFirm: firmName || 'Minchin & Kelly',
           // Transaction category for document generation routing
           transactionCategory: (transactionData as any).transactionCategory || 'normal_transfer',
           includeBondRegistration: (transactionData as any).includeBondRegistration || false,

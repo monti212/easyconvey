@@ -62,6 +62,9 @@ serve(async (req: Request) => {
       documentPaths,
       documentImages,
       stream: wantStream,
+      // Conveyancer identity
+      conveyancerName,
+      conveyancerFirm,
       // Transaction category
       transactionCategory,
       includeBondRegistration,
@@ -179,7 +182,14 @@ serve(async (req: Request) => {
     // ─── Transaction details block (shared across all document types) ──
     const transactionBlock = `
 TRANSACTION REFERENCE: ${transactionId}
-TRANSACTION CATEGORY: ${transactionCategory || 'Normal Transfer'}${includeBondRegistration ? ' + Bond Registration' : ''}
+TRANSACTION CATEGORY: ${transactionCategory ? transactionCategory.replace(/_/g, ' ').toUpperCase() : 'NORMAL TRANSFER'}${includeBondRegistration ? ' + BOND REGISTRATION' : ''}
+
+═══════════════════════════════════════
+CONVEYANCER (APPEARER) DETAILS:
+═══════════════════════════════════════
+Conveyancer Name: ${conveyancerName || 'To be confirmed'}
+Law Firm: ${conveyancerFirm || 'To be confirmed'}
+Office Location: Gaborone, Botswana
 
 ${(extractedOwnerName || extractedPlotNumber || extractedPropertyAddress || extractedTitleDeedNumber) ? `═══════════════════════════════════════
 TITLE DEED — OCR EXTRACTED DATA (PRIMARY SOURCE — use this for property details):
@@ -197,12 +207,13 @@ ${extractedIdNumber ? `ID Number (from ID document): ${extractedIdNumber}` : ''}
 ═══════════════════════════════════════
 BUYER (PURCHASER) INFORMATION:
 ═══════════════════════════════════════
-Full Name: ${resolveBuyerName()}
+Full Legal Name: ${resolveBuyerName()}
+Date of Birth: ${buyerDetails?.dateOfBirth || "To be confirmed"}
+ID / Passport Number: ${buyerDetails?.idNumber || "To be confirmed"}
 Entity Type: ${buyerDetails?.entityType || "Individual"}
 Gender: ${buyerDetails?.gender || "Not specified"}
 Nationality: ${buyerDetails?.nationality || "Motswana"}
 Marital Status: ${buyerDetails?.maritalStatus || "Not specified"}
-ID Number: ${buyerDetails?.idNumber || buyerDetails?.agentIdPassport || "To be verified"}
 Contact Phone: ${buyerDetails?.phone || buyerDetails?.agentContact || "On file"}
 Contact Email: ${buyerDetails?.email || buyerDetails?.agentEmail || "On file"}
 First-time Buyer: ${buyerDetails?.isFirstTimeBuyer ? "Yes" : "No"}
@@ -224,12 +235,13 @@ Commission: ${buyerDetails.commissionValue || "Not specified"}% (${buyerDetails.
 ═══════════════════════════════════════
 SELLER (TRANSFEROR) INFORMATION:
 ═══════════════════════════════════════
-Full Name: ${resolveSellerName()}
+Full Legal Name: ${resolveSellerName()}
+Date of Birth: ${sellerDetails?.dateOfBirth || "To be confirmed"}
+ID / Passport Number: ${sellerDetails?.idNumber || "To be confirmed"}
 Entity Type: ${sellerDetails?.entityType || "Individual"}
 Gender: ${sellerDetails?.gender || "Not specified"}
 Nationality: ${sellerDetails?.nationality || "Motswana"}
 Marital Status: ${sellerDetails?.maritalStatus || "Not specified"}
-ID Number: ${sellerDetails?.idNumber || sellerDetails?.agentIdPassport || "To be verified"}
 
 ═══════════════════════════════════════
 PROPERTY & FINANCIAL DETAILS:
