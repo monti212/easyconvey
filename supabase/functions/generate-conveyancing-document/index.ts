@@ -69,6 +69,11 @@ serve(async (req: Request) => {
       transactionCategory,
       includeBondRegistration,
       // OCR-extracted fields from title deed scan
+      extractedOwnerIdNumber,
+      extractedPreviousOwner,
+      extractedPurchasePrice,
+      extractedHasMortgageBond,
+      extractedMortgageBondNumber,
       extractedOwnerName,
       extractedPlotNumber,
       extractedPropertyAddress,
@@ -176,7 +181,20 @@ serve(async (req: Request) => {
       if (sellerDetails?.hasAgent && sellerDetails?.agentName) return sellerDetails.agentName;
       if (sellerDetails?.companyName) return sellerDetails.companyName;
       if (sellerDetails?.trustName) return sellerDetails.trustName;
+      // Fall back to OCR-extracted registered owner from the title deed
+      if (extractedOwnerName) return extractedOwnerName;
       return sellerName || "Not specified";
+    };
+
+    const resolveSellerIdNumber = () => {
+      if (sellerDetails?.idNumber) return sellerDetails.idNumber;
+      if (extractedOwnerIdNumber) return extractedOwnerIdNumber;
+      return "To be confirmed";
+    };
+
+    const resolveSellerDateOfBirth = () => {
+      if (sellerDetails?.dateOfBirth) return sellerDetails.dateOfBirth;
+      return "To be confirmed";
     };
 
     // ─── Transaction details block (shared across all document types) ──
@@ -192,17 +210,21 @@ Law Firm: ${conveyancerFirm || 'To be confirmed'}
 Office Location: Gaborone, Botswana
 
 ${(extractedOwnerName || extractedPlotNumber || extractedPropertyAddress || extractedTitleDeedNumber) ? `═══════════════════════════════════════
-TITLE DEED — OCR EXTRACTED DATA (PRIMARY SOURCE — use this for property details):
+TITLE DEED — OCR EXTRACTED DATA (HIGHEST PRIORITY — use this data over all other sources):
 ═══════════════════════════════════════
-${extractedOwnerName ? `Registered Owner (Seller): ${extractedOwnerName}` : ''}
+${extractedOwnerName ? `Registered Owner / SELLER Full Name: ${extractedOwnerName}` : ''}
+${extractedOwnerIdNumber ? `Registered Owner / SELLER ID Number: ${extractedOwnerIdNumber}` : ''}
+${extractedPreviousOwner ? `Previous Owner (chain of title seller): ${extractedPreviousOwner}` : ''}
 ${extractedPlotNumber ? `Plot / Stand Number: ${extractedPlotNumber}` : ''}
 ${extractedTitleDeedNumber ? `Title Deed / Certificate No: ${extractedTitleDeedNumber}` : ''}
 ${extractedPropertyAddress ? `Property Address: ${extractedPropertyAddress}` : ''}
 ${extractedPropertyDescription ? `Property Description (CERTAIN/SITUATE): ${extractedPropertyDescription}` : ''}
 ${extractedAdministrativeDistrict ? `Administrative District: ${extractedAdministrativeDistrict}` : ''}
 ${extractedExtent ? `Extent / Size: ${extractedExtent}` : ''}
-${extractedClientName ? `Client Name (from ID document): ${extractedClientName}` : ''}
-${extractedIdNumber ? `ID Number (from ID document): ${extractedIdNumber}` : ''}
+${extractedPurchasePrice ? `Purchase Price from Deed: ${extractedPurchasePrice}` : ''}
+${extractedHasMortgageBond ? `Mortgage Bond Registered: Yes${extractedMortgageBondNumber ? ` — Bond No: ${extractedMortgageBondNumber}` : ''}` : ''}
+${extractedClientName ? `Buyer Name (from ID document): ${extractedClientName}` : ''}
+${extractedIdNumber ? `Buyer ID Number (from ID document): ${extractedIdNumber}` : ''}
 ` : ''}
 ═══════════════════════════════════════
 BUYER (PURCHASER) INFORMATION:
@@ -236,12 +258,13 @@ Commission: ${buyerDetails.commissionValue || "Not specified"}% (${buyerDetails.
 SELLER (TRANSFEROR) INFORMATION:
 ═══════════════════════════════════════
 Full Legal Name: ${resolveSellerName()}
-Date of Birth: ${sellerDetails?.dateOfBirth || "To be confirmed"}
-ID / Passport Number: ${sellerDetails?.idNumber || "To be confirmed"}
+Date of Birth: ${resolveSellerDateOfBirth()}
+ID / Passport Number: ${resolveSellerIdNumber()}
 Entity Type: ${sellerDetails?.entityType || "Individual"}
 Gender: ${sellerDetails?.gender || "Not specified"}
 Nationality: ${sellerDetails?.nationality || "Motswana"}
 Marital Status: ${sellerDetails?.maritalStatus || "Not specified"}
+${extractedPreviousOwner ? `Previous Owner (chain of title): ${extractedPreviousOwner}` : ''}
 
 ═══════════════════════════════════════
 PROPERTY & FINANCIAL DETAILS:

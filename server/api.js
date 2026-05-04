@@ -129,12 +129,17 @@ app.post('/api/analyze-deed', upload.single('file'), async (req, res) => {
 - hasBonds (boolean): whether existing bonds/mortgages are detected
 - hasSubdivisions (boolean): whether subdivision mentions are found
 - ownerName (string): full registered owner name extracted from the deed, or "Unknown"
+- ownerIdNumber (string): ID/passport number of the registered owner extracted from the deed, or "Unknown"
+- previousOwnerName (string): name of the previous owner (the seller in the last transfer) if visible, or "Unknown"
 - plotNumber (string): plot/erf/stand number extracted from the deed, or "Unknown"
 - propertyAddress (string): full property address or location description, or "Unknown"
 - propertyDescription (string): legal description of property (e.g. "Certain piece of land situate..."), or "Unknown"
 - administrativeDistrict (string): district or town the property is in, or "Unknown"
 - extent (string): size/extent of the property (e.g. "450 square metres"), or "Unknown"
-- titleDeedNumber (string): certificate of registered title number, or "Unknown"
+- titleDeedNumber (string): certificate of registered title number or deed number, or "Unknown"
+- purchasePrice (string): purchase price stated in the deed, or "Unknown"
+- hasMortgageBond (boolean): whether a mortgage bond is registered against the property
+- mortgageBondNumber (string): mortgage bond number if registered, or "Unknown"
 - errors (array of strings): any issues found with the document
 
 Return ONLY valid JSON, no markdown or explanation.`;

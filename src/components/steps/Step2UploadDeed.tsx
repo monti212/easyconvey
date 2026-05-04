@@ -18,12 +18,17 @@ interface Step2Props {
     documentFilePaths?: { path: string; bucket: string; name: string; type: string }[];
     documentDataUrls?: { dataUrl: string; name: string; docType: string }[];
     extractedOwnerName?: string;
+    extractedOwnerIdNumber?: string;
+    extractedPreviousOwner?: string;
     extractedPlotNumber?: string;
     extractedPropertyAddress?: string;
     extractedPropertyDescription?: string;
     extractedTitleDeedNumber?: string;
     extractedAdministrativeDistrict?: string;
     extractedExtent?: string;
+    extractedPurchasePrice?: string;
+    extractedHasMortgageBond?: boolean;
+    extractedMortgageBondNumber?: string;
   }) => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -51,12 +56,17 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
   const [analysisUnavailable, setAnalysisUnavailable] = useState(false);
   const [extractedFields, setExtractedFields] = useState<{
     ownerName?: string;
+    ownerIdNumber?: string;
+    previousOwnerName?: string;
     plotNumber?: string;
     propertyAddress?: string;
     propertyDescription?: string;
     titleDeedNumber?: string;
     administrativeDistrict?: string;
     extent?: string;
+    purchasePrice?: string;
+    hasMortgageBond?: boolean;
+    mortgageBondNumber?: string;
   }>({});
 
   // Check if the user is selling to determine if deed upload is mandatory
@@ -128,14 +138,20 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
           const isValid = result.isValid !== false;
 
           if (isValid) {
+            const def = (v: any) => (v && v !== 'Unknown' ? v : undefined);
             const ocr = {
-              ownerName: result.ownerName !== 'Unknown' ? result.ownerName : undefined,
-              plotNumber: result.plotNumber !== 'Unknown' ? result.plotNumber : undefined,
-              propertyAddress: result.propertyAddress !== 'Unknown' ? result.propertyAddress : undefined,
-              propertyDescription: result.propertyDescription !== 'Unknown' ? result.propertyDescription : undefined,
-              titleDeedNumber: result.titleDeedNumber !== 'Unknown' ? result.titleDeedNumber : undefined,
-              administrativeDistrict: result.administrativeDistrict !== 'Unknown' ? result.administrativeDistrict : undefined,
-              extent: result.extent !== 'Unknown' ? result.extent : undefined,
+              ownerName: def(result.ownerName),
+              ownerIdNumber: def(result.ownerIdNumber),
+              previousOwnerName: def(result.previousOwnerName),
+              plotNumber: def(result.plotNumber),
+              propertyAddress: def(result.propertyAddress),
+              propertyDescription: def(result.propertyDescription),
+              titleDeedNumber: def(result.titleDeedNumber),
+              administrativeDistrict: def(result.administrativeDistrict),
+              extent: def(result.extent),
+              purchasePrice: def(result.purchasePrice),
+              hasMortgageBond: result.hasMortgageBond || false,
+              mortgageBondNumber: def(result.mortgageBondNumber),
             };
             setExtractedFields(ocr);
             onUpdate({
@@ -145,12 +161,17 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
               documentFilePaths: filePaths,
               documentDataUrls: dataUrls,
               extractedOwnerName: ocr.ownerName,
+              extractedOwnerIdNumber: ocr.ownerIdNumber,
+              extractedPreviousOwner: ocr.previousOwnerName,
               extractedPlotNumber: ocr.plotNumber,
               extractedPropertyAddress: ocr.propertyAddress,
               extractedPropertyDescription: ocr.propertyDescription,
               extractedTitleDeedNumber: ocr.titleDeedNumber,
               extractedAdministrativeDistrict: ocr.administrativeDistrict,
               extractedExtent: ocr.extent,
+              extractedPurchasePrice: ocr.purchasePrice,
+              extractedHasMortgageBond: ocr.hasMortgageBond,
+              extractedMortgageBondNumber: ocr.mortgageBondNumber,
             });
             setErrorMessage('');
             setLandType(result.landType || 'Unknown');
@@ -387,6 +408,24 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
                           <li className="text-xs flex items-start">
                             <span className="w-36 text-gray-500 flex-shrink-0">Registered Owner:</span>
                             <span className="font-semibold text-blue-800">{extractedFields.ownerName}</span>
+                          </li>
+                        )}
+                        {extractedFields.ownerIdNumber && (
+                          <li className="text-xs flex items-start">
+                            <span className="w-36 text-gray-500 flex-shrink-0">Owner ID / Passport:</span>
+                            <span className="font-semibold text-blue-800">{extractedFields.ownerIdNumber}</span>
+                          </li>
+                        )}
+                        {extractedFields.previousOwnerName && (
+                          <li className="text-xs flex items-start">
+                            <span className="w-36 text-gray-500 flex-shrink-0">Previous Owner:</span>
+                            <span className="font-semibold text-blue-800">{extractedFields.previousOwnerName}</span>
+                          </li>
+                        )}
+                        {extractedFields.purchasePrice && (
+                          <li className="text-xs flex items-start">
+                            <span className="w-36 text-gray-500 flex-shrink-0">Purchase Price:</span>
+                            <span className="font-semibold text-blue-800">{extractedFields.purchasePrice}</span>
                           </li>
                         )}
                         {extractedFields.plotNumber && (

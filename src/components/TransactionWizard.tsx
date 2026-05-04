@@ -91,12 +91,17 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     sellerCommissionValue: '',
     // OCR-extracted deed fields
     extractedOwnerName: '',
+    extractedOwnerIdNumber: '',
+    extractedPreviousOwner: '',
     extractedPlotNumber: '',
     extractedPropertyAddress: '',
     extractedPropertyDescription: '',
     extractedTitleDeedNumber: '',
     extractedAdministrativeDistrict: '',
     extractedExtent: '',
+    extractedPurchasePrice: '',
+    extractedHasMortgageBond: false,
+    extractedMortgageBondNumber: '',
     // OCR-extracted personal info (from ID documents)
     extractedClientName: '',
     extractedIdNumber: '',

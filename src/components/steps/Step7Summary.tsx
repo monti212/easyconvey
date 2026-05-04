@@ -334,6 +334,11 @@ const Step7Summary: React.FC<Step7Props> = ({
           includeBondRegistration: (transactionData as any).includeBondRegistration || false,
           // OCR-extracted fields from deed upload — primary source for property data
           extractedOwnerName: (transactionData as any).extractedOwnerName || '',
+          extractedOwnerIdNumber: (transactionData as any).extractedOwnerIdNumber || '',
+          extractedPreviousOwner: (transactionData as any).extractedPreviousOwner || '',
+          extractedPurchasePrice: (transactionData as any).extractedPurchasePrice || '',
+          extractedHasMortgageBond: (transactionData as any).extractedHasMortgageBond || false,
+          extractedMortgageBondNumber: (transactionData as any).extractedMortgageBondNumber || '',
           extractedPlotNumber: (transactionData as any).extractedPlotNumber || '',
           extractedPropertyAddress: (transactionData as any).extractedPropertyAddress || '',
           extractedPropertyDescription: (transactionData as any).extractedPropertyDescription || '',
@@ -1381,15 +1386,20 @@ const Step7Summary: React.FC<Step7Props> = ({
 
       {!isSubmitted && (
         <div className="mb-6">
+          {mode === 'conveyancer' && (
+            <p className="text-xs text-gray-500 text-center mb-3">
+              Clicking <strong>Save &amp; Submit</strong> saves this transaction to the dashboard under its transaction type. You can return to it at any time.
+            </p>
+          )}
           <button
             onClick={handleSubmitTransaction}
             disabled={isSubmitting}
             className={`w-full py-3.5 px-6 border-2 border-transparent rounded-xl text-base font-semibold shadow-[0px_6px_12px_rgba(0,0,0,0.08)] text-white bg-[#0B1F3A] hover:bg-[#0B1F3A]/90 transition-colors ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {isSubmitting ? (
-              <><Loader2 className="inline-block mr-2 h-5 w-5 animate-spin" />Submitting...</>
+              <><Loader2 className="inline-block mr-2 h-5 w-5 animate-spin" />Saving...</>
             ) : (
-              <><CheckCircle className="inline-block mr-2 h-5 w-5" />{mode === 'client' ? 'Submit Your Information' : 'Submit Transaction'}</>
+              <><CheckCircle className="inline-block mr-2 h-5 w-5" />{mode === 'client' ? 'Submit Your Information' : 'Save & Submit Transaction'}</>
             )}
           </button>
         </div>
