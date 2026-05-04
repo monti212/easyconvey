@@ -79,6 +79,7 @@ function App() {
   const [showConveyancerWizard, setShowConveyancerWizard] = useState(false);
   const [transactions, setTransactions] = useState<TransactionData[]>([]);
   const [currentTransactionId, setCurrentTransactionId] = useState<string | null>(null);
+  const [currentSupabaseCaseId, setCurrentSupabaseCaseId] = useState<string | null>(null);
   const [sharedTransactionData, setSharedTransactionData] = useState({
     transactionId: '',
     transactionType: '',
@@ -216,11 +217,15 @@ function App() {
 
   const handleStartNewTransaction = (caseId?: string) => {
     if (caseId) {
-      // Use the Supabase case ID so the wizard updates the existing case
+      // caseId is a real Supabase UUID — pass it as both the display ID and the Supabase case ID
       setCurrentTransactionId(caseId);
+      setCurrentSupabaseCaseId(caseId);
       setStarted(true);
     } else {
+      // No existing case — create a new in-memory transaction ID but NO Supabase case ID yet
+      // The wizard will create the Supabase case on first persist
       handleStartTransaction();
+      setCurrentSupabaseCaseId(null);
     }
     setShowConveyancerWizard(true);
     setShowConveyancerOverview(false);
@@ -351,13 +356,14 @@ function App() {
           <TransactionContext.Provider value={transactionContextValue}>
             <TransactionWizard
               transactionId={currentTransactionId}
-              initialCaseId={currentTransactionId}
+              initialCaseId={currentSupabaseCaseId}
               onSharedLink={handleSharedLink}
               sharedTransactionData={sharedTransactionData}
               mode="conveyancer"
               onComplete={() => {
                 setShowConveyancerWizard(false);
                 setStarted(false);
+                setCurrentSupabaseCaseId(null);
               }}
             />
           </TransactionContext.Provider>

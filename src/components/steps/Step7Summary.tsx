@@ -136,12 +136,28 @@ const Step7Summary: React.FC<Step7Props> = ({
 
   // Derive display names for buyer and seller based on current party's role and case record
   const isBuyerRole = transactionData.transactionType !== 'selling';
+
+  // Current party (conveyancer's client) — use OCR-extracted name if no other name available
   const currentPartyDisplayName = transactionData.hasAgent
     ? transactionData.agentName
-    : (transactionData as any).companyName || (transactionData as any).trustName || 'Party';
+    : (transactionData as any).companyName
+    || (transactionData as any).trustName
+    || (transactionData as any).deceasedName
+    || (transactionData as any).extractedClientName   // from ID document OCR
+    || (transactionData as any).extractedOwnerName    // from title deed OCR
+    || 'Pending';
+
+  // Counter-party — use OCR registered owner (= seller) as fallback when they haven't submitted yet
   const counterpartyDisplayName = isBuyerRole
-    ? (caseRecord?.seller_data?.clientName || caseRecord?.seller_data?.agentName || 'Seller')
-    : (caseRecord?.buyer_data?.clientName || caseRecord?.buyer_data?.agentName || 'Buyer');
+    ? (caseRecord?.seller_data?.clientName
+      || caseRecord?.seller_data?.agentName
+      || (transactionData as any).extractedOwnerName  // registered owner from deed = seller
+      || 'Pending')
+    : (caseRecord?.buyer_data?.clientName
+      || caseRecord?.buyer_data?.agentName
+      || (transactionData as any).extractedClientName
+      || 'Pending');
+
   const resolvedBuyerName = isBuyerRole ? currentPartyDisplayName : counterpartyDisplayName;
   const resolvedSellerName = isBuyerRole ? counterpartyDisplayName : currentPartyDisplayName;
 
