@@ -62,6 +62,16 @@ serve(async (req: Request) => {
       documentPaths,
       documentImages,
       stream: wantStream,
+      // OCR-extracted fields from title deed scan
+      extractedOwnerName,
+      extractedPlotNumber,
+      extractedPropertyAddress,
+      extractedPropertyDescription,
+      extractedTitleDeedNumber,
+      extractedAdministrativeDistrict,
+      extractedExtent,
+      extractedClientName,
+      extractedIdNumber,
     } = await req.json();
 
     // ─── Fetch document URLs from Supabase Storage ───────────────────
@@ -167,6 +177,19 @@ serve(async (req: Request) => {
     const transactionBlock = `
 TRANSACTION REFERENCE: ${transactionId}
 
+${(extractedOwnerName || extractedPlotNumber || extractedPropertyAddress || extractedTitleDeedNumber) ? `═══════════════════════════════════════
+TITLE DEED — OCR EXTRACTED DATA (PRIMARY SOURCE — use this for property details):
+═══════════════════════════════════════
+${extractedOwnerName ? `Registered Owner (Seller): ${extractedOwnerName}` : ''}
+${extractedPlotNumber ? `Plot / Stand Number: ${extractedPlotNumber}` : ''}
+${extractedTitleDeedNumber ? `Title Deed / Certificate No: ${extractedTitleDeedNumber}` : ''}
+${extractedPropertyAddress ? `Property Address: ${extractedPropertyAddress}` : ''}
+${extractedPropertyDescription ? `Property Description (CERTAIN/SITUATE): ${extractedPropertyDescription}` : ''}
+${extractedAdministrativeDistrict ? `Administrative District: ${extractedAdministrativeDistrict}` : ''}
+${extractedExtent ? `Extent / Size: ${extractedExtent}` : ''}
+${extractedClientName ? `Client Name (from ID document): ${extractedClientName}` : ''}
+${extractedIdNumber ? `ID Number (from ID document): ${extractedIdNumber}` : ''}
+` : ''}
 ═══════════════════════════════════════
 BUYER (PURCHASER) INFORMATION:
 ═══════════════════════════════════════

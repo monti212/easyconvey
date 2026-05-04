@@ -9,11 +9,14 @@ CRITICAL INSTRUCTIONS:
 - This is the ACTUAL TRANSFER DOCUMENT registered at the Deeds Registry — NOT a sale agreement
 - The conveyancer appears before the Registrar of Deeds on behalf of the seller via Power of Attorney
 - Use the EXACT formal legal language and structure shown in the required format below
-- Use actual party details provided — do NOT use placeholder names or bracketed placeholders
+- Use actual party details from the transaction data — NEVER output bracketed placeholders like [NAME], [DATE], [NUMBER]
+- If any field is genuinely unknown, write "OUTSTANDING — [field description]" (not a bracket placeholder)
 - Property descriptions must use the formal CERTAIN / SITUATE / MEASURING / AS WILL MORE FULLY APPEAR / WHICH PROPERTY / SUBJECT TO format
 - All amounts must be stated in figures AND words (e.g., "P1,150,000.00 (One Million One Hundred and Fifty Thousand Pula)")
-- If the sale price differs from the valuation, state BOTH: "sold ... for the sum of [SALE PRICE] but valued at [VALUATION] for transfer duty purposes"
+- If the sale price differs from the valuation, state BOTH prices; if no valuation is provided, state only the sale price
 - Reference the full chain of title (Certificate of Registered State Title → subsequent deeds → last deed in favour of seller)
+- HIGHEST PRIORITY DATA SOURCES: Use extractedOwnerName as the seller name, extractedPlotNumber as the lot number, extractedPropertyAddress as the property location, extractedPropertyDescription for the CERTAIN/SITUATE clauses, extractedTitleDeedNumber for the WHICH PROPERTY clause — these come directly from OCR of the uploaded title deed
+- CATCHPHRASES: After each major section (after the cover page, after the SUBJECT TO conditions block, after the WHEREFORE clause, after the execution block), add a right-aligned catchphrase line showing the first word of the next section (e.g., *THAT*, *AND*, *WHEREFORE*, *THUS*)
 
 MARITAL STATUS HANDLING (CRITICAL — apply the correct format for the SELLER):
 - If "single" or "Single":
@@ -170,14 +173,15 @@ on the above date.
 ---
 
 CRITICAL REMINDERS:
-- Replace ALL placeholders with actual data from the transaction details and uploaded documents
-- If a data point is not available, write "To be confirmed" — never output a bracket placeholder
+- NEVER output bracketed placeholders like [NAME], [DATE], [NUMBER] in the final document — use real data or write "OUTSTANDING — [description]"
+- Priority data order: (1) extractedOwnerName/extractedPlotNumber/extractedPropertyAddress from deed OCR, (2) uploaded document images, (3) form fields, (4) "OUTSTANDING" if genuinely missing
 - The 6 numbered conditions are STANDARD for State Grant properties — include them verbatim
-- If the property has different conditions (e.g. commercial use, freehold), adapt accordingly based on uploaded title deed
-- The chain of title (WHICH PROPERTY clause) must trace from the original State Title through all subsequent transfers to the seller
-- Sale price and valuation may differ — include both if valuation is provided
-- For company buyers, ALWAYS include the Section 25 Companies Act endorsement
+- If the property has different conditions (e.g. commercial use, freehold), adapt based on uploaded title deed
+- The chain of title (WHICH PROPERTY clause) must trace from the original State Title through all subsequent transfers to the seller — use extractedTitleDeedNumber if available
+- Sale price and valuation: include both if valuation differs from sale price; otherwise state only the sale price
+- For company buyers, ALWAYS include the Section 25 Companies Act endorsement in ENDORSEMENTS
 - The Appearer (conveyancer) acts via Power of Attorney granted by the seller — reference the POA date and place
-- Use ordinal dates: "16th day of October 1994" not "16 October 1994"`,
+- Use ordinal dates: "16th day of October 1994" not "16 October 1994"
+- Add catchphrases after each major section (first word of next section, right-aligned, italicised)`,
   };
 }

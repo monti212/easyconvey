@@ -310,6 +310,16 @@ const Step7Summary: React.FC<Step7Props> = ({
           documentPaths: (transactionData.documentFilePaths || []).map(fp => ({ path: fp.path, bucket: fp.bucket })),
           documentImages: (transactionData.documentDataUrls || []).map(d => ({ dataUrl: d.dataUrl, name: d.name, docType: d.docType })),
           stream: true,
+          // OCR-extracted fields from deed upload — primary source for property data
+          extractedOwnerName: (transactionData as any).extractedOwnerName || '',
+          extractedPlotNumber: (transactionData as any).extractedPlotNumber || '',
+          extractedPropertyAddress: (transactionData as any).extractedPropertyAddress || '',
+          extractedPropertyDescription: (transactionData as any).extractedPropertyDescription || '',
+          extractedTitleDeedNumber: (transactionData as any).extractedTitleDeedNumber || '',
+          extractedAdministrativeDistrict: (transactionData as any).extractedAdministrativeDistrict || '',
+          extractedExtent: (transactionData as any).extractedExtent || '',
+          extractedClientName: (transactionData as any).extractedClientName || '',
+          extractedIdNumber: (transactionData as any).extractedIdNumber || '',
         }),
         signal,
       });
