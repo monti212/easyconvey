@@ -79,6 +79,7 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
   const [caseDocuments, setCaseDocuments] = useState<CaseDocument[]>([]);
   const [selectedDocType, setSelectedDocType] = useState<DocumentType>('deed_of_sale');
   const [generatedDocuments, setGeneratedDocuments] = useState<Record<DocumentType, string>>({} as Record<DocumentType, string>);
+  const [wizardData, setWizardData] = useState<any>(null);
 
   // Use real user from auth context for logging
   const currentUser = orgUser ? {
@@ -139,39 +140,56 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         // Documents may not exist yet
       }
 
+      // Extract wizard data stored by the conveyancer during the transaction wizard
+      const wd = Array.isArray(caseRecord?.documents) && caseRecord.documents.length > 0
+        ? caseRecord.documents[caseRecord.documents.length - 1]?.wizardData
+        : null;
+      if (wd) setWizardData(wd);
+
       // Build transaction display data
       const bd = dbBuyerData;
       const sd = dbSellerData;
 
       const getBuyerName = () => {
+        // Client wizard submission (highest priority)
         if (bd?.clientName) return bd.clientName;
-        if (bd?.hasAgent) return bd.agentName;
-        if (caseRecord?.client_name) return caseRecord.client_name;
-        return buyerData?.agentName || 'Buyer';
+        if (bd?.hasAgent && bd?.agentName) return bd.agentName;
+        // OCR-extracted from ID document uploaded in wizard
+        if (wd?.extractedClientName) return wd.extractedClientName;
+        if (wd?.clientName) return wd.clientName;
+        if (caseRecord?.client_name && caseRecord.client_name !== 'Client' && caseRecord.client_name !== 'Pending') return caseRecord.client_name;
+        return buyerData?.agentName || 'Pending';
       };
 
       const getSellerName = () => {
+        // Client wizard submission (highest priority)
         if (sd?.clientName) return sd.clientName;
-        if (sd?.hasAgent) return sd.agentName;
-        return sellerData?.agentName || 'Seller';
+        if (sd?.hasAgent && sd?.agentName) return sd.agentName;
+        // OCR-extracted registered owner from title deed = seller
+        if (wd?.extractedOwnerName) return wd.extractedOwnerName;
+        return sellerData?.agentName || 'Pending';
       };
 
-      const price = bd?.sellingPrice || sd?.sellingPrice || caseRecord?.property?.price?.toString() || '0';
+      const price = wd?.sellingPrice || bd?.sellingPrice || sd?.sellingPrice
+        || caseRecord?.property?.price?.toString() || '0';
 
       const txn = {
         id: transactionId,
         buyerName: getBuyerName(),
         sellerName: getSellerName(),
         propertyPrice: price,
-        propertyAddress: caseRecord?.property?.address || 'Address pending',
+        propertyAddress: wd?.extractedPropertyAddress || caseRecord?.property?.address || 'Address pending',
         status: caseRecord?.status === 'in_progress' ? 'In Progress' : caseRecord?.status === 'completed' ? 'Completed' : 'Documents Uploaded',
-        progress: caseRecord?.status === 'completed' ? 100 : (bd && sd ? 75 : 50),
+        progress: caseRecord?.status === 'completed' ? 100 : (bd && sd ? 75 : bd || sd ? 50 : 25),
         submissionDate: caseRecord?.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-        buyerDocuments: bd?.uploadedDocuments || [],
+        buyerDocuments: bd?.uploadedDocuments || wd?.uploadedDocuments || [],
         sellerDocuments: sd?.uploadedDocuments || [],
-        buyerDetails: bd,
+        buyerDetails: bd || wd,
         sellerDetails: sd,
+        wizardData: wd,
         caseNumber: caseRecord?.case_number || transactionId,
+        transactionCategory: wd?.transactionCategory || caseRecord?.case_type || 'normal_transfer',
+        includeBondRegistration: wd?.includeBondRegistration || false,
       };
 
       setTransactions([txn]);
@@ -244,6 +262,28 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
           sellerName: currentTransaction?.sellerName || 'Not specified',
           documentPaths: caseDocuments.map(d => ({ path: d.file_path, bucket: 'documents', name: d.document_name, type: d.document_type })),
           stream: true,
+          // Conveyancer identity
+          conveyancerName: orgUser ? `${orgUser.first_name || ''} ${orgUser.last_name || ''}`.trim() : 'Conveyancer',
+          conveyancerFirm: authOrg?.name || 'Minchin & Kelly',
+          // Transaction category
+          transactionCategory: currentTransaction?.transactionCategory || wizardData?.transactionCategory || 'normal_transfer',
+          includeBondRegistration: currentTransaction?.includeBondRegistration || wizardData?.includeBondRegistration || false,
+          // OCR-extracted deed fields (from wizard data)
+          extractedOwnerName: wizardData?.extractedOwnerName || '',
+          extractedOwnerIdNumber: wizardData?.extractedOwnerIdNumber || '',
+          extractedPreviousOwner: wizardData?.extractedPreviousOwner || '',
+          extractedPlotNumber: wizardData?.extractedPlotNumber || '',
+          extractedPropertyAddress: wizardData?.extractedPropertyAddress || '',
+          extractedPropertyDescription: wizardData?.extractedPropertyDescription || '',
+          extractedTitleDeedNumber: wizardData?.extractedTitleDeedNumber || '',
+          extractedAdministrativeDistrict: wizardData?.extractedAdministrativeDistrict || '',
+          extractedExtent: wizardData?.extractedExtent || '',
+          extractedPurchasePrice: wizardData?.extractedPurchasePrice || '',
+          extractedHasMortgageBond: wizardData?.extractedHasMortgageBond || false,
+          extractedMortgageBondNumber: wizardData?.extractedMortgageBondNumber || '',
+          extractedClientName: wizardData?.extractedClientName || '',
+          extractedIdNumber: wizardData?.extractedIdNumber || '',
+          extractedDateOfBirth: wizardData?.extractedDateOfBirth || '',
         }),
       });
 
@@ -499,8 +539,24 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                   </div>
                   <div className="flex items-center">
                     <Banknote className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-600">Property Value: {formatCurrency(currentTransaction.propertyPrice)}</span>
+                    <span className="text-sm text-gray-600">
+                      Property Value: {currentTransaction.propertyPrice && currentTransaction.propertyPrice !== '0'
+                        ? formatCurrency(currentTransaction.propertyPrice)
+                        : wizardData?.extractedPurchasePrice || 'Pending'}
+                    </span>
                   </div>
+                  {(wizardData?.transactionCategory || (wizardData as any)?.includeBondRegistration) && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {wizardData?.transactionCategory && (
+                        <span className="px-2 py-0.5 bg-[#0B1F3A]/5 text-[#0B1F3A] text-xs rounded-full font-medium capitalize">
+                          {wizardData.transactionCategory.replace(/_/g, ' ')}
+                        </span>
+                      )}
+                      {(wizardData as any)?.includeBondRegistration && (
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded-full font-medium">+ Bond</span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="space-y-4">
@@ -532,49 +588,49 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                 <div className="space-y-3">
                   <div>
                     <p className="text-sm font-medium text-gray-700">Name</p>
-                    <p className="text-gray-900">{currentTransaction.buyerName}</p>
+                    <p className="text-gray-900 font-medium">{currentTransaction.buyerName}</p>
+                    {wizardData?.extractedClientName && wizardData.extractedClientName !== currentTransaction.buyerName && (
+                      <p className="text-xs text-blue-600 mt-0.5">ID OCR: {wizardData.extractedClientName}</p>
+                    )}
                   </div>
-                  
-                  {currentTransaction.buyerDetails && (
-                    <>
-                      {currentTransaction.buyerDetails.hasAgent && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-700">Agent</p>
-                          <p className="text-gray-900">{currentTransaction.buyerDetails.agentName}</p>
-                          <p className="text-sm text-gray-600">{currentTransaction.buyerDetails.agentCompany}</p>
-                        </div>
-                      )}
-                      
-                      {currentTransaction.buyerDetails.nationality && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-700">Nationality</p>
-                          <p className="text-gray-900">{currentTransaction.buyerDetails.nationality}</p>
-                        </div>
-                      )}
-                      
-                      {currentTransaction.buyerDetails.isFirstTimeBuyer && (
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                          <p className="text-sm font-medium text-green-800">First Time Buyer</p>
-                          <p className="text-xs text-green-700">Eligible for transfer duty exemption</p>
-                        </div>
-                      )}
-                    </>
+
+                  {(currentTransaction.buyerDetails?.nationality || wizardData?.nationality) && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Nationality</p>
+                      <p className="text-gray-900">{currentTransaction.buyerDetails?.nationality || wizardData?.nationality}</p>
+                    </div>
                   )}
-                  
+
+                  {(currentTransaction.buyerDetails?.maritalStatus || wizardData?.maritalStatus) && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Marital Status</p>
+                      <p className="text-gray-900 capitalize">
+                        {(currentTransaction.buyerDetails?.maritalStatus || wizardData?.maritalStatus || '').replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                  )}
+
+                  {(currentTransaction.buyerDetails?.isFirstTimeBuyer || wizardData?.isFirstTimeBuyer) && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <p className="text-sm font-medium text-green-800">First Time Buyer</p>
+                      <p className="text-xs text-green-700">Eligible for transfer duty exemption</p>
+                    </div>
+                  )}
+
                   <div>
                     <p className="text-sm font-medium text-gray-700">Documents ({currentTransaction.buyerDocuments.length})</p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {currentTransaction.buyerDocuments.slice(0, 3).map((doc: string, index: number) => (
-                        <span key={index} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                          {doc}
-                        </span>
-                      ))}
-                      {currentTransaction.buyerDocuments.length > 3 && (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                          +{currentTransaction.buyerDocuments.length - 3} more
-                        </span>
-                      )}
-                    </div>
+                    {currentTransaction.buyerDocuments.length === 0 ? (
+                      <p className="text-xs text-amber-600 mt-1">Awaiting document upload</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {currentTransaction.buyerDocuments.slice(0, 3).map((doc: string, index: number) => (
+                          <span key={index} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">{doc}</span>
+                        ))}
+                        {currentTransaction.buyerDocuments.length > 3 && (
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">+{currentTransaction.buyerDocuments.length - 3} more</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -585,46 +641,51 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                   <Building className="h-5 w-5 text-blue-600 mr-2" />
                   Seller Information
                 </h3>
-                
+
                 <div className="space-y-3">
                   <div>
                     <p className="text-sm font-medium text-gray-700">Name</p>
-                    <p className="text-gray-900">{currentTransaction.sellerName}</p>
+                    <p className="text-gray-900 font-medium">{currentTransaction.sellerName}</p>
+                    {wizardData?.extractedOwnerName && (
+                      <p className="text-xs text-blue-600 mt-0.5">From deed: {wizardData.extractedOwnerName}</p>
+                    )}
                   </div>
-                  
-                  {currentTransaction.sellerDetails && (
-                    <>
-                      {currentTransaction.sellerDetails.hasAgent && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-700">Agent</p>
-                          <p className="text-gray-900">{currentTransaction.sellerDetails.agentName}</p>
-                          <p className="text-sm text-gray-600">{currentTransaction.sellerDetails.agentCompany}</p>
-                        </div>
-                      )}
-                      
-                      {currentTransaction.sellerDetails.nationality && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-700">Nationality</p>
-                          <p className="text-gray-900">{currentTransaction.sellerDetails.nationality}</p>
-                        </div>
-                      )}
-                    </>
+
+                  {wizardData?.extractedOwnerIdNumber && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">ID / Passport</p>
+                      <p className="text-gray-900 font-mono text-sm">{wizardData.extractedOwnerIdNumber}</p>
+                    </div>
                   )}
-                  
+
+                  {wizardData?.extractedPlotNumber && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Plot Number</p>
+                      <p className="text-gray-900">{wizardData.extractedPlotNumber}</p>
+                    </div>
+                  )}
+
+                  {(currentTransaction.sellerDetails?.nationality) && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Nationality</p>
+                      <p className="text-gray-900">{currentTransaction.sellerDetails.nationality}</p>
+                    </div>
+                  )}
+
                   <div>
                     <p className="text-sm font-medium text-gray-700">Documents ({currentTransaction.sellerDocuments.length})</p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {currentTransaction.sellerDocuments.slice(0, 3).map((doc: string, index: number) => (
-                        <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                          {doc}
-                        </span>
-                      ))}
-                      {currentTransaction.sellerDocuments.length > 3 && (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                          +{currentTransaction.sellerDocuments.length - 3} more
-                        </span>
-                      )}
-                    </div>
+                    {currentTransaction.sellerDocuments.length === 0 ? (
+                      <p className="text-xs text-amber-600 mt-1">Awaiting document upload</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {currentTransaction.sellerDocuments.slice(0, 3).map((doc: string, index: number) => (
+                          <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">{doc}</span>
+                        ))}
+                        {currentTransaction.sellerDocuments.length > 3 && (
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">+{currentTransaction.sellerDocuments.length - 3} more</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
