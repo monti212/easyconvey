@@ -73,7 +73,7 @@ async function callOpenAI(apiKey, instructions, input, options = {}) {
 
 // ─── Comprehensive conveyancing document generation (streaming, replaces Supabase edge function) ───
 app.post('/api/generate-document', async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'OpenAI API key not configured on server' });
 
   const {
@@ -252,10 +252,10 @@ CRITICAL DATA RULE:
   }
 });
 
-// Analyze uploaded deed via pdf-parse + GPT-5.2
+// Analyze uploaded deed via pdf-parse + AI
 app.post('/api/analyze-deed', upload.single('file'), async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'OpenAI API key not configured' });
+  const apiKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'No AI API key configured on server' });
 
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
@@ -267,15 +267,35 @@ app.post('/api/analyze-deed', upload.single('file'), async (req, res) => {
       try {
         const pdfParse = (await import('pdf-parse')).default;
         const pdfData = await pdfParse(req.file.buffer);
-        extractedText = pdfData.text || '';
+        extractedText = (pdfData.text || '').trim();
       } catch (err) {
-        console.warn('pdf-parse failed, using filename-based analysis:', err.message);
+        console.warn('pdf-parse failed:', err.message);
       }
     }
 
-    // If no text extracted, use file metadata
-    if (!extractedText) {
-      extractedText = `File: ${req.file.originalname}, Size: ${req.file.size} bytes, Type: ${req.file.mimetype}`;
+    // Scanned / image-based PDF — no extractable text — accept for manual review
+    if (!extractedText || extractedText.length < 50) {
+      return res.json({
+        isValid: true,
+        landType: 'Pending Review',
+        hasCaveats: false,
+        hasBonds: false,
+        hasSubdivisions: false,
+        ownerName: 'Unknown',
+        ownerIdNumber: 'Unknown',
+        previousOwnerName: 'Unknown',
+        plotNumber: 'Unknown',
+        propertyAddress: 'Unknown',
+        propertyDescription: 'Unknown',
+        administrativeDistrict: 'Unknown',
+        extent: 'Unknown',
+        titleDeedNumber: 'Unknown',
+        purchasePrice: 'Unknown',
+        hasMortgageBond: false,
+        mortgageBondNumber: 'Unknown',
+        errors: [],
+        scannedDocument: true,
+      });
     }
 
     const instructions = `You are a Botswana property title deed analyst. Analyze the provided document text and return a JSON object with these fields:
@@ -329,10 +349,10 @@ Return ONLY valid JSON, no markdown or explanation.`;
   }
 });
 
-// Analyze ID / Passport / identity document via pdf-parse + GPT
+// Analyze ID / Passport / identity document via pdf-parse + AI
 app.post('/api/analyze-id', upload.single('file'), async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'OpenAI API key not configured' });
+  const apiKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'No AI API key configured on server' });
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
   try {
@@ -341,13 +361,14 @@ app.post('/api/analyze-id', upload.single('file'), async (req, res) => {
       try {
         const pdfParse = (await import('pdf-parse')).default;
         const pdfData = await pdfParse(req.file.buffer);
-        extractedText = pdfData.text || '';
+        extractedText = (pdfData.text || '').trim();
       } catch (err) {
         console.warn('pdf-parse failed for ID doc:', err.message);
       }
     }
-    if (!extractedText) {
-      extractedText = `File: ${req.file.originalname}, Size: ${req.file.size} bytes, Type: ${req.file.mimetype}`;
+    // Scanned document — return empty result gracefully
+    if (!extractedText || extractedText.length < 30) {
+      return res.json({ fullName: 'Unknown', idNumber: 'Unknown', dateOfBirth: 'Unknown', nationality: 'Unknown', gender: 'unknown', expiryDate: 'Unknown', documentType: 'Unknown', scannedDocument: true });
     }
 
     const instructions = `You are an identity document analyst. Extract data from the provided document text (ID card, passport, or similar) and return a JSON object with:
@@ -377,7 +398,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
 
 // Analyze document quality via OpenAI Responses API
 app.post('/api/analyze-document', async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'OpenAI API key not configured on server' });
 
   const { fileName, fileType, fileSize, docType } = req.body;
