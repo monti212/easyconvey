@@ -27,14 +27,25 @@ app.get('/api/client-info', (req, res) => {
   });
 });
 
-// Helper: call OpenAI Chat Completions API
+// Helper: call AI Chat Completions API (supports OpenAI and Groq)
 async function callOpenAI(apiKey, instructions, input, options = {}) {
-  const { model = 'gpt-4o', max_tokens = 4096, temperature = 0.1, ...rest } = options;
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const groqKey = process.env.GROQ_API_KEY;
+
+  // Use Groq if available (free tier), fall back to OpenAI
+  const useGroq = !!groqKey;
+  const key = useGroq ? groqKey : apiKey;
+  const baseUrl = useGroq
+    ? 'https://api.groq.com/openai/v1'
+    : 'https://api.openai.com/v1';
+  const defaultModel = useGroq ? 'llama-3.1-70b-versatile' : 'gpt-4o';
+
+  const { model = defaultModel, max_tokens = 4096, temperature = 0.1, ...rest } = options;
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      'Authorization': `Bearer ${key}`,
     },
     body: JSON.stringify({
       model,
@@ -50,7 +61,7 @@ async function callOpenAI(apiKey, instructions, input, options = {}) {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    const error = new Error(errorData.error?.message || `OpenAI API error: ${response.status}`);
+    const error = new Error(errorData.error?.message || `AI API error: ${response.status}`);
     error.status = response.status;
     error.details = errorData;
     throw error;
@@ -191,11 +202,18 @@ CRITICAL DATA RULE:
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('Access-Control-Allow-Origin', '*');
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const groqKey = process.env.GROQ_API_KEY;
+      const streamKey = groqKey || apiKey;
+      const streamUrl = groqKey
+        ? 'https://api.groq.com/openai/v1/chat/completions'
+        : 'https://api.openai.com/v1/chat/completions';
+      const streamModel = groqKey ? 'llama-3.1-70b-versatile' : 'gpt-4o';
+
+      const response = await fetch(streamUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${streamKey}` },
         body: JSON.stringify({
-          model: 'gpt-4o',
+          model: streamModel,
           messages: [
             { role: 'system', content: instructions },
             { role: 'user', content: prompt },
