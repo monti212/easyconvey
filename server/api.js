@@ -37,7 +37,7 @@ async function callOpenAI(apiKey, instructions, input, options = {}) {
   const baseUrl = useGroq
     ? 'https://api.groq.com/openai/v1'
     : 'https://api.openai.com/v1';
-  const defaultModel = useGroq ? 'llama-3.1-70b-versatile' : 'gpt-4o';
+  const defaultModel = useGroq ? 'llama-3.3-70b-versatile' : 'gpt-4o';
 
   const { model = defaultModel, max_tokens = 4096, temperature = 0.1, ...rest } = options;
 
@@ -207,7 +207,7 @@ CRITICAL DATA RULE:
       const streamUrl = groqKey
         ? 'https://api.groq.com/openai/v1/chat/completions'
         : 'https://api.openai.com/v1/chat/completions';
-      const streamModel = groqKey ? 'llama-3.1-70b-versatile' : 'gpt-4o';
+      const streamModel = groqKey ? 'llama-3.3-70b-versatile' : 'gpt-4o';
 
       const response = await fetch(streamUrl, {
         method: 'POST',
