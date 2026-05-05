@@ -184,24 +184,22 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-[#0B1F3A] border-b border-[#0B1F3A]">
+      <header className="bg-white shadow-soft border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Brand */}
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-[#C8A14F] flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-serif font-bold text-sm">M</span>
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center">
+              <div>
+                <h1 className="font-serif text-xl font-semibold text-primary tracking-tight">
+                  Minchin &amp; Kelly<span className="text-secondary">.</span>
+                </h1>
+                <p className="text-sm text-gray-500">{authOrg?.name || 'Practice'} — Practice Management</p>
               </div>
-              <span className="font-serif text-lg font-semibold text-white tracking-tight">
-                Minchin &amp; Kelly<span className="text-[#C8A14F]">.</span>
-              </span>
             </div>
 
-            {/* Right side */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center space-x-3">
               <button
                 onClick={() => setShowNewCase(true)}
-                className="inline-flex items-center px-4 py-2 bg-[#C8A14F] text-[#0B1F3A] text-sm font-semibold rounded-lg hover:bg-[#b8923f] transition-colors"
+                className="btn-shine inline-flex items-center px-4 py-2 bg-secondary text-primary text-sm font-semibold rounded-lg hover:bg-secondary-dark transition-colors"
               >
                 <Plus className="h-4 w-4 mr-1.5" />
                 New Case
@@ -210,7 +208,7 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
               {unreadCount > 0 && (
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <Bell className="h-5 w-5" />
                   <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
@@ -219,24 +217,25 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
                 </button>
               )}
 
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-white">{user.first_name} {user.last_name}</p>
-                <p className="text-xs text-slate-400 capitalize">{user.role.replace('_', ' ')}</p>
+              <div className="flex items-center space-x-3">
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-900">{user.first_name} {user.last_name}</p>
+                  <p className="text-xs text-gray-500 capitalize">{user.role.replace('_', ' ')}</p>
+                </div>
+                <button
+                  onClick={onLogout}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Logout
+                </button>
               </div>
-              <button
-                onClick={onLogout}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white border border-slate-600 hover:border-slate-400 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Sign Out
-              </button>
             </div>
           </div>
         </div>
       </header>
 
       {/* Navigation Tabs */}
-      <div className="bg-white border-b border-border">
+      <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-8 overflow-x-auto">
             {tabs.map((tab) => {
@@ -245,9 +244,9 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
+                  className={`flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'border-[#C8A14F] text-[#0B1F3A]'
+                      ? 'border-secondary text-primary'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >

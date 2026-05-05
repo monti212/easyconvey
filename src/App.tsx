@@ -425,41 +425,41 @@ function App() {
   return (
     <TransactionContext.Provider value={transactionContextValue}>
       <div className="min-h-screen bg-background">
-        <header className="bg-[#0B1F3A] border-b border-[#0B1F3A]">
+        <header className="bg-white shadow-soft">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
+            <div className="flex justify-between items-center py-4 md:py-5">
               {/* Brand */}
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-[#C8A14F] flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-serif font-bold text-sm">M</span>
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                  <span className="text-secondary font-serif font-bold text-sm">M</span>
                 </div>
-                <span className="text-lg font-serif font-semibold text-white tracking-tight">
-                  Minchin &amp; Kelly<span className="text-[#C8A14F]">.</span>
+                <span className="text-lg md:text-xl font-serif font-semibold text-primary tracking-tight">
+                  Minchin &amp; Kelly<span className="text-secondary">.</span>
                 </span>
               </div>
 
               {/* Right side */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center space-x-3">
                 {isPortalLoggedIn && orgUser && organization ? (
                   <div className="relative" ref={userMenuRef}>
                     <button
                       onClick={() => setUserMenuOpen(prev => !prev)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/10 transition-colors"
+                      className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-[#C8A14F] flex items-center justify-center flex-shrink-0">
-                        <span className="text-white font-semibold text-sm">
+                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                        <span className="text-secondary font-semibold text-sm">
                           {orgUser.first_name?.[0]?.toUpperCase() || 'U'}
                         </span>
                       </div>
                       <div className="text-left hidden sm:block">
-                        <p className="text-sm font-medium text-white leading-tight">
+                        <p className="text-sm font-medium text-gray-900 leading-tight">
                           {orgUser.first_name} {orgUser.last_name}
                         </p>
-                        <p className="text-xs text-slate-400 leading-tight capitalize">
+                        <p className="text-xs text-gray-500 leading-tight capitalize">
                           {organization.type.replace(/_/g, ' ')}
                         </p>
                       </div>
-                      <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+                      <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
 
                     {userMenuOpen && (
@@ -513,7 +513,7 @@ function App() {
                 ) : (
                   <button
                     onClick={() => setShowPortalLogin(true)}
-                    className="inline-flex items-center px-4 py-2 text-sm font-semibold text-[#0B1F3A] bg-[#C8A14F] rounded-lg hover:bg-[#b8923f] transition-colors"
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     <LogIn className="h-4 w-4 mr-2" />
                     Sign In
