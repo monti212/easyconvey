@@ -213,10 +213,12 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         : data.entityType === 'society' ? data.societyName
         : 'Client';
 
-      // Derive case_type from transaction category; append bond if included
+      // Derive case_type from transaction category
+      // hasBond (Step 2 loan question) is a property flag, NOT the transaction type
+      // Only use it if no transactionCategory has been selected yet
       const caseType = data.transactionCategory
         ? (data.includeBondRegistration ? `${data.transactionCategory}_bond` : data.transactionCategory)
-        : (data.hasBond ? 'bond' : (data.transactionType || 'normal_transfer'));
+        : (data.transactionType || 'normal_transfer');
 
       const step = stepOverride ?? currentStep;
       const stepName = getCurrentStepName();
