@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { X, Link2, FileText, Copy, Check, Send } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Link2, FileText, Copy, Check, Send, ClipboardList } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import * as casesService from '../services/cases.service';
+
+const STORAGE_KEY = 'easyconvey_last_share_links';
 
 interface NewCaseModalProps {
   isOpen: boolean;
@@ -18,8 +20,18 @@ export default function NewCaseModal({ isOpen, onClose, onCaseCreated }: NewCase
   const [generatedLinks, setGeneratedLinks] = useState<{ buyerLink: string; sellerLink: string; caseNumber: string } | null>(null);
   const [buyerEmail, setBuyerEmail] = useState('');
   const [sellerEmail, setSellerEmail] = useState('');
-  const [copiedLink, setCopiedLink] = useState<'buyer' | 'seller' | null>(null);
+  const [copiedLink, setCopiedLink] = useState<'buyer' | 'seller' | 'both' | null>(null);
   const [emailSent, setEmailSent] = useState<{ buyer?: boolean; seller?: boolean }>({});
+
+  // Restore links from localStorage when modal opens
+  useEffect(() => {
+    if (isOpen && !generatedLinks) {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) setGeneratedLinks(JSON.parse(saved));
+      } catch { /* ignore */ }
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -50,11 +62,14 @@ export default function NewCaseModal({ isOpen, onClose, onCaseCreated }: NewCase
           priority: 'medium',
           documents: [],
         });
-        setGeneratedLinks({
+        const links = {
           buyerLink: `${window.location.origin}?case=${buyerToken}&role=buyer`,
           sellerLink: `${window.location.origin}?case=${sellerToken}&role=seller`,
           caseNumber: case_.case_number,
-        });
+        };
+        setGeneratedLinks(links);
+        // Persist so links survive page navigation
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
       }
     } catch (err) {
       console.error('Failed to create case:', err);
@@ -93,8 +108,11 @@ export default function NewCaseModal({ isOpen, onClose, onCaseCreated }: NewCase
     }
   };
 
-  const handleClose = () => {
-    setGeneratedLinks(null);
+  const handleClose = (clearLinks = false) => {
+    if (clearLinks) {
+      setGeneratedLinks(null);
+      localStorage.removeItem(STORAGE_KEY);
+    }
     setCaseType('buying');
     setClientName('');
     setMode('links');
@@ -107,7 +125,7 @@ export default function NewCaseModal({ isOpen, onClose, onCaseCreated }: NewCase
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 relative">
-        <button onClick={handleClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+        <button onClick={() => handleClose(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
           <X className="h-5 w-5" />
         </button>
 
@@ -192,7 +210,21 @@ export default function NewCaseModal({ isOpen, onClose, onCaseCreated }: NewCase
         ) : (
           <>
             <h2 className="text-xl font-bold text-gray-900 mb-1">Case Created</h2>
-            <p className="text-sm text-gray-500 mb-4">Case {generatedLinks.caseNumber} — share these links with the buyer and seller.</p>
+            <p className="text-sm text-gray-500 mb-2">Case {generatedLinks.caseNumber} — share these links with the buyer and seller.</p>
+
+            {/* Copy Both button */}
+            <button
+              onClick={async () => {
+                const text = `Buyer Link:\n${generatedLinks.buyerLink}\n\nSeller Link:\n${generatedLinks.sellerLink}`;
+                await navigator.clipboard.writeText(text);
+                setCopiedLink('both');
+                setTimeout(() => setCopiedLink(null), 2000);
+              }}
+              className="w-full flex items-center justify-center gap-2 mb-4 py-2 px-4 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-colors"
+            >
+              {copiedLink === 'both' ? <Check className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
+              {copiedLink === 'both' ? 'Both Links Copied!' : 'Copy Both Links'}
+            </button>
 
             <div className="space-y-4">
               {/* Buyer Link */}
@@ -268,10 +300,10 @@ export default function NewCaseModal({ isOpen, onClose, onCaseCreated }: NewCase
               </div>
 
               <button
-                onClick={handleClose}
+                onClick={() => handleClose(true)}
                 className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
               >
-                Done
+                Done (clear links)
               </button>
             </div>
           </>
