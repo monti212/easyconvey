@@ -300,8 +300,6 @@ const Step7Summary: React.FC<Step7Props> = ({
     saveDocToDb(docType, docName, '', 'generating');
 
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-
       const currentPartyDetails = buildPartyDetails(transactionData);
       const isBuyer = transactionData.transactionType !== 'selling';
 
@@ -312,25 +310,19 @@ const Step7Summary: React.FC<Step7Props> = ({
 
       if (isBuyer) {
         buyerDetails = currentPartyDetails;
-        buyerName = currentPartyDetails?.clientName || 'Not specified';
+        buyerName = resolvedBuyerName;
         sellerDetails = buildPartyDetails(caseRecord?.seller_data);
-        sellerName = sellerDetails?.clientName || 'Not specified';
+        sellerName = resolvedSellerName;
       } else {
         sellerDetails = currentPartyDetails;
-        sellerName = currentPartyDetails?.clientName || 'Not specified';
+        sellerName = resolvedSellerName;
         buyerDetails = buildPartyDetails(caseRecord?.buyer_data);
-        buyerName = buyerDetails?.clientName || 'Not specified';
+        buyerName = resolvedBuyerName;
       }
 
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch(`${supabaseUrl}/functions/v1/generate-conveyancing-document`, {
+      const response = await fetch('/api/generate-document', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': anonKey,
-          'Authorization': `Bearer ${session?.access_token || anonKey}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           transactionId: transactionReferenceId,
           documentType: docType,

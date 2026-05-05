@@ -242,16 +242,9 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
     );
 
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch(`${supabaseUrl}/functions/v1/generate-conveyancing-document`, {
+      const response = await fetch('/api/generate-document', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': anonKey,
-          'Authorization': `Bearer ${session?.access_token || anonKey}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           transactionId,
           documentType: typeToGenerate,
