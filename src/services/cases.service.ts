@@ -181,14 +181,35 @@ export async function createCaseWithTokens(
   const case_ = await createCase(data);
   const buyerToken = generateToken();
   const sellerToken = generateToken();
+  // 1 year expiry — 30 days was too short for real transactions
+  const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
 
   const { error } = await supabase.from('case_share_tokens').insert([
-    { case_id: case_.id, role: 'buyer', token: buyerToken },
-    { case_id: case_.id, role: 'seller', token: sellerToken },
+    { case_id: case_.id, role: 'buyer', token: buyerToken, expires_at: expiresAt },
+    { case_id: case_.id, role: 'seller', token: sellerToken, expires_at: expiresAt },
   ]);
   if (error) throw error;
 
   return { case_, buyerToken, sellerToken };
+}
+
+export async function regenerateShareTokens(
+  caseId: string
+): Promise<{ buyerToken: string; sellerToken: string }> {
+  // Delete old tokens for this case
+  await supabase.from('case_share_tokens').delete().eq('case_id', caseId);
+
+  const buyerToken = generateToken();
+  const sellerToken = generateToken();
+  const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { error } = await supabase.from('case_share_tokens').insert([
+    { case_id: caseId, role: 'buyer', token: buyerToken, expires_at: expiresAt },
+    { case_id: caseId, role: 'seller', token: sellerToken, expires_at: expiresAt },
+  ]);
+  if (error) throw error;
+
+  return { buyerToken, sellerToken };
 }
 
 export async function getCaseByToken(token: string): Promise<{ case_: Case; role: string; expired: boolean; used: boolean } | null> {

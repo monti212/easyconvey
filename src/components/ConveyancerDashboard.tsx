@@ -216,6 +216,24 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
     setTimeout(() => setCopiedToken(null), 2000);
   };
 
+  const isTokenExpired = (token: any) =>
+    token?.expires_at && new Date(token.expires_at) < new Date();
+
+  const handleRegenerateLinks = async () => {
+    try {
+      const { buyerToken, sellerToken } = await casesService.regenerateShareTokens(transactionId);
+      const refreshed = await casesService.getTokensForCase(transactionId);
+      setShareTokens(refreshed);
+      // Copy both new links to clipboard automatically
+      const buyerLink = `${window.location.origin}?case=${buyerToken}&role=buyer`;
+      const sellerLink = `${window.location.origin}?case=${sellerToken}&role=seller`;
+      await navigator.clipboard.writeText(`Buyer Link:\n${buyerLink}\n\nSeller Link:\n${sellerLink}`);
+      alert('New links generated and copied to clipboard! Links are valid for 1 year.');
+    } catch {
+      alert('Failed to regenerate links. Please try again.');
+    }
+  };
+
   const currentTransaction = transactions.find(t => t.id === transactionId);
 
   const formatCurrency = (amount: string) => {
@@ -843,15 +861,19 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                     {buyerStatus === 'completed' ? 'Completed' : 'Pending'}
                   </span>
                 </div>
-                {shareTokens.find(t => t.role === 'buyer') && (
-                  <button
-                    onClick={() => copyShareLink('buyer')}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center"
-                  >
-                    {copiedToken === 'buyer' ? <Check className="h-3.5 w-3.5 mr-1.5 text-green-600" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
-                    {copiedToken === 'buyer' ? 'Copied!' : 'Copy Buyer Link'}
-                  </button>
-                )}
+                {shareTokens.find(t => t.role === 'buyer') && (() => {
+                  const bt = shareTokens.find(t => t.role === 'buyer')!;
+                  const expired = isTokenExpired(bt);
+                  return (
+                    <button
+                      onClick={() => !expired && copyShareLink('buyer')}
+                      disabled={expired}
+                      className={`w-full px-3 py-1.5 text-sm border rounded-lg transition-colors flex items-center justify-center ${expired ? 'border-red-200 bg-red-50 text-red-500 cursor-not-allowed' : 'border-gray-300 hover:bg-gray-50'}`}
+                    >
+                      {expired ? '⚠ Buyer Link Expired' : copiedToken === 'buyer' ? <><Check className="h-3.5 w-3.5 mr-1.5 text-green-600" />Copied!</> : <><Copy className="h-3.5 w-3.5 mr-1.5" />Copy Buyer Link</>}
+                    </button>
+                  );
+                })()}
 
                 {/* Seller */}
                 <div className="flex items-center justify-between">
@@ -860,20 +882,32 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                     <span className="text-sm font-medium text-gray-700">Seller</span>
                   </div>
                   <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                    sellerStatus === 'completed'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-amber-100 text-amber-800'
+                    sellerStatus === 'completed' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
                   }`}>
                     {sellerStatus === 'completed' ? 'Completed' : 'Pending'}
                   </span>
                 </div>
-                {shareTokens.find(t => t.role === 'seller') && (
+                {shareTokens.find(t => t.role === 'seller') && (() => {
+                  const st = shareTokens.find(t => t.role === 'seller')!;
+                  const expired = isTokenExpired(st);
+                  return (
+                    <button
+                      onClick={() => !expired && copyShareLink('seller')}
+                      disabled={expired}
+                      className={`w-full px-3 py-1.5 text-sm border rounded-lg transition-colors flex items-center justify-center ${expired ? 'border-red-200 bg-red-50 text-red-500 cursor-not-allowed' : 'border-gray-300 hover:bg-gray-50'}`}
+                    >
+                      {expired ? '⚠ Seller Link Expired' : copiedToken === 'seller' ? <><Check className="h-3.5 w-3.5 mr-1.5 text-green-600" />Copied!</> : <><Copy className="h-3.5 w-3.5 mr-1.5" />Copy Seller Link</>}
+                    </button>
+                  );
+                })()}
+
+                {/* Regenerate if any token is expired */}
+                {shareTokens.some(t => isTokenExpired(t)) && (
                   <button
-                    onClick={() => copyShareLink('seller')}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center"
+                    onClick={handleRegenerateLinks}
+                    className="w-full px-3 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-medium"
                   >
-                    {copiedToken === 'seller' ? <Check className="h-3.5 w-3.5 mr-1.5 text-green-600" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
-                    {copiedToken === 'seller' ? 'Copied!' : 'Copy Seller Link'}
+                    🔄 Regenerate Share Links
                   </button>
                 )}
               </div>
