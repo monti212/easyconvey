@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { ArrowLeft, CheckCircle, Clipboard, Download, FileText, Users, Clock, Banknote, UserCircle, Building, Lock, Shield, ExternalLink, Share2, Loader2, Sparkles, Eye, Printer, StopCircle, PlayCircle, FolderDown, Send, Building2, FileDown } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clipboard, Download, FileText, Users, Clock, Banknote, UserCircle, Building, Lock, Shield, ExternalLink, Share2, Loader2, Sparkles, Eye, Printer, StopCircle, PlayCircle, FolderDown, Send, Building2, FileDown, AlertTriangle } from 'lucide-react';
 import { downloadAsWord } from '../../lib/downloadAsWord';
 import { useTransactions } from '../../App';
 import { pdf } from '@react-pdf/renderer';
@@ -1174,6 +1174,29 @@ const Step7Summary: React.FC<Step7Props> = ({
           <div className="h-0.5 bg-gradient-to-r from-[#C8A14F] via-[#C8A14F]/60 to-transparent"></div>
 
           <div className="px-4 py-4 md:px-6 md:py-5">
+            {/* Seller details requirement notice */}
+            {resolvedSellerName === 'Pending' && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">Seller details not yet submitted</p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Documents can still be generated but seller fields will show as OUTSTANDING. Send the seller their share link so they can submit their details before finalising.
+                  </p>
+                </div>
+              </div>
+            )}
+            {resolvedBuyerName === 'Pending' && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">Buyer details not yet submitted</p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Documents can still be generated but buyer fields will show as OUTSTANDING. Send the buyer their share link so they can submit their details before finalising.
+                  </p>
+                </div>
+              </div>
+            )}
             {/* Generate All / Stop / Download Pack controls */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">

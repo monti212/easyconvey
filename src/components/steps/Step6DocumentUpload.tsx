@@ -427,13 +427,15 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
             <div className="relative">
               <h3 className="text-lg md:text-xl font-bold text-red-600 mb-3 md:mb-4">IMPORTANT NOTICE</h3>
               <div className="text-gray-700 space-y-3 md:space-y-4 mb-5 md:mb-6">
-                <p className="text-sm md:text-base">Please note that the following documents are also required:</p>
+                <p className="text-sm md:text-base">Please note that the following are also required before transfer can be completed:</p>
                 <ul className="list-disc pl-5 md:pl-6 space-y-1 md:space-y-2">
                   <li className="text-sm md:text-base">Tax clearance from relevant authorities</li>
                   <li className="text-sm md:text-base">Rates clearance certificate from local municipality</li>
-                  <li className="text-sm md:text-base">Letter of Compliance (where applicable)</li>
+                  <li className="text-sm md:text-base">Letter of Compliance — where applicable</li>
+                  <li className="text-sm md:text-base">Land Board Consent — where applicable (tribal land only)</li>
+                  <li className="text-sm md:text-base">Bond Cancellation — where applicable (existing mortgage only)</li>
                 </ul>
-                <p className="text-sm md:text-base font-medium">These steps are essential to complete your transaction successfully.</p>
+                <p className="text-sm md:text-base font-medium">Requirements marked "where applicable" depend on your specific transaction and location.</p>
               </div>
               <button
                 onClick={() => setShowImportantNote(false)}
@@ -811,8 +813,7 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
           </div>
           <div className="ml-3 md:ml-4">
             <p className="text-xs md:text-base text-amber-800">
-              <strong className="font-semibold">Important:</strong> After submission, you'll need to obtain tax clearance, 
-              letter of compliance (where necessary), and pay rates clearance to complete your transaction.
+              <strong className="font-semibold">Important:</strong> After submission, you'll need to obtain tax clearance and rates clearance before transfer. Letter of Compliance, Land Board Consent, and Bond Cancellation are required where applicable.
             </p>
           </div>
         </div>

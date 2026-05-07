@@ -613,9 +613,10 @@ const Step3SellingPrice: React.FC<Step3Props> = ({
           
           {/* Valuation document upload */}
           <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Upload Valuation Report
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Upload Valuation Report <span className="text-xs font-normal text-gray-400">(where applicable)</span>
             </label>
+            <p className="text-xs text-gray-500 mb-2">Required only when the sale price differs from the official market valuation, or when a valuation is requested by BURS for transfer duty purposes.</p>
             
             {!valuationDocument && !isUploading ? (
               <>
