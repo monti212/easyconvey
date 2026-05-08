@@ -15,6 +15,13 @@ CRITICAL INSTRUCTIONS:
 - Format using Markdown: use # for title, ## for parts, ### for sections, **bold** for defined terms, numbered lists for clauses
 - The document should be at minimum 3000 words covering every aspect of the transaction
 - Use the actual party details provided — do NOT use placeholder names
+- DATA RESOLUTION ORDER (apply IN ORDER for every field — do not skip steps):
+  1. Use the explicit value from the BUYER/SELLER information block if it is non-empty AND not the literal string "To be confirmed".
+  2. Otherwise, use the matching value from the "TITLE DEED — OCR EXTRACTED DATA" block (registered owner / property source of truth).
+  3. Otherwise, extract the value directly from any attached document images (ID, title deed, marriage cert, etc.).
+  4. ONLY if all three sources fail, write "To be confirmed".
+- "To be confirmed" is a last resort. If the OCR-extracted block contains the seller's name, ID, plot number, title deed number, etc., USE THOSE VALUES — do not write "To be confirmed" while real data exists in the prompt.
+- Never output a bracket placeholder like [NAME] or [DOB] under any circumstances.
 - Reference the Deeds Registry Act (Cap 33:02), Transfer Duty Act (Cap 53:01), and Tribal Land Act where applicable
 
 MARITAL STATUS HANDLING (CRITICAL — apply for BOTH buyer and seller):

@@ -166,34 +166,51 @@ serve(async (req: Request) => {
     }
 
     // ─── Resolve buyer/seller names from various data shapes ─────────
+    // "To be confirmed" sentinel — treat these as missing so OCR fallbacks can take over
+    const isPresent = (v: unknown): v is string =>
+      typeof v === "string" && v.trim().length > 0 && v.trim().toLowerCase() !== "to be confirmed";
+
     const resolveBuyerName = () => {
-      if (buyerDetails?.clientName) return buyerDetails.clientName;
-      if (buyerDetails?.hasAgent && buyerDetails?.agentName) return buyerDetails.agentName;
-      if (buyerDetails?.companyName) return buyerDetails.companyName;
-      if (buyerDetails?.trustName) return buyerDetails.trustName;
-      if (buyerDetails?.deceasedName) return buyerDetails.deceasedName;
-      if (buyerDetails?.societyName) return buyerDetails.societyName;
+      if (isPresent(buyerDetails?.clientName)) return buyerDetails.clientName;
+      if (buyerDetails?.hasAgent && isPresent(buyerDetails?.agentName)) return buyerDetails.agentName;
+      if (isPresent(buyerDetails?.companyName)) return buyerDetails.companyName;
+      if (isPresent(buyerDetails?.trustName)) return buyerDetails.trustName;
+      if (isPresent(buyerDetails?.deceasedName)) return buyerDetails.deceasedName;
+      if (isPresent(buyerDetails?.societyName)) return buyerDetails.societyName;
+      // Fall back to OCR-extracted buyer name from the ID document
+      if (isPresent(extractedClientName)) return extractedClientName;
       return buyerName || "Not specified";
     };
 
+    const resolveBuyerIdNumber = () => {
+      if (isPresent(buyerDetails?.idNumber)) return buyerDetails.idNumber;
+      if (isPresent(extractedIdNumber)) return extractedIdNumber;
+      return "To be confirmed";
+    };
+
+    const resolveBuyerDateOfBirth = () => {
+      if (isPresent(buyerDetails?.dateOfBirth)) return buyerDetails.dateOfBirth;
+      return "To be confirmed";
+    };
+
     const resolveSellerName = () => {
-      if (sellerDetails?.clientName) return sellerDetails.clientName;
-      if (sellerDetails?.hasAgent && sellerDetails?.agentName) return sellerDetails.agentName;
-      if (sellerDetails?.companyName) return sellerDetails.companyName;
-      if (sellerDetails?.trustName) return sellerDetails.trustName;
+      if (isPresent(sellerDetails?.clientName)) return sellerDetails.clientName;
+      if (sellerDetails?.hasAgent && isPresent(sellerDetails?.agentName)) return sellerDetails.agentName;
+      if (isPresent(sellerDetails?.companyName)) return sellerDetails.companyName;
+      if (isPresent(sellerDetails?.trustName)) return sellerDetails.trustName;
       // Fall back to OCR-extracted registered owner from the title deed
-      if (extractedOwnerName) return extractedOwnerName;
+      if (isPresent(extractedOwnerName)) return extractedOwnerName;
       return sellerName || "Not specified";
     };
 
     const resolveSellerIdNumber = () => {
-      if (sellerDetails?.idNumber) return sellerDetails.idNumber;
-      if (extractedOwnerIdNumber) return extractedOwnerIdNumber;
+      if (isPresent(sellerDetails?.idNumber)) return sellerDetails.idNumber;
+      if (isPresent(extractedOwnerIdNumber)) return extractedOwnerIdNumber;
       return "To be confirmed";
     };
 
     const resolveSellerDateOfBirth = () => {
-      if (sellerDetails?.dateOfBirth) return sellerDetails.dateOfBirth;
+      if (isPresent(sellerDetails?.dateOfBirth)) return sellerDetails.dateOfBirth;
       return "To be confirmed";
     };
 
@@ -230,8 +247,8 @@ ${extractedIdNumber ? `Buyer ID Number (from ID document): ${extractedIdNumber}`
 BUYER (PURCHASER) INFORMATION:
 ═══════════════════════════════════════
 Full Legal Name: ${resolveBuyerName()}
-Date of Birth: ${buyerDetails?.dateOfBirth || "To be confirmed"}
-ID / Passport Number: ${buyerDetails?.idNumber || "To be confirmed"}
+Date of Birth: ${resolveBuyerDateOfBirth()}
+ID / Passport Number: ${resolveBuyerIdNumber()}
 Entity Type: ${buyerDetails?.entityType || "Individual"}
 Gender: ${buyerDetails?.gender || "Not specified"}
 Nationality: ${buyerDetails?.nationality || "Motswana"}
@@ -300,7 +317,7 @@ Where information from uploaded documents conflicts with form data, prefer the d
     // ─── Get document type specific instructions and prompts ─────────
     const config = getDocumentConfig(documentType, transactionBlock);
     const instructions = knowledgeBaseContent
-      ? `${config.instructions}\n\n${"═".repeat(39)}\nKNOWLEDGE BASE — STRUCTURAL REFERENCE ONLY\n${"═".repeat(39)}\nThe following is an authoritative STRUCTURAL TEMPLATE from the Minchin & Kelly knowledge base showing the correct format, section order, legal phrasing style, and clause structure for Botswana conveyancing documents.\n\nCRITICAL RULES:\n- Use this ONLY as a structural and stylistic guide — learn the format, section headings, clause ordering, and legal language patterns.\n- NEVER copy placeholder text (e.g. "[FULL NAME OF TRANSFEROR]", "[GABORONE / FRANCISTOWN / LOBATSE]") into your output.\n- NEVER reproduce the template content verbatim. Every sentence must be generated fresh using the ACTUAL transaction data provided by the user.\n- Replace ALL bracketed placeholders with real data from the transaction details and uploaded documents.\n- If real data is not available for a field, write "To be confirmed" — never output a bracket placeholder.\n\n${knowledgeBaseContent}`
+      ? `${config.instructions}\n\n${"═".repeat(39)}\nKNOWLEDGE BASE — STRUCTURAL REFERENCE ONLY\n${"═".repeat(39)}\nThe following is an authoritative STRUCTURAL TEMPLATE from the Minchin & Kelly knowledge base showing the correct format, section order, legal phrasing style, and clause structure for Botswana conveyancing documents.\n\nCRITICAL RULES:\n- Use this ONLY as a structural and stylistic guide — learn the format, section headings, clause ordering, and legal language patterns.\n- NEVER copy placeholder text (e.g. "[FULL NAME OF TRANSFEROR]", "[GABORONE / FRANCISTOWN / LOBATSE]") into your output.\n- NEVER reproduce the template content verbatim. Every sentence must be generated fresh using the ACTUAL transaction data provided by the user.\n- Replace ALL bracketed placeholders with real data from the transaction details and uploaded documents.\n- For every field, follow the DATA RESOLUTION ORDER from the document-specific instructions: party block → OCR-extracted block → attached image extraction → "To be confirmed" (last resort only). Do NOT write "To be confirmed" while real data exists in the OCR-extracted block or attached images.\n- Never output a bracket placeholder like [NAME] or [DOB] under any circumstances.\n\n${knowledgeBaseContent}`
       : config.instructions;
     const textPrompt = config.prompt;
 

@@ -10,6 +10,12 @@ CRITICAL INSTRUCTIONS:
 - The Power of Attorney follows a specific prescribed format — do NOT deviate from the structure below
 - The Declaration of Seller is a statutory declaration and must follow the prescribed form exactly
 - Use actual party details provided — do NOT use placeholder names or bracketed placeholders
+- DATA RESOLUTION ORDER (apply IN ORDER for every field — do not skip steps):
+  1. Use the explicit value from the BUYER/SELLER information block if it is non-empty AND not the literal string "To be confirmed".
+  2. Otherwise, use the matching value from the "TITLE DEED — OCR EXTRACTED DATA" block (registered owner / property source of truth).
+  3. Otherwise, extract the value directly from any attached document images (ID, title deed, marriage cert, etc.).
+  4. ONLY if all three sources fail, write "To be confirmed".
+- "To be confirmed" is a last resort. If the OCR-extracted block contains the seller's name, ID, plot number, title deed number, etc., USE THOSE VALUES — do not write "To be confirmed" while real data exists in the prompt.
 - Property descriptions must use the formal CERTAIN / SITUATE / MEASURING / WHICH PROPERTY / SUBJECT TO format
 - All amounts must be stated in figures AND words (e.g., "P300,000.00 (Three Hundred Thousand Pula)")
 - Reference Certificate of Registered Title numbers where available from uploaded documents
@@ -183,7 +189,8 @@ DECLARED BEFORE ME AT **[CITY/TOWN]** ON THIS _______ DAY OF _________________ [
 
 CRITICAL REMINDERS:
 - Replace ALL placeholders with actual data from the transaction details and uploaded documents
-- If a data point is not available, write "To be confirmed" — never output a bracket placeholder
+- For every field, follow the DATA RESOLUTION ORDER: party block → OCR-extracted block → attached image extraction → "To be confirmed" (last resort only). Do NOT write "To be confirmed" while real data exists in the OCR-extracted block or document images.
+- Never output a bracket placeholder like [NAME] or [DOB]
 - The 9 numbered items in the Declaration of Seller are STANDARD and must always be included verbatim
 - Property descriptions must match exactly between both documents
 - The purchase price must match exactly between both documents

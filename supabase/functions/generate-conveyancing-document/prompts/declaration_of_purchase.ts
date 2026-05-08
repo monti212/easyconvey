@@ -10,7 +10,13 @@ CRITICAL INSTRUCTIONS:
 - Do NOT use markdown section headings (no ### headers). The document flows as one continuous declaration
 - Use the EXACT formal legal language and structure used in Botswana conveyancing practice
 - Use actual party details provided — do NOT use placeholder names or bracketed placeholders
-- If a data point is not available, write "To be confirmed" — never output a bracket placeholder
+- DATA RESOLUTION ORDER (apply IN ORDER for every field — do not skip steps):
+  1. Use the explicit value from the BUYER/SELLER information block if it is non-empty AND not the literal string "To be confirmed".
+  2. Otherwise, use the matching value from the "TITLE DEED — OCR EXTRACTED DATA" block (this block is the registered owner / property source of truth).
+  3. Otherwise, extract the value directly from any attached document images (ID, title deed, marriage cert, etc.).
+  4. ONLY if all three sources fail, write "To be confirmed".
+- "To be confirmed" is a last resort. If the OCR-extracted block contains the seller's name, ID, plot number, title deed number, etc., USE THOSE VALUES — do not fall back to "To be confirmed" while real data exists in the prompt.
+- Never output a bracket placeholder like [NAME] or [DOB] under any circumstances.
 - Property descriptions must use the formal CERTAIN / SITUATE / MEASURING / WHICH PROPERTY / SUBJECT TO format
 - All amounts must be stated in figures AND words (e.g., "P300,000.00 (Three Hundred Thousand Pula)")
 - Reference Certificate of Registered Title numbers where available from uploaded documents
@@ -199,7 +205,8 @@ THUS SWORN TO AND SIGNED BY THE DEPONENT BEFORE ME AT **[CITY]** ON THIS _______
 
 CRITICAL REMINDERS:
 - Replace ALL placeholders with actual data from the transaction details and uploaded documents
-- If a data point is not available, write "To be confirmed" — never output a bracket placeholder
+- For every field, follow the DATA RESOLUTION ORDER: party block → OCR-extracted block → attached image extraction → "To be confirmed" (last resort only). Do NOT write "To be confirmed" while real data exists in the OCR-extracted block or document images.
+- Never output a bracket placeholder like [NAME] or [DOB]
 - The 9 numbered items in the declaration are STANDARD and must always be included verbatim — do not paraphrase them
 - Apply the correct marital status format for BOTH buyer AND seller
 - The Board Resolution and Affidavit of Shareholding are ONLY included when the purchaser is a company entity

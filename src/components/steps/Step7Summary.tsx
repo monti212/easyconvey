@@ -227,9 +227,13 @@ const Step7Summary: React.FC<Step7Props> = ({
     return () => { active = false; };
   }, [supabaseCaseId, mode]);
 
-  const buildPartyDetails = useCallback((data: any) => {
-    if (!data) return null;
-    // Priority: explicitly entered clientName > OCR-extracted name > entity-derived name
+  const buildPartyDetails = useCallback((data: any, deedFallback?: { name?: string; idNumber?: string; dateOfBirth?: string }) => {
+    // If counter-party hasn't submitted their form yet, build a stub from deed extraction
+    if (!data) {
+      if (!deedFallback || (!deedFallback.name && !deedFallback.idNumber)) return null;
+      data = {};
+    }
+    // Priority: explicitly entered clientName > OCR-extracted name > entity-derived name > deed fallback
     const name = data.clientName?.trim()
       || data.extractedClientName?.trim()
       || (data.hasAgent ? data.agentName
@@ -238,16 +242,19 @@ const Step7Summary: React.FC<Step7Props> = ({
         : data.entityType === 'estate' ? data.deceasedName
         : data.entityType === 'society' ? data.societyName
         : undefined)
+      || deedFallback?.name?.trim()
       || 'Not specified';
 
     const idNum = data.idPassportNumber?.trim()
       || data.extractedIdNumber?.trim()
       || data.agentIdPassport?.trim()
       || data.idNumber?.trim()
+      || deedFallback?.idNumber?.trim()
       || 'To be confirmed';
 
     const dob = data.dateOfBirth?.trim()
       || data.extractedDateOfBirth?.trim()
+      || deedFallback?.dateOfBirth?.trim()
       || 'To be confirmed';
 
     return {
@@ -303,6 +310,13 @@ const Step7Summary: React.FC<Step7Props> = ({
       const currentPartyDetails = buildPartyDetails(transactionData);
       const isBuyer = transactionData.transactionType !== 'selling';
 
+      // Deed-extracted owner = current titleholder = seller in this transaction
+      const sellerFallbackFromDeed = {
+        name: (transactionData as any).extractedOwnerName,
+        idNumber: (transactionData as any).extractedOwnerIdNumber,
+        dateOfBirth: (transactionData as any).extractedOwnerDateOfBirth,
+      };
+
       let buyerDetails: any;
       let sellerDetails: any;
       let buyerName: string;
@@ -311,7 +325,7 @@ const Step7Summary: React.FC<Step7Props> = ({
       if (isBuyer) {
         buyerDetails = currentPartyDetails;
         buyerName = resolvedBuyerName;
-        sellerDetails = buildPartyDetails(caseRecord?.seller_data);
+        sellerDetails = buildPartyDetails(caseRecord?.seller_data, sellerFallbackFromDeed);
         sellerName = resolvedSellerName;
       } else {
         sellerDetails = currentPartyDetails;
