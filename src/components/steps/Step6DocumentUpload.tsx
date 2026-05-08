@@ -22,6 +22,12 @@ interface Step6Props {
     extractedClientName?: string;
     extractedIdNumber?: string;
     extractedDateOfBirth?: string;
+    extractedBuyerName?: string;
+    extractedBuyerIdNumber?: string;
+    extractedBuyerDateOfBirth?: string;
+    extractedSellerName?: string;
+    extractedSellerIdNumber?: string;
+    extractedSellerDateOfBirth?: string;
     uploadedDocumentsByParty?: Record<string, 'buyer' | 'seller'>;
   }) => void;
   onNext: () => void;
@@ -206,7 +212,10 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
       setDocsByParty(newDocsByParty);
       const updatePayload: Parameters<typeof onUpdate>[0] = { uploadedDocuments: newUploads, documentFilePaths: singlePaths, documentDataUrls: singleDataUrls, uploadedDocumentsByParty: newDocsByParty };
 
-      // OCR identity documents
+      // OCR identity documents — route extracted fields to the party-tagged bucket
+      // matching the active toggle. Also write to the legacy single-bucket fields
+      // (extractedClientName/IdNumber/DateOfBirth) when the active party is the
+      // current user's role, so existing readers keep working unchanged.
       if (isIdDocument(docType)) {
         try {
           const formData = new FormData();
@@ -215,9 +224,26 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
           if (idRes.ok) {
             const idData = await idRes.json();
             setOcrResults(prev => ({ ...prev, [newFileName]: idData }));
-            if (idData.fullName && idData.fullName !== 'Unknown') updatePayload.extractedClientName = idData.fullName;
-            if (idData.idNumber && idData.idNumber !== 'Unknown') updatePayload.extractedIdNumber = idData.idNumber;
-            if (idData.dateOfBirth && idData.dateOfBirth !== 'Unknown') updatePayload.extractedDateOfBirth = idData.dateOfBirth;
+            const validFullName = idData.fullName && idData.fullName !== 'Unknown' ? idData.fullName : '';
+            const validIdNumber = idData.idNumber && idData.idNumber !== 'Unknown' ? idData.idNumber : '';
+            const validDob = idData.dateOfBirth && idData.dateOfBirth !== 'Unknown' ? idData.dateOfBirth : '';
+            if (activeParty === 'buyer') {
+              if (validFullName) updatePayload.extractedBuyerName = validFullName;
+              if (validIdNumber) updatePayload.extractedBuyerIdNumber = validIdNumber;
+              if (validDob) updatePayload.extractedBuyerDateOfBirth = validDob;
+            } else {
+              if (validFullName) updatePayload.extractedSellerName = validFullName;
+              if (validIdNumber) updatePayload.extractedSellerIdNumber = validIdNumber;
+              if (validDob) updatePayload.extractedSellerDateOfBirth = validDob;
+            }
+            // Legacy single-bucket fields — keep populated for the *current user's* side
+            // (transactionType === 'selling' → user is seller; otherwise buyer)
+            const userIsSeller = transactionType === 'selling';
+            if ((userIsSeller && activeParty === 'seller') || (!userIsSeller && activeParty === 'buyer')) {
+              if (validFullName) updatePayload.extractedClientName = validFullName;
+              if (validIdNumber) updatePayload.extractedIdNumber = validIdNumber;
+              if (validDob) updatePayload.extractedDateOfBirth = validDob;
+            }
           }
         } catch { /* OCR failure is non-blocking */ }
       }

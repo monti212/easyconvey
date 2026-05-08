@@ -137,25 +137,32 @@ const Step7Summary: React.FC<Step7Props> = ({
   // Derive display names for buyer and seller based on current party's role and case record
   const isBuyerRole = transactionData.transactionType !== 'selling';
 
+  // Party-tagged ID OCR (Step 6) and deed OCR (Step 2) — read both buckets so the
+  // conveyancer's centrally-uploaded docs satisfy the resolvers without share-link submission.
+  const tx = transactionData as any;
+  const buyerOcrName = tx.extractedBuyerName || (isBuyerRole ? tx.extractedClientName : '') || '';
+  const sellerOcrName = tx.extractedSellerName || tx.extractedOwnerName || (!isBuyerRole ? tx.extractedClientName : '') || '';
+
   // Current party (conveyancer's client) — use OCR-extracted name if no other name available
   const currentPartyDisplayName = transactionData.hasAgent
     ? transactionData.agentName
-    : (transactionData as any).companyName
-    || (transactionData as any).trustName
-    || (transactionData as any).deceasedName
-    || (transactionData as any).extractedClientName   // from ID document OCR
-    || (transactionData as any).extractedOwnerName    // from title deed OCR
+    : tx.companyName
+    || tx.trustName
+    || tx.deceasedName
+    || (isBuyerRole ? buyerOcrName : sellerOcrName)
+    || tx.extractedClientName   // legacy single-bucket fallback
+    || tx.extractedOwnerName    // legacy seller-side fallback
     || 'Pending';
 
   // Counter-party — use OCR registered owner (= seller) as fallback when they haven't submitted yet
   const counterpartyDisplayName = isBuyerRole
     ? (caseRecord?.seller_data?.clientName
       || caseRecord?.seller_data?.agentName
-      || (transactionData as any).extractedOwnerName  // registered owner from deed = seller
+      || sellerOcrName  // party-tagged seller OCR (deed or ID) — populated by Step 6 toggle
       || 'Pending')
     : (caseRecord?.buyer_data?.clientName
       || caseRecord?.buyer_data?.agentName
-      || (transactionData as any).extractedClientName
+      || buyerOcrName  // party-tagged buyer OCR
       || 'Pending');
 
   const resolvedBuyerName = isBuyerRole ? currentPartyDisplayName : counterpartyDisplayName;
@@ -310,11 +317,17 @@ const Step7Summary: React.FC<Step7Props> = ({
       const currentPartyDetails = buildPartyDetails(transactionData);
       const isBuyer = transactionData.transactionType !== 'selling';
 
-      // Deed-extracted owner = current titleholder = seller in this transaction
-      const sellerFallbackFromDeed = {
-        name: (transactionData as any).extractedOwnerName,
-        idNumber: (transactionData as any).extractedOwnerIdNumber,
-        dateOfBirth: (transactionData as any).extractedOwnerDateOfBirth,
+      // Party-tagged OCR fallbacks (populated by Step 6 toggle + Step 2 deed)
+      const txAny = transactionData as any;
+      const sellerFallback = {
+        name: txAny.extractedSellerName || txAny.extractedOwnerName,
+        idNumber: txAny.extractedSellerIdNumber || txAny.extractedOwnerIdNumber,
+        dateOfBirth: txAny.extractedSellerDateOfBirth,
+      };
+      const buyerFallback = {
+        name: txAny.extractedBuyerName,
+        idNumber: txAny.extractedBuyerIdNumber,
+        dateOfBirth: txAny.extractedBuyerDateOfBirth,
       };
 
       let buyerDetails: any;
@@ -325,12 +338,12 @@ const Step7Summary: React.FC<Step7Props> = ({
       if (isBuyer) {
         buyerDetails = currentPartyDetails;
         buyerName = resolvedBuyerName;
-        sellerDetails = buildPartyDetails(caseRecord?.seller_data, sellerFallbackFromDeed);
+        sellerDetails = buildPartyDetails(caseRecord?.seller_data, sellerFallback);
         sellerName = resolvedSellerName;
       } else {
         sellerDetails = currentPartyDetails;
         sellerName = resolvedSellerName;
-        buyerDetails = buildPartyDetails(caseRecord?.buyer_data);
+        buyerDetails = buildPartyDetails(caseRecord?.buyer_data, buyerFallback);
         buyerName = resolvedBuyerName;
       }
 
@@ -376,6 +389,13 @@ const Step7Summary: React.FC<Step7Props> = ({
           extractedExtent: (transactionData as any).extractedExtent || '',
           extractedClientName: (transactionData as any).extractedClientName || '',
           extractedIdNumber: (transactionData as any).extractedIdNumber || '',
+          // Party-tagged ID OCR (set in Step 6 by the BUYER/SELLER toggle)
+          extractedBuyerName: (transactionData as any).extractedBuyerName || '',
+          extractedBuyerIdNumber: (transactionData as any).extractedBuyerIdNumber || '',
+          extractedBuyerDateOfBirth: (transactionData as any).extractedBuyerDateOfBirth || '',
+          extractedSellerName: (transactionData as any).extractedSellerName || '',
+          extractedSellerIdNumber: (transactionData as any).extractedSellerIdNumber || '',
+          extractedSellerDateOfBirth: (transactionData as any).extractedSellerDateOfBirth || '',
         }),
         signal,
       });

@@ -83,6 +83,13 @@ serve(async (req: Request) => {
       extractedExtent,
       extractedClientName,
       extractedIdNumber,
+      // Party-tagged ID OCR (Step 6 active-party toggle)
+      extractedBuyerName,
+      extractedBuyerIdNumber,
+      extractedBuyerDateOfBirth,
+      extractedSellerName,
+      extractedSellerIdNumber,
+      extractedSellerDateOfBirth,
     } = await req.json();
 
     // ─── Fetch document URLs from Supabase Storage ───────────────────
@@ -184,19 +191,22 @@ serve(async (req: Request) => {
       if (isPresent(buyerDetails?.trustName)) return buyerDetails.trustName;
       if (isPresent(buyerDetails?.deceasedName)) return buyerDetails.deceasedName;
       if (isPresent(buyerDetails?.societyName)) return buyerDetails.societyName;
-      // Fall back to OCR-extracted buyer name from the ID document
+      // Party-tagged buyer ID OCR first (Step 6 BUYER toggle), then legacy single bucket
+      if (isPresent(extractedBuyerName)) return extractedBuyerName;
       if (isPresent(extractedClientName)) return extractedClientName;
       return buyerName || "Not specified";
     };
 
     const resolveBuyerIdNumber = () => {
       if (isPresent(buyerDetails?.idNumber)) return buyerDetails.idNumber;
+      if (isPresent(extractedBuyerIdNumber)) return extractedBuyerIdNumber;
       if (isPresent(extractedIdNumber)) return extractedIdNumber;
       return "To be confirmed";
     };
 
     const resolveBuyerDateOfBirth = () => {
       if (isPresent(buyerDetails?.dateOfBirth)) return buyerDetails.dateOfBirth;
+      if (isPresent(extractedBuyerDateOfBirth)) return extractedBuyerDateOfBirth;
       return "To be confirmed";
     };
 
@@ -205,19 +215,22 @@ serve(async (req: Request) => {
       if (sellerDetails?.hasAgent && isPresent(sellerDetails?.agentName)) return sellerDetails.agentName;
       if (isPresent(sellerDetails?.companyName)) return sellerDetails.companyName;
       if (isPresent(sellerDetails?.trustName)) return sellerDetails.trustName;
-      // Fall back to OCR-extracted registered owner from the title deed
+      // Party-tagged seller ID OCR first, then deed-extracted registered owner
+      if (isPresent(extractedSellerName)) return extractedSellerName;
       if (isPresent(extractedOwnerName)) return extractedOwnerName;
       return sellerName || "Not specified";
     };
 
     const resolveSellerIdNumber = () => {
       if (isPresent(sellerDetails?.idNumber)) return sellerDetails.idNumber;
+      if (isPresent(extractedSellerIdNumber)) return extractedSellerIdNumber;
       if (isPresent(extractedOwnerIdNumber)) return extractedOwnerIdNumber;
       return "To be confirmed";
     };
 
     const resolveSellerDateOfBirth = () => {
       if (isPresent(sellerDetails?.dateOfBirth)) return sellerDetails.dateOfBirth;
+      if (isPresent(extractedSellerDateOfBirth)) return extractedSellerDateOfBirth;
       return "To be confirmed";
     };
 
@@ -233,8 +246,8 @@ Conveyancer Name: ${conveyancerName || 'To be confirmed'}
 Law Firm: ${conveyancerFirm || 'To be confirmed'}
 Office Location: Gaborone, Botswana
 
-${(extractedOwnerName || extractedPlotNumber || extractedPropertyAddress || extractedTitleDeedNumber) ? `═══════════════════════════════════════
-TITLE DEED — OCR EXTRACTED DATA (HIGHEST PRIORITY — use this data over all other sources):
+${(extractedOwnerName || extractedPlotNumber || extractedPropertyAddress || extractedTitleDeedNumber || extractedBuyerName || extractedSellerName || extractedClientName) ? `═══════════════════════════════════════
+DOCUMENT OCR EXTRACTED DATA (HIGHEST PRIORITY — use this data over all other sources; party-tagged fields are AUTHORITATIVE — never reassign to the wrong party):
 ═══════════════════════════════════════
 ${extractedOwnerName ? `Registered Owner / SELLER Full Name: ${extractedOwnerName}` : ''}
 ${extractedOwnerIdNumber ? `Registered Owner / SELLER ID Number: ${extractedOwnerIdNumber}` : ''}
@@ -247,8 +260,12 @@ ${extractedAdministrativeDistrict ? `Administrative District: ${extractedAdminis
 ${extractedExtent ? `Extent / Size: ${extractedExtent}` : ''}
 ${extractedPurchasePrice ? `Purchase Price from Deed: ${extractedPurchasePrice}` : ''}
 ${extractedHasMortgageBond ? `Mortgage Bond Registered: Yes${extractedMortgageBondNumber ? ` — Bond No: ${extractedMortgageBondNumber}` : ''}` : ''}
-${extractedClientName ? `Buyer Name (from ID document): ${extractedClientName}` : ''}
-${extractedIdNumber ? `Buyer ID Number (from ID document): ${extractedIdNumber}` : ''}
+${extractedBuyerName ? `BUYER Full Name (party-tagged from ID document): ${extractedBuyerName}` : (extractedClientName ? `Buyer Name (from ID document): ${extractedClientName}` : '')}
+${extractedBuyerIdNumber ? `BUYER ID / Passport Number (party-tagged from ID document): ${extractedBuyerIdNumber}` : (extractedIdNumber ? `Buyer ID Number (from ID document): ${extractedIdNumber}` : '')}
+${extractedBuyerDateOfBirth ? `BUYER Date of Birth (party-tagged from ID document): ${extractedBuyerDateOfBirth}` : ''}
+${extractedSellerName ? `SELLER Full Name (party-tagged from ID document): ${extractedSellerName}` : ''}
+${extractedSellerIdNumber ? `SELLER ID / Passport Number (party-tagged from ID document): ${extractedSellerIdNumber}` : ''}
+${extractedSellerDateOfBirth ? `SELLER Date of Birth (party-tagged from ID document): ${extractedSellerDateOfBirth}` : ''}
 ` : ''}
 ═══════════════════════════════════════
 BUYER (PURCHASER) INFORMATION:

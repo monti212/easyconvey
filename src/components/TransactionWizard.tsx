@@ -102,10 +102,17 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     extractedPurchasePrice: '',
     extractedHasMortgageBond: false,
     extractedMortgageBondNumber: '',
-    // OCR-extracted personal info (from ID documents)
+    // OCR-extracted personal info (from ID documents) — single-bucket legacy + party-tagged buckets
     extractedClientName: '',
     extractedIdNumber: '',
     extractedDateOfBirth: '',
+    // Party-tagged ID OCR (set by Step 6 based on active-party toggle)
+    extractedBuyerName: '',
+    extractedBuyerIdNumber: '',
+    extractedBuyerDateOfBirth: '',
+    extractedSellerName: '',
+    extractedSellerIdNumber: '',
+    extractedSellerDateOfBirth: '',
     gender: '',
     nationality: '',
     maritalStatus: '',
