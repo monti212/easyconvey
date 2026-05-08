@@ -316,19 +316,19 @@ Valuation Amount: ${buyerDetails?.valuationAmount ? `P ${parseInt(buyerDetails.v
 DOCUMENTS ON FILE:
 Buyer Documents: ${buyerDetails?.uploadedDocuments?.join(", ") || "Pending"}
 Seller Documents: ${sellerDetails?.uploadedDocuments?.join(", ") || "Pending"}
-${pdfDocNames.length > 0 ? `PDF Documents Available: ${pdfDocNames.join(", ")}` : ""}
 ${pdfDocsByParty.length > 0 ? `
-PDF Documents (party-tagged — DO NOT confuse buyer and seller documents):
-${pdfDocsByParty.map((d, i) => `  ${i + 1}. ${d.name}${d.type ? ` (${d.type})` : ""} — belongs to ${d.party ? d.party.toUpperCase() : "UNTAGGED"}`).join("\n")}` : ""}
+PDF DOCUMENT INVENTORY (these PDF filenames are listed ONLY so you know which documents the user uploaded — FILENAMES ARE NOT DATA. Never copy any part of a filename into the output. Their actual extracted content (if any) is already in the DOCUMENT OCR EXTRACTED DATA block above):
+${pdfDocsByParty.map((d, i) => `  ${i + 1}. type=${d.type || "unspecified"} — belongs to ${d.party ? d.party.toUpperCase() : "UNTAGGED"}`).join("\n")}` : ""}
 ${imageUrls.length > 0 ? `
 ═══════════════════════════════════════
 ATTACHED DOCUMENT IMAGES (${imageUrls.length} document(s)):
 ═══════════════════════════════════════
-PARTY-TAGGED IMAGE INDEX (the user has labelled which document belongs to whom — these tags are AUTHORITATIVE; do not reassign documents to the wrong party):
-${imageUrls.map((img, i) => `  Image ${i + 1}${img.name ? ` (${img.name})` : ""}${img.type ? ` — type: ${img.type}` : ""} — belongs to ${img.party ? img.party.toUpperCase() : "UNTAGGED"}`).join("\n")}
+PARTY-TAG ROUTING TABLE (which side each image belongs to — this is a routing hint, NOT a data field; do not reassign documents to the wrong party, and do not copy these tag words or any filenames into the output):
+${imageUrls.map((img, i) => `  Image ${i + 1}${img.type ? ` — type: ${img.type}` : ""} — belongs to ${img.party ? img.party.toUpperCase() : "UNTAGGED"}`).join("\n")}
 
 CRITICAL: The attached images are scans/photos of actual legal documents (IDs, title deeds, passports, marriage certificates, etc.).
-The images are passed to you in the SAME ORDER as the index above. When you extract data from "Image N", apply that data ONLY to the party labelled in the index — never to the other party.
+EXTRACT VALUES FROM THE IMAGES THEMSELVES — read the names, ID numbers, dates, addresses, etc. that are visible inside the document scans. Do NOT use filenames or party-tag words as values.
+The images are passed to you in the SAME ORDER as the routing table above. When you extract data from "Image N", apply that data ONLY to the party labelled in the routing table — never to the other party.
 You MUST carefully analyze each image and extract ALL relevant information including but not limited to:
 - Full legal names of all parties (buyer, seller, spouse, witnesses)
 - ID numbers, passport numbers, date of birth
@@ -348,7 +348,7 @@ Where information from uploaded documents conflicts with form data, prefer the d
     // ─── Get document type specific instructions and prompts ─────────
     const config = getDocumentConfig(documentType, transactionBlock);
     const instructions = knowledgeBaseContent
-      ? `${config.instructions}\n\n${"═".repeat(39)}\nKNOWLEDGE BASE — STRUCTURAL REFERENCE ONLY\n${"═".repeat(39)}\nThe following is an authoritative STRUCTURAL TEMPLATE from the Minchin & Kelly knowledge base showing the correct format, section order, legal phrasing style, and clause structure for Botswana conveyancing documents.\n\nCRITICAL RULES:\n- Use this ONLY as a structural and stylistic guide — learn the format, section headings, clause ordering, and legal language patterns.\n- NEVER copy placeholder text (e.g. "[FULL NAME OF TRANSFEROR]", "[GABORONE / FRANCISTOWN / LOBATSE]") into your output.\n- NEVER reproduce the template content verbatim. Every sentence must be generated fresh using the ACTUAL transaction data provided by the user.\n- Replace ALL bracketed placeholders with real data from the transaction details and uploaded documents.\n- For every field, follow the DATA RESOLUTION ORDER from the document-specific instructions: party block → OCR-extracted block → attached image extraction → "To be confirmed" (last resort only). Do NOT write "To be confirmed" while real data exists in the OCR-extracted block or attached images.\n- Never output a bracket placeholder like [NAME] or [DOB] under any circumstances.\n\n${knowledgeBaseContent}`
+      ? `${config.instructions}\n\n${"═".repeat(39)}\nKNOWLEDGE BASE — STRUCTURAL REFERENCE ONLY\n${"═".repeat(39)}\nThe following is an authoritative STRUCTURAL TEMPLATE from the Minchin & Kelly knowledge base showing the correct format, section order, legal phrasing style, and clause structure for Botswana conveyancing documents.\n\nCRITICAL RULES:\n- Use this ONLY as a structural and stylistic guide — learn the format, section headings, clause ordering, and legal language patterns.\n- NEVER copy placeholder text (e.g. "[FULL NAME OF TRANSFEROR]", "[GABORONE / FRANCISTOWN / LOBATSE]") into your output.\n- NEVER reproduce the template content verbatim. Every sentence must be generated fresh using the ACTUAL transaction data provided by the user.\n- Replace ALL bracketed placeholders with real data from the transaction details and uploaded documents.\n- For every field, follow the DATA RESOLUTION ORDER from the document-specific instructions: party block → OCR-extracted block → attached image extraction → "To be confirmed" (last resort only). Do NOT write "To be confirmed" while real data exists in the OCR-extracted block or attached images.\n- Never output a bracket placeholder like [NAME] or [DOB] under any circumstances.\n- FILENAMES ARE NOT DATA. The PDF inventory and image routing table list file names / party tags only so you know what was uploaded. Never copy a filename, party-tag word ("BUYER" / "SELLER"), or document type label into the output as a field value. Read values from inside the images and from the OCR-extracted block.\n\n${knowledgeBaseContent}`
       : config.instructions;
     const textPrompt = config.prompt;
 

@@ -22,6 +22,7 @@ CRITICAL INSTRUCTIONS:
   4. ONLY if all three sources fail, write "To be confirmed".
 - "To be confirmed" is a last resort. If the OCR-extracted block contains the seller's name, ID, plot number, title deed number, etc., USE THOSE VALUES — do not write "To be confirmed" while real data exists in the prompt.
 - Never output a bracket placeholder like [NAME] or [DOB] under any circumstances.
+- FILENAMES ARE NOT DATA. The prompt's PDF inventory and image routing table list file names and party tags so you know what was uploaded — they are metadata. Never copy a filename, the words "BUYER"/"SELLER", or a document-type label into the output as a field value. All legal data must come from the structured BUYER/SELLER fields, the OCR-extracted block, or the visible content of attached document images.
 - Reference the Deeds Registry Act (Cap 33:02), Transfer Duty Act (Cap 53:01), and Tribal Land Act where applicable
 
 MARITAL STATUS HANDLING (CRITICAL — apply for BOTH buyer and seller):

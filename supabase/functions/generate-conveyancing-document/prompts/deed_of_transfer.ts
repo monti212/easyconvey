@@ -5,131 +5,139 @@ export function getDeedOfTransferConfig(transactionBlock: string): DocumentConfi
     instructions: `You are an expert Botswana property conveyancing attorney generating a Deed of Transfer for registration at the Deeds Registry of Botswana.
 
 CRITICAL INSTRUCTIONS:
-- Generate a COMPLETE Deed of Transfer in the EXACT format used by the Deeds Registry of Botswana
+- Generate a COMPLETE Deed of Transfer in the EXACT format used by the Deeds Registry of Botswana (the format is reproduced verbatim below)
 - This is the ACTUAL TRANSFER DOCUMENT registered at the Deeds Registry — NOT a sale agreement
-- The conveyancer appears before the Registrar of Deeds on behalf of the seller via Power of Attorney
-- Use the EXACT formal legal language and structure shown in the required format below
+- The conveyancer (Appearer) appears before the Registrar of Deeds on behalf of the seller via Power of Attorney
+- The structure, line breaks, and section ordering shown below are STATUTORY — do not reorganise, rename sections, or paraphrase boilerplate
 - Use actual party details from the transaction data — NEVER output bracketed placeholders like [NAME], [DATE], [NUMBER]
-- If any field is genuinely unknown, write "OUTSTANDING — [field description]" (not a bracket placeholder)
-- Property descriptions must use the formal CERTAIN / SITUATE / MEASURING / AS WILL MORE FULLY APPEAR / WHICH PROPERTY / SUBJECT TO format
-- All amounts must be stated in figures AND words (e.g., "P1,150,000.00 (One Million One Hundred and Fifty Thousand Pula)")
-- If the sale price differs from the valuation, state BOTH prices; if no valuation is provided, state only the sale price
-- Reference the full chain of title (Certificate of Registered State Title → subsequent deeds → last deed in favour of seller)
-- HIGHEST PRIORITY DATA SOURCES: Use extractedOwnerName as the seller name, extractedPlotNumber as the lot number, extractedPropertyAddress as the property location, extractedPropertyDescription for the CERTAIN/SITUATE clauses, extractedTitleDeedNumber for the WHICH PROPERTY clause — these come directly from OCR of the uploaded title deed
-- CATCHPHRASES: After each major section (after the cover page, after the SUBJECT TO conditions block, after the WHEREFORE clause, after the execution block), add a right-aligned catchphrase line showing the first word of the next section (e.g., *THAT*, *AND*, *WHEREFORE*, *THUS*)
 
-MARITAL STATUS HANDLING (CRITICAL — apply the correct format for the SELLER):
-- If "single" or "Single":
-  → State "(Bachelor)" for male or "(Spinster)" for female after the date of birth
-- If "married_in" or "Married in Community of Property":
-  → Include spouse full name, born (maiden name), date of birth
-  → State "Married in community of property to [SPOUSE NAME]"
-  → State "Which marriage is governed by the Laws of Botswana"
-  → Both spouses' Power of Attorney may be required
-- If "married_out" or "Married Out of Community of Property":
-  → Include spouse full name, born (maiden name), date of birth
-  → State "Married out of community of property to [SPOUSE NAME]"
-  → Reference the Antenuptial Contract
-- If "divorced":
-  → State "(Divorced)" after the date of birth
-- If "widowed":
-  → State "(Widow/Widower of the late [DECEASED SPOUSE NAME])" after the date of birth
+DATA RESOLUTION ORDER (apply IN ORDER for every field — do not skip steps):
+  1. Use the explicit value from the BUYER/SELLER information block if it is non-empty AND not the literal string "To be confirmed".
+  2. Otherwise, use the matching value from the "DOCUMENT OCR EXTRACTED DATA" block (registered owner / property source of truth).
+  3. Otherwise, extract the value directly from any attached document images (party-tagged via the image index).
+  4. ONLY if all three sources fail, write "OUTSTANDING — [field description]" (e.g. "OUTSTANDING — seller date of birth"). Never use a bracketed placeholder.
 
-BUYER TYPE HANDLING:
-- If buyer is a Company (Pty Ltd):
-  → Use full registered company name with "(PROPRIETARY) LIMITED"
-  → Add "its successors-in-title or assigns" after the company name
-  → Include ENDORSEMENTS section at the end: "[COMPANY NAME] is authorized to acquire immovable property in terms of Section 25 of the Companies Act"
-- If buyer is an Individual:
-  → Include full name, date of birth, marital status (same format as seller)
-  → Add "his/her heirs, executors, administrators or assigns" after the name
-- If buyer is a Trust:
-  → Use trust name and trustee details
-- If buyer is a Deceased Estate:
-  → Reference Letters of Administration/Executorship
+FILENAMES ARE NOT DATA (CRITICAL — read carefully):
+- The prompt may list uploaded file names ("title_deed.pdf", "id_smith_john.jpg", etc.) for INVENTORY purposes. These names are file system metadata. They are NOT a source of legal data.
+- Never copy any part of a filename into the output. Never derive party names, plot numbers, ID numbers, or dates from a filename.
+- ALL legal data must come from (a) the structured BUYER/SELLER fields, (b) the DOCUMENT OCR EXTRACTED DATA block, or (c) the visible content of attached document images.
+- If a needed field is not present in (a)/(b)/(c), write "OUTSTANDING — [field description]". Do NOT invent values from filenames.
 
-PROPERTY CONDITIONS:
-- Include ALL conditions from the State Grant or Fixed Period State Grant
-- Standard conditions include: 99-year ownership period, residential use restriction, maintenance obligations, mineral rights reserved to State, Government construction rights, service connection responsibility
-- These come from the title deed and should be extracted from uploaded documents where available
+PARTY-TAG INDEX IS A ROUTING HINT, NOT DATA:
+- The "ATTACHED DOCUMENT IMAGES" section labels each image as belonging to BUYER or SELLER. That tag tells you which side a document's contents apply to. The tag itself is not a value to copy into the document.
 
-DOCUMENT EXTRACTION (HIGHEST PRIORITY):
-- If document images are attached, extract ALL relevant information
-- Title deeds are the PRIMARY source for property descriptions, chain of title, conditions, and lot details
-- Uploaded documents override form placeholders
-- Never leave a field as "Not specified" if the information is visible in an attached document`,
+MARITAL STATUS HANDLING (CRITICAL — apply for the SELLER and where applicable the BUYER):
+- "single" / Single → write "(Bachelor)" for male or "(Spinster)" for female immediately after the date-of-birth line
+- "married_in" / Married in Community of Property →
+    "Married in community of property to [SPOUSE FULL NAME]"
+    "(Born [SPOUSE MAIDEN NAME] on the [ordinal] day of [Month] [Year])"
+    "Which marriage is governed by the Laws of Botswana"
+- "married_out" / Married Out of Community of Property → same as above but "Married out of community of property to …" plus "Antenuptial Contract dated …"
+- "divorced" → write "(Divorced)" after the date of birth
+- "widowed" → write "(Widow/Widower of the late [DECEASED SPOUSE NAME])" after the date of birth
+
+BUYER ENTITY HANDLING:
+- Individual: include full name, date of birth, marital status (same rules as seller). Closing line: "his/her Heirs, executors, administrators or assigns".
+- Company (Pty Ltd): use full registered company name with "(PROPRIETARY) LIMITED". Closing line: "its successors-in-title or assigns". Append the ENDORSEMENTS section after the registration block: "[COMPANY NAME] (Proprietary) Limited is authorised to acquire immovable property in terms of Section 25 of the Companies Act".
+- Trust: use trust name with "in his capacity as Trustee of [TRUST NAME]".
+- Deceased Estate: reference Letters of Administration / Executorship.
+
+PROPERTY DESCRIPTION FORMATTING (the property block uses tabular alignment — keep label and value on the same line, label left-aligned in caps):
+- CERTAIN, SITUATE, MEASURING, AS WILL MORE FULLY APPEAR, WHICH PROPERTY, SUBJECT TO, AND SUBJECT TO are the labels (in that order).
+- Long labels span two lines like the sample ("AS WILL MORE\\nFULLY APPEAR:").
+- AND FURTHER SUBJECT TO is a separate paragraph followed by the numbered conditions list (1. with sub-clauses a–e, then 2., 3., 4., 5., 6.).
+
+NUMBERS AND DATES:
+- All amounts must be stated in figures AND words: "P1,150,000.00 (One Million One Hundred and Fifty Thousand Pula)".
+- If sale price differs from valuation, state BOTH (sale price first, then "but valued at … for transfer duty purposes"). If they are equal or no valuation, state only the sale price.
+- Dates use ordinal day form: "16th day of October 1994" (not "16 October 1994").
+
+FORMATTING:
+- The cover page (top): document title, "by", seller name, "in favour of", buyer name, "in respect of", lot description — each centred on its own line. Then a right-aligned "Prepared by me" / "Conveyancer" block.
+- The body uses paragraph prose for the "appeared before me" / "AND the said Appearer declared" / "WHEREFORE the Appearer" sections, and tabular prose for the property description block (CERTAIN/SITUATE/etc.).
+- Signature block at the end uses dotted/underscored signature lines (use "______________________________" for the lines).
+- Use Markdown bold (**…**) ONLY for party names, plot/lot numbers, deed numbers, and key amounts.
+- Do NOT add "passed by" or any wording not present in the registry sample.`,
 
     prompt: `Generate a complete Deed of Transfer for registration at the Botswana Deeds Registry for the following property transaction:
 ${transactionBlock}
 
 ═══════════════════════════════════════
-REQUIRED DOCUMENT STRUCTURE — FOLLOW THIS EXACT FORMAT:
+REQUIRED DOCUMENT STRUCTURE — REPRODUCE THIS LAYOUT EXACTLY (substitute real values for the sample placeholders, never copy the placeholder words themselves)
 ═══════════════════════════════════════
 
-# DEED OF TRANSFER
+DEED OF TRANSFER
 
-passed by
+by
 
 **[SELLER FULL NAME IN CAPS]**
 
 in favour of
 
-**[BUYER NAME IN CAPS]**
-[If company: **(PROPRIETARY) LIMITED**]
+**[BUYER FULL NAME IN CAPS]**
 
 in respect of
 
-**LOT [NUMBER] [LOCATION]**
+**LOT [PLOT NUMBER] [LOCATION IN CAPS]**
 
----
+                                               Prepared by me
 
-Prepared by me
+                                               Conveyancer
 
-Conveyancer
-
-## DEED OF TRANSFER NO. ___________
+DEED OF TRANSFER NO. ___________
 
 **Be it hereby made known:**
 
-THAT **[CONVEYANCER FULL NAME IN CAPS]** appeared before me, the Registrar of Deeds for Botswana at **GABORONE**, he the said Appearer, being duly authorised thereto by a Power of Attorney granted to him by
+THAT **[CONVEYANCER FULL NAME IN CAPS]** appeared before me, the Registrar of Deeds for Botswana at **[PLACE]**, he the said Appearer, being duly authorised thereto by a Power of Attorney granted to him by
 
 **[SELLER FULL NAME IN CAPS]**
-(Born on the [ordinal date] day of [month] [year])
-[Marital status — see MARITAL STATUS HANDLING rules: e.g. "(Bachelor)", "(Spinster)", or married details]
+(Born on the [ordinal] day of [Month] [Year])
+[Apply marital status block here per MARITAL STATUS HANDLING — e.g.:
+"Married in community of property to
+**[SPOUSE FULL NAME IN CAPS]**
+(Born [SPOUSE MAIDEN NAME] on the [ordinal] day of [Month] [Year])
+Which marriage is governed by the Laws of Botswana"]
 
-which Power of Attorney is dated the **[ordinal date]** day of **[month] [year]** and was signed at **[place]**
+which Power of Attorney is dated the [ordinal] day of [Month] [Year] and was signed at [PLACE];
 
-AND the said Appearer declared that his Principal has truly and legally sold and that he, the Appearer in his capacity aforesaid, did by these presents, cede and transfer in full and free property to and on behalf of
+AND the said Appearer declared that his Principal had truly and legally sold and that he, the Appearer in his capacity aforesaid, did by these presents, cede and transfer in full and free property to and on behalf of
 
-**[BUYER NAME IN CAPS]**
-[If company: **(PROPRIETARY) LIMITED**]
+**[BUYER FULL NAME IN CAPS]**
+(Born on the [ordinal] day of [Month] [Year])
+[Apply marital status block — e.g. "(Spinster)" or "(Bachelor)" or "Married in community of property to …"]
 
-[If individual: his/her heirs, executors, administrators or assigns]
-[If company: its successors-in-title or assigns]
+[Closing pronoun line — for individual: "her Heirs, executors, administrators or assigns" or "his Heirs, executors, administrators or assigns"; for company: "its successors-in-title or assigns"], the following property, that is to say:
 
-the following property, that is to say:
+    **CERTAIN:**                   piece of land being [PLOT ADDRESS], [PLACE];
 
-CERTAIN:\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0piece of land being Lot [number] [location];
+    **SITUATE:**                   in [AREA], [CITY];
 
-SITUATE:\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0in the [location/extension/area];
+    **MEASURING:**            [PLOT SIZE] m² ([SIZE IN WORDS] Square Metres);
 
-MEASURING:\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0[size] m\u00b2 ([size in words] Square Metres);
+    **AS WILL MORE**
+    **FULLY APPEAR:**         from **General Plan D.S.L. No. [NUMBER]** surveyed by Land Surveyor [FULL NAME] in [Month Year] and approved by the Director of Surveys and Lands on the [ordinal] day of [Month] [Year];
 
-AS WILL MORE
-FULLY APPEAR:\u00a0\u00a0\u00a0\u00a0from General Plan D.S.L. No. [number] surveyed by Land Surveyor [name] in [dates] and approved by the Director of Surveys and Lands on the [date];
+    **WHICH PROPERTY:**      was held under **Certificate of Registered State Title No. [NUMBER]** dated [ordinal] day of [Month] [Year] and subsequent Deeds the last of which being **Deed of Transfer No. [NUMBER]** dated [ordinal] day of [Month] [Year] made in favour of **[SELLER FULL NAME IN CAPS]**;
 
-WHICH PROPERTY:\u00a0\u00a0was held under Certificate of Registered State Title No. [number] dated [date] and subsequent deeds the last of which being [Deed type] No. [number] dated [date] made in favour of **[SELLER NAME IN CAPS]**;
+    **SUBJECT TO:**                the conditions contained in **Certificate of Rights to Minerals No. [NUMBER]** dated [ordinal] day of [Month] [Year];
 
-SUBJECT TO:\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0the conditions contained in Certificate of Rights to Minerals No. [number] dated [date];
+    **AND SUBJECT TO:**       all such conditions as the aforesaid Deed will more fully point out;
 
-AND FURTHER
-SUBJECT TO:\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0the reservations and conditions namely:-
+AND FURTHER SUBJECT TO the following conditions:
 
-1. This Deed of Transfer shall vest ownership of the property in the purchaser for a period of 99 years from the date of Registration of **Deed of Fixed Period State Grant No. [number]** in the Deeds Registry, dated **[date]** made in favour of **[original grantee name]** (Born xx/xx/[year]) [marital status] and the Purchaser shall have the right to cede, assign, transfer, lease, sell, mortgage or otherwise deal with the property during the period of ownership, always provided that at the end of the 99 year period referred to above the property together with all the improvements thereon (in whose name soever they may then be registered) shall revert to the State absolutely without compensation payable for improvements or otherwise.
+1. a) This Deed of Transfer shall vest ownership of the property in the purchaser for a period of [PERIOD — typically 99 years] from the date of Registration of **Deed of Fixed Period State Grant No. [NUMBER]** dated [ordinal] day of [Month] [Year] made in favour of [ORIGINAL GRANTEE NAME] and the Purchaser shall have the right to cede, assign, transfer, lease, sell, mortgage or otherwise deal with the property during the period of ownership;
+
+   b) Upon expiry of the Deed of Transfer, the purchaser shall be allowed to renew his title for another [PERIOD];
+
+   c) The State shall notify the purchaser of the property of the impending expiry of the property at least five (5) years prior to its lapse;
+
+   d) The purchaser of the property shall be allowed [PERIOD] years before the expiry of transfer to indicate his intention in writing to renew and negotiations should be concluded not later than [PERIOD] years before the expiry of the Deed of Transfer;
+
+   e) Where the purchaser elects not to renew the Deed, the Deed of Transfer shall terminate on the date of expiry and rights and title therein shall revert to the state together with developments;
 
 2. The property shall only be used for the following purpose - residential and may not be used for any other purpose except with the written permission of the Government.
 
-3. The purchaser or his successors in title or assigns shall maintain the buildings, their replacement and improvements on the property in good order and repair throughout the period of the Grant and on determination of the Grant shall surrender the said property with all buildings and erections thereon in good repair and condition. No compensation shall be payable by the State for any improvements on the property.
+3. The purchaser or his successors in title or assigns shall maintain the buildings, their replacement and improvements on the property in good order and repair throughout the period of the Grant and on determination of the Grant shall surrender the said property with all buildings and erections thereon in good repair and condition.
 
 4. All mineral rights in and upon the property are reserved to the State and the Government may at any time deal with such rights in accordance with any law then in force relating to the prospecting for and mining of minerals.
 
@@ -137,51 +145,46 @@ SUBJECT TO:\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0the reservations and conditions n
 
 6. Connection of services to individual plots shall be the responsibility of the Purchaser.
 
-WHEREFORE the Appearer, renouncing all the right, title and interest which his Principal heretofore had to the premises did in consequence also acknowledge it to be entirely dispossessed of and disentitled to the same and that by virtue of these presents, the said
+WHEREFORE the Appearer, renouncing all the right, title and interest which his Principal heretofore had to the premises did in consequence also acknowledge him to be entirely dispossessed of and disentitled to the same and that by virtue of these presents, the said
 
-**[BUYER NAME IN CAPS]**
-[If company: **(PROPRIETARY) LIMITED**]
+**[BUYER FULL NAME IN CAPS]**
+(Born on the [ordinal] day of [Month] [Year])
+[Apply marital status block — e.g. "(Spinster)"]
 
-AND, finally, acknowledging that the property was sold on the **[ordinal date]** day of **[month] [year]** for the sum of **[SALE PRICE IN FIGURES] ([SALE PRICE IN WORDS])** [if valuation differs: but valued at **[VALUATION IN FIGURES] ([VALUATION IN WORDS])** for transfer duty purposes].
+[Closing pronoun line — "her Heirs, executors, administrators or assigns" / "his Heirs, executors, administrators or assigns" / "its successors-in-title or assigns"], now is and henceforth shall be entitled thereto, conformably to local custom; the State, however, reserving its rights.
 
----
+AND, finally, acknowledging that the property was sold on the [ordinal] day of [Month] [Year] for the sum of **P[SALE PRICE FIGURES] ([SALE PRICE IN WORDS])** [if valuation differs: but valued at **P[VALUATION FIGURES] ([VALUATION IN WORDS])** for transfer duty purposes].
 
-In witness whereof I, the said Registrar, together with the Appearer q.q. have subscribed to these presents, and have caused the Seal of Office to be affixed hereto.
+In witness whereof I; the said Registrar, together with the Appearer q.q. have subscribed to these presents, and have caused the Seal of Office to be affixed hereto.
 
-THUS DONE AND EXECUTED at the Office of the Registrar of Deeds for Botswana at **GABORONE** on this _______ day of _________________ in the Year of Our Lord **[year in words] ([year in figures])**.
+THUS DONE AND EXECUTED at the Office of the Registrar of Deeds for Botswana at **GABORONE** on this [ordinal] day of [Month] in the Year of Our Lord **[YEAR IN WORDS] (20[YEAR])**.
 
 In my presence
 
-\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0______________________________
-\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0Registrar of Deeds Botswana
+            ______________________________                                              ______________________________
 
-\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0______________________________
-\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0q.q. his Principal
+           Registrar of Deeds Botswana                                             q.q. his Principal
 
 Registered in the Register of
 kept at
 on the above date.
 
----
+[If buyer is a Company (Pty Ltd), append immediately after the registration line:]
 
-[If buyer is a Company (Pty Ltd), include this section:]
+ENDORSEMENTS
 
-## ENDORSEMENTS
+**[COMPANY NAME] (Proprietary) Limited** is authorised to acquire immovable property in terms of Section 25 of the Companies Act.
 
-**[COMPANY NAME] (Proprietary) Limited** is authorized to acquire immovable property in terms of Section 25 of the Companies Act
-
----
-
-CRITICAL REMINDERS:
-- NEVER output bracketed placeholders like [NAME], [DATE], [NUMBER] in the final document — use real data or write "OUTSTANDING — [description]"
-- Priority data order: (1) extractedOwnerName/extractedPlotNumber/extractedPropertyAddress from deed OCR, (2) uploaded document images, (3) form fields, (4) "OUTSTANDING" if genuinely missing
-- The 6 numbered conditions are STANDARD for State Grant properties — include them verbatim
-- If the property has different conditions (e.g. commercial use, freehold), adapt based on uploaded title deed
-- The chain of title (WHICH PROPERTY clause) must trace from the original State Title through all subsequent transfers to the seller — use extractedTitleDeedNumber if available
-- Sale price and valuation: include both if valuation differs from sale price; otherwise state only the sale price
-- For company buyers, ALWAYS include the Section 25 Companies Act endorsement in ENDORSEMENTS
-- The Appearer (conveyancer) acts via Power of Attorney granted by the seller — reference the POA date and place
-- Use ordinal dates: "16th day of October 1994" not "16 October 1994"
-- Add catchphrases after each major section (first word of next section, right-aligned, italicised)`,
+═══════════════════════════════════════
+CRITICAL REMINDERS — RE-READ BEFORE OUTPUTTING:
+═══════════════════════════════════════
+- NEVER output bracketed placeholders ([NAME], [DATE], [NUMBER]) in the final document. Use the real value or "OUTSTANDING — [description]".
+- NEVER copy filenames or any part of filenames as data. Filenames listed in the prompt are inventory only.
+- For every field, follow the DATA RESOLUTION ORDER: party block → OCR-extracted block → attached image extraction → "OUTSTANDING" (last resort). Do NOT write "OUTSTANDING" while real data exists in the OCR-extracted block or document images.
+- The cover page format is fixed: document title, "by", seller, "in favour of", buyer, "in respect of", lot. Then a right-aligned "Prepared by me" / "Conveyancer".
+- The 6 numbered conditions are STANDARD for Fixed Period State Grant residential properties — include them verbatim with sub-clauses a–e on condition 1.
+- Use ordinal dates ("16th day of October 1994") and figures-and-words for all amounts.
+- For company buyers, ALWAYS append the Section 25 Companies Act endorsement.
+- The Appearer (conveyancer) acts via Power of Attorney granted by the seller — reference the POA date and place.`,
   };
 }
