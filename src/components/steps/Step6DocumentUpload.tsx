@@ -751,25 +751,40 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
             })}
           </ul>
           
-          {uploadedDocuments.length > 0 && (
-            <div className="mt-6 md:mt-8 bg-white rounded-xl p-4 md:p-5 border border-blue-200">
-              <h4 className="text-sm md:text-base font-medium text-gray-900 mb-3 md:mb-4 flex items-center">
-                <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
-                Uploaded Documents
-              </h4>
-              <div className="relative w-full h-4 bg-gray-200 rounded-full mb-2">
-                <div 
-                  className="absolute top-0 left-0 h-full bg-green-500 rounded-full"
-                  style={{ 
-                    width: `${Math.min(100, (uploadedDocuments.length / fullRequiredDocuments.length) * 100)}%` 
-                  }}
-                ></div>
+          {uploadedDocuments.length > 0 && (() => {
+            // Party-specific progress: only count uploads tagged for the active party
+            const activeUploadCount = uploadedDocuments.filter(d => docsByParty[d] === activeParty).length;
+            const buyerCount = uploadedDocuments.filter(d => docsByParty[d] === 'buyer').length;
+            const sellerCount = uploadedDocuments.filter(d => docsByParty[d] === 'seller').length;
+            const activePct = Math.min(100, (activeUploadCount / fullRequiredDocuments.length) * 100);
+            const isBuyerActive = activeParty === 'buyer';
+            return (
+              <div className={`mt-6 md:mt-8 bg-white rounded-xl p-4 md:p-5 border-2 ${isBuyerActive ? 'border-secondary/40' : 'border-primary/30'}`}>
+                <h4 className="text-sm md:text-base font-medium text-gray-900 mb-3 md:mb-4 flex items-center">
+                  <CheckCircle className={`h-4 w-4 mr-2 ${isBuyerActive ? 'text-secondary-dark' : 'text-primary'}`} />
+                  {isBuyerActive ? 'Buyer' : 'Seller'} progress
+                  <span className="ml-2 text-[10px] font-semibold tracking-wider uppercase text-gray-500">— switch toggle for the other party</span>
+                </h4>
+                <div className="relative w-full h-4 bg-gray-200 rounded-full mb-2">
+                  <div
+                    className={`absolute top-0 left-0 h-full rounded-full transition-all ${isBuyerActive ? 'bg-secondary' : 'bg-primary'}`}
+                    style={{ width: `${activePct}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium">{activeUploadCount}</span> of <span className="font-medium">{fullRequiredDocuments.length}</span> {isBuyerActive ? 'buyer' : 'seller'} documents uploaded
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                  <div className={`px-2 py-1.5 rounded ${isBuyerActive ? 'bg-secondary/10 text-primary font-semibold' : 'bg-gray-50 text-gray-600'}`}>
+                    Buyer total: {buyerCount}
+                  </div>
+                  <div className={`px-2 py-1.5 rounded ${!isBuyerActive ? 'bg-primary/10 text-primary font-semibold' : 'bg-gray-50 text-gray-600'}`}>
+                    Seller total: {sellerCount}
+                  </div>
+                </div>
               </div>
-              <p className="text-xs text-gray-600">
-                <span className="font-medium">{uploadedDocuments.length}</span> of <span className="font-medium">{fullRequiredDocuments.length}</span> documents uploaded
-              </p>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Right side - Upload area */}

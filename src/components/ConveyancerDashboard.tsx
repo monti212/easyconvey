@@ -154,7 +154,8 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         // Client wizard submission (highest priority)
         if (bd?.clientName) return bd.clientName;
         if (bd?.hasAgent && bd?.agentName) return bd.agentName;
-        // OCR-extracted from ID document uploaded in wizard
+        // Party-tagged ID OCR (Step 6 BUYER toggle), then legacy single bucket
+        if (wd?.extractedBuyerName) return wd.extractedBuyerName;
         if (wd?.extractedClientName) return wd.extractedClientName;
         if (wd?.clientName) return wd.clientName;
         if (caseRecord?.client_name && caseRecord.client_name !== 'Client' && caseRecord.client_name !== 'Pending') return caseRecord.client_name;
@@ -165,10 +166,19 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         // Client wizard submission (highest priority)
         if (sd?.clientName) return sd.clientName;
         if (sd?.hasAgent && sd?.agentName) return sd.agentName;
-        // OCR-extracted registered owner from title deed = seller
+        // Party-tagged seller ID OCR (Step 6 SELLER toggle), then deed-extracted registered owner
+        if (wd?.extractedSellerName) return wd.extractedSellerName;
         if (wd?.extractedOwnerName) return wd.extractedOwnerName;
         return sellerData?.agentName || 'Pending';
       };
+
+      // Split wizard-uploaded documents by party tag (uploadedDocumentsByParty was set
+      // in Step 6 by the BUYER/SELLER toggle). Falls back to all-uploads when no tags.
+      const wdByParty: Record<string, 'buyer' | 'seller'> = wd?.uploadedDocumentsByParty || {};
+      const allWdDocs: string[] = wd?.uploadedDocuments || [];
+      const taggedBuyerDocs = allWdDocs.filter((d: string) => wdByParty[d] === 'buyer');
+      const taggedSellerDocs = allWdDocs.filter((d: string) => wdByParty[d] === 'seller');
+      const hasAnyTags = Object.keys(wdByParty).length > 0;
 
       const price = wd?.sellingPrice || bd?.sellingPrice || sd?.sellingPrice
         || caseRecord?.property?.price?.toString() || '0';
@@ -182,8 +192,10 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         status: caseRecord?.status === 'in_progress' ? 'In Progress' : caseRecord?.status === 'completed' ? 'Completed' : 'Documents Uploaded',
         progress: caseRecord?.status === 'completed' ? 100 : (bd && sd ? 75 : bd || sd ? 50 : 25),
         submissionDate: caseRecord?.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-        buyerDocuments: bd?.uploadedDocuments || wd?.uploadedDocuments || [],
-        sellerDocuments: sd?.uploadedDocuments || [],
+        // Use party-tagged splits when the wizard tagged uploads. Otherwise fall back to
+        // the legacy behaviour (all wizard docs counted as buyer's, none as seller's).
+        buyerDocuments: bd?.uploadedDocuments || (hasAnyTags ? taggedBuyerDocs : (wd?.uploadedDocuments || [])),
+        sellerDocuments: sd?.uploadedDocuments || (hasAnyTags ? taggedSellerDocs : []),
         buyerDetails: bd || wd,
         sellerDetails: sd,
         wizardData: wd,
@@ -604,10 +616,16 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                   <div>
                     <p className="text-sm font-medium text-gray-700">Name</p>
                     <p className="text-gray-900 font-medium">{currentTransaction.buyerName}</p>
-                    {wizardData?.extractedClientName && wizardData.extractedClientName !== currentTransaction.buyerName && (
-                      <p className="text-xs text-blue-600 mt-0.5">ID OCR: {wizardData.extractedClientName}</p>
+                    {(wizardData?.extractedBuyerName || wizardData?.extractedClientName) && (wizardData?.extractedBuyerName || wizardData?.extractedClientName) !== currentTransaction.buyerName && (
+                      <p className="text-xs text-blue-600 mt-0.5">ID OCR: {wizardData?.extractedBuyerName || wizardData?.extractedClientName}</p>
                     )}
                   </div>
+                  {wizardData?.extractedBuyerIdNumber && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">ID / Passport</p>
+                      <p className="text-gray-900 font-mono text-sm">{wizardData.extractedBuyerIdNumber}</p>
+                    </div>
+                  )}
 
                   {(currentTransaction.buyerDetails?.nationality || wizardData?.nationality) && (
                     <div>
@@ -661,15 +679,18 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                   <div>
                     <p className="text-sm font-medium text-gray-700">Name</p>
                     <p className="text-gray-900 font-medium">{currentTransaction.sellerName}</p>
-                    {wizardData?.extractedOwnerName && (
+                    {wizardData?.extractedSellerName && wizardData.extractedSellerName !== currentTransaction.sellerName && (
+                      <p className="text-xs text-blue-600 mt-0.5">ID OCR: {wizardData.extractedSellerName}</p>
+                    )}
+                    {wizardData?.extractedOwnerName && wizardData.extractedOwnerName !== currentTransaction.sellerName && wizardData.extractedOwnerName !== wizardData.extractedSellerName && (
                       <p className="text-xs text-blue-600 mt-0.5">From deed: {wizardData.extractedOwnerName}</p>
                     )}
                   </div>
 
-                  {wizardData?.extractedOwnerIdNumber && (
+                  {(wizardData?.extractedSellerIdNumber || wizardData?.extractedOwnerIdNumber) && (
                     <div>
                       <p className="text-sm font-medium text-gray-700">ID / Passport</p>
-                      <p className="text-gray-900 font-mono text-sm">{wizardData.extractedOwnerIdNumber}</p>
+                      <p className="text-gray-900 font-mono text-sm">{wizardData?.extractedSellerIdNumber || wizardData?.extractedOwnerIdNumber}</p>
                     </div>
                   )}
 
