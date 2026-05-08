@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, Upload, CheckCircle, AlertCircle, User, Building, Users } from 'lucide-react';
+import { ArrowRight, Upload, CheckCircle, AlertCircle, User, Building, Users, ShoppingCart, Tag } from 'lucide-react';
 import { useTransactions } from '../App';
 import * as casesService from '../services/cases.service';
 import { useAuth } from '../hooks/useAuth';
@@ -111,8 +111,9 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     maritalStatus: '',
     requiredDocuments: [] as string[],
     uploadedDocuments: [] as string[],
-    documentFilePaths: [] as { path: string; bucket: string; name: string; type: string }[],
-    documentDataUrls: [] as { dataUrl: string; name: string; docType: string }[],
+    documentFilePaths: [] as { path: string; bucket: string; name: string; type: string; party?: 'buyer' | 'seller' }[],
+    documentDataUrls: [] as { dataUrl: string; name: string; docType: string; party?: 'buyer' | 'seller' }[],
+    uploadedDocumentsByParty: {} as Record<string, 'buyer' | 'seller'>,
     otherPartyDocuments: [] as string[], // Track other party's documents
     isFirstTimeBuyer: false,  // Added for first time buyer status
     // Company specific fields
@@ -932,6 +933,29 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           </div>
         </div>
       )}
+
+      {/* Role Banner — visible on every step so the user always knows whose side is being captured */}
+      {transactionData.transactionType && (() => {
+        const isBuyer = transactionData.transactionType === 'buying';
+        return (
+          <div className={`px-4 py-3 md:px-6 md:py-4 border-b ${isBuyer ? 'bg-secondary/10 border-secondary/30' : 'bg-primary/5 border-primary/20'}`}>
+            <div className="max-w-5xl mx-auto flex items-center gap-3">
+              <div className={`flex-shrink-0 rounded-full h-10 w-10 flex items-center justify-center ${isBuyer ? 'bg-secondary text-primary' : 'bg-primary text-white'}`}>
+                {isBuyer ? <ShoppingCart className="h-5 w-5" /> : <Tag className="h-5 w-5" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-[10px] font-semibold tracking-[0.2em] uppercase ${isBuyer ? 'text-secondary-dark' : 'text-primary'}`}>
+                  Capturing
+                </p>
+                <p className={`text-base md:text-lg font-bold leading-tight ${isBuyer ? 'text-primary' : 'text-primary'}`}>
+                  {isBuyer ? 'BUYER side' : 'SELLER side'}
+                  <span className="ml-2 text-xs font-normal text-gray-600">— all fields and uploads on this step belong to the {isBuyer ? 'buyer (purchaser)' : 'seller (transferor)'}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Progress Bar - Mobile optimized version */}
       <div className="bg-gradient-to-r from-primary via-primary to-primary-dark relative overflow-hidden">

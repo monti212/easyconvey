@@ -86,14 +86,17 @@ serve(async (req: Request) => {
     } = await req.json();
 
     // ─── Fetch document URLs from Supabase Storage ───────────────────
-    const imageUrls: string[] = [];
+    // Each entry retains the party tag ('buyer' | 'seller' | undefined) so the AI prompt
+    // can tell the model exactly which document belongs to whom.
+    const imageUrls: { url: string; party?: 'buyer' | 'seller'; type?: string; name?: string }[] = [];
     const pdfDocNames: string[] = [];
+    const pdfDocsByParty: { name: string; party?: 'buyer' | 'seller'; type?: string }[] = [];
 
     // Add base64 data URLs directly (bypasses storage — most reliable)
     if (documentImages && documentImages.length > 0) {
       for (const img of documentImages) {
         if (img.dataUrl && img.dataUrl.startsWith('data:image/')) {
-          imageUrls.push(img.dataUrl);
+          imageUrls.push({ url: img.dataUrl, party: img.party, type: img.docType, name: img.name });
         }
       }
     }
@@ -133,6 +136,9 @@ serve(async (req: Request) => {
       for (const docPath of documentPaths) {
         const path: string = docPath.path || docPath;
         const bucket: string = docPath.bucket || "documents";
+        const party: 'buyer' | 'seller' | undefined = docPath.party;
+        const type: string | undefined = docPath.type;
+        const name: string | undefined = docPath.name;
 
         try {
           if (isImageFile(path)) {
@@ -152,12 +158,13 @@ serve(async (req: Request) => {
             const base64 = btoa(binary);
             const ext = path.toLowerCase().split(".").pop() || "jpeg";
             const mimeType = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : ext === "webp" ? "image/webp" : "image/jpeg";
-            imageUrls.push(`data:${mimeType};base64,${base64}`);
-            log("INFO", "Image converted to base64", { path, size: bytes.length });
+            imageUrls.push({ url: `data:${mimeType};base64,${base64}`, party, type, name });
+            log("INFO", "Image converted to base64", { path, size: bytes.length, party });
           } else {
             // Track PDF/other docs by name
             const filename = path.split("/").pop() || path;
             pdfDocNames.push(filename);
+            pdfDocsByParty.push({ name: filename, party, type });
           }
         } catch (dlErr) {
           log("WARN", "Failed to download image", { path, error: (dlErr as Error).message });
@@ -293,11 +300,18 @@ DOCUMENTS ON FILE:
 Buyer Documents: ${buyerDetails?.uploadedDocuments?.join(", ") || "Pending"}
 Seller Documents: ${sellerDetails?.uploadedDocuments?.join(", ") || "Pending"}
 ${pdfDocNames.length > 0 ? `PDF Documents Available: ${pdfDocNames.join(", ")}` : ""}
+${pdfDocsByParty.length > 0 ? `
+PDF Documents (party-tagged — DO NOT confuse buyer and seller documents):
+${pdfDocsByParty.map((d, i) => `  ${i + 1}. ${d.name}${d.type ? ` (${d.type})` : ""} — belongs to ${d.party ? d.party.toUpperCase() : "UNTAGGED"}`).join("\n")}` : ""}
 ${imageUrls.length > 0 ? `
 ═══════════════════════════════════════
 ATTACHED DOCUMENT IMAGES (${imageUrls.length} document(s)):
 ═══════════════════════════════════════
+PARTY-TAGGED IMAGE INDEX (the user has labelled which document belongs to whom — these tags are AUTHORITATIVE; do not reassign documents to the wrong party):
+${imageUrls.map((img, i) => `  Image ${i + 1}${img.name ? ` (${img.name})` : ""}${img.type ? ` — type: ${img.type}` : ""} — belongs to ${img.party ? img.party.toUpperCase() : "UNTAGGED"}`).join("\n")}
+
 CRITICAL: The attached images are scans/photos of actual legal documents (IDs, title deeds, passports, marriage certificates, etc.).
+The images are passed to you in the SAME ORDER as the index above. When you extract data from "Image N", apply that data ONLY to the party labelled in the index — never to the other party.
 You MUST carefully analyze each image and extract ALL relevant information including but not limited to:
 - Full legal names of all parties (buyer, seller, spouse, witnesses)
 - ID numbers, passport numbers, date of birth
@@ -327,10 +341,10 @@ Where information from uploaded documents conflicts with form data, prefer the d
     ];
 
     if (imageUrls.length > 0) {
-      for (const url of imageUrls) {
+      for (const img of imageUrls) {
         contentParts.push({
           type: "image_url",
-          image_url: { url },
+          image_url: { url: img.url },
         });
       }
     }

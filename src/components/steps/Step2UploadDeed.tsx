@@ -15,8 +15,8 @@ interface Step2Props {
     hasBond?: boolean;
     bondDocument?: string;
     skippedDeedUpload?: boolean;
-    documentFilePaths?: { path: string; bucket: string; name: string; type: string }[];
-    documentDataUrls?: { dataUrl: string; name: string; docType: string }[];
+    documentFilePaths?: { path: string; bucket: string; name: string; type: string; party?: 'buyer' | 'seller' }[];
+    documentDataUrls?: { dataUrl: string; name: string; docType: string; party?: 'buyer' | 'seller' }[];
     extractedOwnerName?: string;
     extractedOwnerIdNumber?: string;
     extractedPreviousOwner?: string;
@@ -92,15 +92,15 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
       try {
         // Auto-convert images to PDF
         const pdfFile = await convertToPdf(file);
-        const filePaths: { path: string; bucket: string; name: string; type: string }[] = [];
-        const dataUrls: { dataUrl: string; name: string; docType: string }[] = [];
+        const filePaths: { path: string; bucket: string; name: string; type: string; party?: 'buyer' | 'seller' }[] = [];
+        const dataUrls: { dataUrl: string; name: string; docType: string; party?: 'buyer' | 'seller' }[] = [];
 
         // Capture original file as base64 for direct AI vision processing
         const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
         if (isImage) {
           try {
             const dataUrl = await fileToDataUrl(file);
-            dataUrls.push({ dataUrl, name: file.name, docType: 'title-deed' });
+            dataUrls.push({ dataUrl, name: file.name, docType: 'title-deed', party: 'seller' });
           } catch { /* ignore base64 conversion errors */ }
         }
 
@@ -111,13 +111,13 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
           const caseId = 'deeds';
           const result = await storageService.uploadFile(pdfFile, orgId, caseId, 'title-deed', 'deeds');
           uploadPath = result.path;
-          filePaths.push({ path: result.path, bucket: 'deeds', name: file.name, type: 'title-deed' });
+          filePaths.push({ path: result.path, bucket: 'deeds', name: file.name, type: 'title-deed', party: 'seller' });
 
           // Also upload original file if it's an image (for AI vision processing)
           const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
           if (isImage) {
             const origResult = await storageService.uploadFile(file, orgId, caseId, 'title-deed-original', 'deeds');
-            filePaths.push({ path: origResult.path, bucket: 'deeds', name: file.name, type: 'title-deed-original' });
+            filePaths.push({ path: origResult.path, bucket: 'deeds', name: file.name, type: 'title-deed-original', party: 'seller' });
           }
         } catch {
           // Storage upload may fail for unauthenticated users — continue with AI analysis
@@ -241,25 +241,25 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
     if (file) {
       // Auto-convert images to PDF
       const pdfFile = await convertToPdf(file);
-      const bondPaths: { path: string; bucket: string; name: string; type: string }[] = [];
-      const bondDataUrls: { dataUrl: string; name: string; docType: string }[] = [];
+      const bondPaths: { path: string; bucket: string; name: string; type: string; party?: 'buyer' | 'seller' }[] = [];
+      const bondDataUrls: { dataUrl: string; name: string; docType: string; party?: 'buyer' | 'seller' }[] = [];
 
       // Capture original as base64 if image
       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
       if (isImage) {
         try {
           const dataUrl = await fileToDataUrl(file);
-          bondDataUrls.push({ dataUrl, name: file.name, docType: 'bond-document' });
+          bondDataUrls.push({ dataUrl, name: file.name, docType: 'bond-document', party: 'seller' });
         } catch { /* ignore */ }
       }
 
       // Upload bond document to Supabase Storage
       try {
         const result = await storageService.uploadFile(pdfFile, 'public', 'deeds', 'bond-cancellation', 'documents');
-        bondPaths.push({ path: result.path, bucket: 'documents', name: file.name, type: 'bond-document' });
+        bondPaths.push({ path: result.path, bucket: 'documents', name: file.name, type: 'bond-document', party: 'seller' });
         if (isImage) {
           const origResult = await storageService.uploadFile(file, 'public', 'deeds', 'bond-cancellation-original', 'documents');
-          bondPaths.push({ path: origResult.path, bucket: 'documents', name: file.name, type: 'bond-document-original' });
+          bondPaths.push({ path: origResult.path, bucket: 'documents', name: file.name, type: 'bond-document-original', party: 'seller' });
         }
       } catch {
         // Storage may not be available for unauthenticated users
@@ -314,6 +314,12 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
           </span>
         )}
       </p>
+
+      {/* Party label — the title deed is the registered owner's = the seller's */}
+      <div className="mb-4 flex items-center gap-2 px-4 py-2 bg-primary/5 border-l-4 border-primary rounded-md">
+        <span className="text-[10px] font-semibold tracking-[0.18em] uppercase text-primary">Document belongs to</span>
+        <span className="text-sm font-bold text-primary">SELLER (registered owner)</span>
+      </div>
 
       {!documentUploaded ? (
         <div className="bg-background border-2 border-dashed border-blue-300 rounded-2xl p-6 md:p-12 text-center transition-all hover:shadow-lg">

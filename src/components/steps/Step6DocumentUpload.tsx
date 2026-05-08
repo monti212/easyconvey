@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Upload, CheckCircle, AlertCircle, Share2, FileText, Eye, X, AlertTriangle, FileType, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Upload, CheckCircle, AlertCircle, Share2, FileText, Eye, X, AlertTriangle, FileType, Sparkles, ShoppingCart, Tag } from 'lucide-react';
 import * as storageService from '../../services/storage.service';
 import { convertToPdf } from '../../lib/convertToPdf';
 
@@ -17,11 +17,12 @@ interface Step6Props {
   onUpdate: (data: {
     uploadedDocuments?: string[];
     otherPartyDocuments?: string[];
-    documentFilePaths?: { path: string; bucket: string; name: string; type: string }[];
-    documentDataUrls?: { dataUrl: string; name: string; docType: string }[];
+    documentFilePaths?: { path: string; bucket: string; name: string; type: string; party?: 'buyer' | 'seller' }[];
+    documentDataUrls?: { dataUrl: string; name: string; docType: string; party?: 'buyer' | 'seller' }[];
     extractedClientName?: string;
     extractedIdNumber?: string;
     extractedDateOfBirth?: string;
+    uploadedDocumentsByParty?: Record<string, 'buyer' | 'seller'>;
   }) => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -47,6 +48,11 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [showImportantNote, setShowImportantNote] = useState(true);
   const [documentQuality, setDocumentQuality] = useState<Record<string, string>>({});
+  // Which party future uploads belong to. Defaults to the current user's role; user can switch
+  // to upload the other party's documents in the same session.
+  const [activeParty, setActiveParty] = useState<'buyer' | 'seller'>(transactionType === 'selling' ? 'seller' : 'buyer');
+  // Track the party each uploaded filename was tagged with — for grouped display
+  const [docsByParty, setDocsByParty] = useState<Record<string, 'buyer' | 'seller'>>({});
   const [showShareModal, setShowShareModal] = useState(false);
   const [partnerEmail, setPartnerEmail] = useState('');
   const [sharedLink, setSharedLink] = useState('');
@@ -91,8 +97,9 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
     setIsUploading(true);
     const newUploads: string[] = [];
     const newQuality: Record<string, string> = { ...documentQuality };
-    const newPaths: { path: string; bucket: string; name: string; type: string }[] = [];
-    const newDataUrls: { dataUrl: string; name: string; docType: string }[] = [];
+    const newPaths: { path: string; bucket: string; name: string; type: string; party?: 'buyer' | 'seller' }[] = [];
+    const newDataUrls: { dataUrl: string; name: string; docType: string; party?: 'buyer' | 'seller' }[] = [];
+    const newDocsByParty: Record<string, 'buyer' | 'seller'> = { ...docsByParty };
 
     for (const originalFile of Array.from(files)) {
       // Capture original as base64 if image (for direct AI vision processing)
@@ -100,7 +107,7 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
       if (isImage) {
         try {
           const dataUrl = await fileToDataUrl(originalFile);
-          newDataUrls.push({ dataUrl, name: originalFile.name, docType: 'bulk-upload' });
+          newDataUrls.push({ dataUrl, name: originalFile.name, docType: 'bulk-upload', party: activeParty });
         } catch { /* ignore */ }
       }
 
@@ -110,10 +117,10 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
         // Try to upload to Supabase Storage
         try {
           const result = await storageService.uploadFile(file, 'public', 'documents', 'bulk', 'documents');
-          newPaths.push({ path: result.path, bucket: 'documents', name: originalFile.name, type: 'bulk-upload' });
+          newPaths.push({ path: result.path, bucket: 'documents', name: originalFile.name, type: 'bulk-upload', party: activeParty });
           if (isImage) {
             const origResult = await storageService.uploadFile(originalFile, 'public', 'documents', 'bulk-original', 'documents');
-            newPaths.push({ path: origResult.path, bucket: 'documents', name: originalFile.name, type: 'bulk-upload-original' });
+            newPaths.push({ path: origResult.path, bucket: 'documents', name: originalFile.name, type: 'bulk-upload-original', party: activeParty });
           }
         } catch {
           setStorageWarnings(prev => [...prev, file.name]);
@@ -137,9 +144,11 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
         }
 
         newUploads.push(file.name);
+        newDocsByParty[file.name] = activeParty;
       } catch {
         newUploads.push(file.name);
         newQuality[file.name] = 'medium';
+        newDocsByParty[file.name] = activeParty;
       }
     }
 
@@ -147,7 +156,9 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
       uploadedDocuments: [...uploadedDocuments, ...newUploads],
       documentFilePaths: newPaths,
       documentDataUrls: newDataUrls,
+      uploadedDocumentsByParty: newDocsByParty,
     });
+    setDocsByParty(newDocsByParty);
     setDocumentQuality(newQuality);
     setIsUploading(false);
   };
@@ -162,13 +173,13 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
     if (!originalFile) return;
 
     const docSlug = docType.replace(/\s+/g, '-');
-    const singleDataUrls: { dataUrl: string; name: string; docType: string }[] = [];
+    const singleDataUrls: { dataUrl: string; name: string; docType: string; party?: 'buyer' | 'seller' }[] = [];
 
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(originalFile.name);
     if (isImage) {
       try {
         const dataUrl = await fileToDataUrl(originalFile);
-        singleDataUrls.push({ dataUrl, name: originalFile.name, docType: docSlug });
+        singleDataUrls.push({ dataUrl, name: originalFile.name, docType: docSlug, party: activeParty });
       } catch { /* ignore */ }
     }
 
@@ -178,20 +189,22 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
     setIsUploading(true);
 
     try {
-      const singlePaths: { path: string; bucket: string; name: string; type: string }[] = [];
+      const singlePaths: { path: string; bucket: string; name: string; type: string; party?: 'buyer' | 'seller' }[] = [];
       try {
         const result = await storageService.uploadFile(file, 'public', 'documents', docSlug, 'documents');
-        singlePaths.push({ path: result.path, bucket: 'documents', name: originalFile.name, type: docSlug });
+        singlePaths.push({ path: result.path, bucket: 'documents', name: originalFile.name, type: docSlug, party: activeParty });
         if (isImage) {
           const origResult = await storageService.uploadFile(originalFile, 'public', 'documents', `${docSlug}-original`, 'documents');
-          singlePaths.push({ path: origResult.path, bucket: 'documents', name: originalFile.name, type: `${docSlug}-original` });
+          singlePaths.push({ path: origResult.path, bucket: 'documents', name: originalFile.name, type: `${docSlug}-original`, party: activeParty });
         }
       } catch {
         setStorageWarnings(prev => [...prev, newFileName]);
       }
 
       const newUploads = [...uploadedDocuments, newFileName];
-      const updatePayload: Parameters<typeof onUpdate>[0] = { uploadedDocuments: newUploads, documentFilePaths: singlePaths, documentDataUrls: singleDataUrls };
+      const newDocsByParty = { ...docsByParty, [newFileName]: activeParty };
+      setDocsByParty(newDocsByParty);
+      const updatePayload: Parameters<typeof onUpdate>[0] = { uploadedDocuments: newUploads, documentFilePaths: singlePaths, documentDataUrls: singleDataUrls, uploadedDocumentsByParty: newDocsByParty };
 
       // OCR identity documents
       if (isIdDocument(docType)) {
@@ -419,6 +432,66 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
         )}
       </p>
 
+      {/* Party toggle — every upload from this step is tagged with the selected party so the AI never mixes them up */}
+      <div className="mb-6 md:mb-8 bg-white rounded-xl shadow-md border border-gray-200 p-4 md:p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-gray-500">Uploading documents for</p>
+            <p className="text-base md:text-lg font-bold text-primary mt-0.5">
+              {activeParty === 'buyer' ? 'BUYER' : 'SELLER'}
+              <span className="ml-2 text-xs font-normal text-gray-500">— switch to upload the other party's documents</span>
+            </p>
+          </div>
+          <div className="inline-flex rounded-lg bg-gray-100 p-1 self-start sm:self-auto" role="tablist" aria-label="Document party selector">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeParty === 'buyer'}
+              onClick={() => setActiveParty('buyer')}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
+                activeParty === 'buyer' ? 'bg-secondary text-primary shadow-sm' : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <ShoppingCart className="h-4 w-4" />
+              Buyer
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeParty === 'seller'}
+              onClick={() => setActiveParty('seller')}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
+                activeParty === 'seller' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <Tag className="h-4 w-4" />
+              Seller
+            </button>
+          </div>
+        </div>
+        {/* Quick split summary so user sees both sides at a glance */}
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className={`rounded-lg p-3 border ${activeParty === 'buyer' ? 'bg-secondary/10 border-secondary/40' : 'bg-gray-50 border-gray-200'}`}>
+            <p className="text-[10px] font-semibold tracking-wider uppercase text-secondary-dark flex items-center gap-1">
+              <ShoppingCart className="h-3 w-3" /> Buyer's documents
+            </p>
+            <p className="text-lg font-bold text-primary mt-0.5">
+              {Object.values(docsByParty).filter(p => p === 'buyer').length}
+              <span className="text-xs font-normal text-gray-500 ml-1">uploaded</span>
+            </p>
+          </div>
+          <div className={`rounded-lg p-3 border ${activeParty === 'seller' ? 'bg-primary/5 border-primary/30' : 'bg-gray-50 border-gray-200'}`}>
+            <p className="text-[10px] font-semibold tracking-wider uppercase text-primary flex items-center gap-1">
+              <Tag className="h-3 w-3" /> Seller's documents
+            </p>
+            <p className="text-lg font-bold text-primary mt-0.5">
+              {Object.values(docsByParty).filter(p => p === 'seller').length}
+              <span className="text-xs font-normal text-gray-500 ml-1">uploaded</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Important Note Modal */}
       {showImportantNote && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-10 px-4">
@@ -588,11 +661,21 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
                       </span>
                     </div>
                     
-                    {isUploaded && quality && (
-                      <div className={`px-2 py-1 rounded-full text-xs ${quality.color} ${quality.bg}`}>
-                        {quality.text}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {isUploaded && docsByParty[docName] && (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+                          docsByParty[docName] === 'buyer' ? 'bg-secondary/20 text-primary' : 'bg-primary/10 text-primary'
+                        }`}>
+                          {docsByParty[docName] === 'buyer' ? <ShoppingCart className="h-3 w-3" /> : <Tag className="h-3 w-3" />}
+                          {docsByParty[docName]}
+                        </span>
+                      )}
+                      {isUploaded && quality && (
+                        <div className={`px-2 py-1 rounded-full text-xs ${quality.color} ${quality.bg}`}>
+                          {quality.text}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   
                   {isUploaded && (
@@ -664,11 +747,17 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
         </div>
 
         {/* Right side - Upload area */}
-        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-lg border border-gray-200 flex flex-col h-full">
+        <div className={`bg-white rounded-2xl p-4 md:p-6 shadow-lg border-2 flex flex-col h-full ${activeParty === 'buyer' ? 'border-secondary/50' : 'border-primary/40'}`}>
           <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-3 md:mb-4 flex items-center">
             <Upload className="h-4 w-4 md:h-5 md:w-5 text-blue-600 mr-2" />
             Bulk Upload
           </h3>
+          <div className={`mb-3 px-3 py-2 rounded-md ${activeParty === 'buyer' ? 'bg-secondary/10 border border-secondary/40' : 'bg-primary/5 border border-primary/30'}`}>
+            <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-gray-500">Files uploaded here will be tagged as</p>
+            <p className="text-sm font-bold text-primary mt-0.5 flex items-center gap-1">
+              {activeParty === 'buyer' ? <><ShoppingCart className="h-3.5 w-3.5" /> BUYER's documents</> : <><Tag className="h-3.5 w-3.5" /> SELLER's documents</>}
+            </p>
+          </div>
           {isUploading ? (
             <div className="flex-1 flex flex-col items-center justify-center bg-blue-50 rounded-xl p-4 md:p-6">
               <div className="animate-pulse flex flex-col items-center">

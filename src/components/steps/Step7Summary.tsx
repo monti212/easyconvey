@@ -38,8 +38,8 @@ interface Step7Props {
     requiredDocuments: string[];
     uploadedDocuments: string[];
     isFirstTimeBuyer?: boolean; // Added for first time buyer status
-    documentFilePaths?: { path: string; bucket: string; name: string; type: string }[];
-    documentDataUrls?: { dataUrl: string; name: string; docType: string }[];
+    documentFilePaths?: { path: string; bucket: string; name: string; type: string; party?: 'buyer' | 'seller' }[];
+    documentDataUrls?: { dataUrl: string; name: string; docType: string; party?: 'buyer' | 'seller' }[];
   };
   transactionId: string | null;
   supabaseCaseId?: string | null;
@@ -352,8 +352,8 @@ const Step7Summary: React.FC<Step7Props> = ({
           sellerDetails,
           buyerName,
           sellerName,
-          documentPaths: (transactionData.documentFilePaths || []).map(fp => ({ path: fp.path, bucket: fp.bucket })),
-          documentImages: (transactionData.documentDataUrls || []).map(d => ({ dataUrl: d.dataUrl, name: d.name, docType: d.docType })),
+          documentPaths: (transactionData.documentFilePaths || []).map(fp => ({ path: fp.path, bucket: fp.bucket, party: fp.party, type: fp.type, name: fp.name })),
+          documentImages: (transactionData.documentDataUrls || []).map(d => ({ dataUrl: d.dataUrl, name: d.name, docType: d.docType, party: d.party })),
           stream: true,
           // Conveyancer details — needed for deed of transfer "appeared before me" clause
           conveyancerName: lawyerName || 'Conveyancer',
