@@ -106,6 +106,9 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
     const newPaths: { path: string; bucket: string; name: string; type: string; party?: 'buyer' | 'seller' }[] = [];
     const newDataUrls: { dataUrl: string; name: string; docType: string; party?: 'buyer' | 'seller' }[] = [];
     const newDocsByParty: Record<string, 'buyer' | 'seller'> = { ...docsByParty };
+    const newOcrResults: Record<string, { fullName?: string; idNumber?: string; dateOfBirth?: string; documentType?: string }> = { ...ocrResults };
+    // Aggregate OCR results across this batch — last successful read wins for the active party
+    const batchExtracted: { fullName?: string; idNumber?: string; dateOfBirth?: string } = {};
 
     for (const originalFile of Array.from(files)) {
       // Capture original as base64 if image (for direct AI vision processing)
@@ -149,6 +152,54 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
           newQuality[file.name] = 'good';
         }
 
+        // ID OCR — every bulk-uploaded file is sent through analyze-id; the API
+        // returns "Unknown" for non-ID documents (which we ignore). Successful
+        // hits are routed to the active party's bucket and shown per-file.
+        try {
+          const idForm = new FormData();
+          idForm.append('file', originalFile);
+          const idRes = await fetch('/api/analyze-id', { method: 'POST', body: idForm });
+          if (idRes.ok) {
+            const idData = await idRes.json();
+            const validFullName = idData.fullName && idData.fullName !== 'Unknown' ? idData.fullName : '';
+            const validIdNumber = idData.idNumber && idData.idNumber !== 'Unknown' ? idData.idNumber : '';
+            const validDob = idData.dateOfBirth && idData.dateOfBirth !== 'Unknown' ? idData.dateOfBirth : '';
+            if (validFullName || validIdNumber || validDob) {
+              newOcrResults[file.name] = idData;
+              if (validFullName) batchExtracted.fullName = validFullName;
+              if (validIdNumber) batchExtracted.idNumber = validIdNumber;
+              if (validDob) batchExtracted.dateOfBirth = validDob;
+            }
+          }
+        } catch { /* OCR failure is non-blocking */ }
+
+        // Title-deed OCR — if the file is recognisable as a deed (active party = seller),
+        // populate the shared deed-extraction fields too. analyze-deed silently returns
+        // "Unknown" for non-deed documents, which we ignore.
+        if (activeParty === 'seller') {
+          try {
+            const deedForm = new FormData();
+            deedForm.append('file', originalFile);
+            const deedRes = await fetch('/api/analyze-deed', { method: 'POST', body: deedForm });
+            if (deedRes.ok) {
+              const deedData = await deedRes.json();
+              const def = (v: unknown) => (v && v !== 'Unknown' ? (v as string) : undefined);
+              if (deedData.ownerName && deedData.ownerName !== 'Unknown') {
+                const deedPayload: Record<string, unknown> = { extractedOwnerName: deedData.ownerName };
+                if (def(deedData.ownerIdNumber)) deedPayload.extractedOwnerIdNumber = deedData.ownerIdNumber;
+                if (def(deedData.plotNumber)) deedPayload.extractedPlotNumber = deedData.plotNumber;
+                if (def(deedData.propertyAddress)) deedPayload.extractedPropertyAddress = deedData.propertyAddress;
+                if (def(deedData.propertyDescription)) deedPayload.extractedPropertyDescription = deedData.propertyDescription;
+                if (def(deedData.titleDeedNumber)) deedPayload.extractedTitleDeedNumber = deedData.titleDeedNumber;
+                if (def(deedData.administrativeDistrict)) deedPayload.extractedAdministrativeDistrict = deedData.administrativeDistrict;
+                if (def(deedData.extent)) deedPayload.extractedExtent = deedData.extent;
+                if (def(deedData.purchasePrice)) deedPayload.extractedPurchasePrice = deedData.purchasePrice;
+                (onUpdate as (d: Record<string, unknown>) => void)(deedPayload);
+              }
+            }
+          } catch { /* deed OCR failure is non-blocking */ }
+        }
+
         newUploads.push(file.name);
         newDocsByParty[file.name] = activeParty;
       } catch {
@@ -158,12 +209,35 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
       }
     }
 
-    onUpdate({
+    const updatePayload: Parameters<typeof onUpdate>[0] = {
       uploadedDocuments: [...uploadedDocuments, ...newUploads],
       documentFilePaths: newPaths,
       documentDataUrls: newDataUrls,
       uploadedDocumentsByParty: newDocsByParty,
-    });
+    };
+
+    // Route any successful ID OCR to the active party's bucket and the legacy
+    // single bucket (for the current user's side).
+    if (batchExtracted.fullName || batchExtracted.idNumber || batchExtracted.dateOfBirth) {
+      if (activeParty === 'buyer') {
+        if (batchExtracted.fullName) updatePayload.extractedBuyerName = batchExtracted.fullName;
+        if (batchExtracted.idNumber) updatePayload.extractedBuyerIdNumber = batchExtracted.idNumber;
+        if (batchExtracted.dateOfBirth) updatePayload.extractedBuyerDateOfBirth = batchExtracted.dateOfBirth;
+      } else {
+        if (batchExtracted.fullName) updatePayload.extractedSellerName = batchExtracted.fullName;
+        if (batchExtracted.idNumber) updatePayload.extractedSellerIdNumber = batchExtracted.idNumber;
+        if (batchExtracted.dateOfBirth) updatePayload.extractedSellerDateOfBirth = batchExtracted.dateOfBirth;
+      }
+      const userIsSeller = transactionType === 'selling';
+      if ((userIsSeller && activeParty === 'seller') || (!userIsSeller && activeParty === 'buyer')) {
+        if (batchExtracted.fullName) updatePayload.extractedClientName = batchExtracted.fullName;
+        if (batchExtracted.idNumber) updatePayload.extractedIdNumber = batchExtracted.idNumber;
+        if (batchExtracted.dateOfBirth) updatePayload.extractedDateOfBirth = batchExtracted.dateOfBirth;
+      }
+    }
+
+    onUpdate(updatePayload);
+    setOcrResults(newOcrResults);
     setDocsByParty(newDocsByParty);
     setDocumentQuality(newQuality);
     setIsUploading(false);
@@ -818,8 +892,12 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
                 <p className="text-sm md:text-base text-blue-800 font-medium mb-1 md:mb-2">
                   Tap to upload multiple documents
                 </p>
-                <p className="text-xs md:text-sm text-blue-600 mb-4 md:mb-6">
+                <p className="text-xs md:text-sm text-blue-600 mb-2">
                   Ensure documents are clear and well-lit before uploading
+                </p>
+                <p className="text-[11px] md:text-xs text-blue-700 bg-blue-100/70 px-2 py-1 rounded mb-4 md:mb-6 inline-flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  IDs and title deeds will be auto-OCR'd and routed to the {activeParty === 'buyer' ? 'BUYER' : 'SELLER'} bucket
                 </p>
                 <input
                   type="file"
