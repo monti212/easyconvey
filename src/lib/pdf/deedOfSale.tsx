@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     color: '#333333',
     lineHeight: 1.7,
     marginBottom: 8,
-    textAlign: 'justify',
+    textAlign: 'center',
   },
   bold: {
     fontFamily: 'Helvetica-Bold',

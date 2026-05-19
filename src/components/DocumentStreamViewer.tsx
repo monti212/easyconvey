@@ -202,21 +202,21 @@ const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
                 </div>
               )}
 
-              <article className="prose prose-gray max-w-none
-                prose-headings:font-serif prose-headings:tracking-tight
-                prose-h1:text-[1.1rem] prose-h1:text-center prose-h1:font-bold prose-h1:text-[#1a1a2e] prose-h1:mb-8 prose-h1:uppercase prose-h1:tracking-[0.15em]
+              <article className="prose prose-gray max-w-none text-center
+                prose-headings:font-serif prose-headings:tracking-tight prose-headings:text-center
+                prose-h1:text-[1.1rem] prose-h1:font-bold prose-h1:text-[#1a1a2e] prose-h1:mb-8 prose-h1:uppercase prose-h1:tracking-[0.15em]
                 prose-h2:text-[0.95rem] prose-h2:font-bold prose-h2:text-[#1a1a2e] prose-h2:border-b prose-h2:border-gray-300 prose-h2:pb-2 prose-h2:mt-10 prose-h2:uppercase prose-h2:tracking-wide
                 prose-h3:text-base prose-h3:font-semibold prose-h3:text-gray-800 prose-h3:mt-6
                 prose-h4:text-sm prose-h4:font-semibold prose-h4:text-gray-700 prose-h4:mt-4
-                prose-p:text-[13px] prose-p:leading-[1.8] prose-p:text-gray-700 prose-p:text-justify
-                prose-li:text-[13px] prose-li:leading-[1.8] prose-li:text-gray-700
+                prose-p:text-[13px] prose-p:leading-[1.8] prose-p:text-gray-700 prose-p:text-center
+                prose-li:text-[13px] prose-li:leading-[1.8] prose-li:text-gray-700 prose-li:text-center
                 prose-strong:text-gray-900 prose-strong:font-semibold
-                prose-ol:pl-6 prose-ul:pl-6
+                prose-ol:pl-6 prose-ol:list-inside prose-ul:pl-6 prose-ul:list-inside
                 prose-hr:border-gray-300
-                prose-table:w-full prose-table:border-collapse prose-table:text-[12px]
+                prose-table:border-collapse prose-table:text-[12px] prose-table:mx-auto
                 prose-thead:bg-[#1a1a2e] prose-thead:text-white
-                prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-semibold prose-th:text-[11px] prose-th:uppercase prose-th:tracking-wide
-                prose-td:px-3 prose-td:py-2 prose-td:border prose-td:border-gray-200 prose-td:text-[12px] prose-td:align-top
+                prose-th:px-3 prose-th:py-2 prose-th:text-center prose-th:font-semibold prose-th:text-[11px] prose-th:uppercase prose-th:tracking-wide
+                prose-td:px-3 prose-td:py-2 prose-td:border prose-td:border-gray-200 prose-td:text-[12px] prose-td:align-top prose-td:text-center
                 prose-tr:even:bg-gray-50
               ">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>

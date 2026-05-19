@@ -69,28 +69,29 @@ export async function downloadAsWord(
     const trimmed = line.trim();
 
     if (trimmed.startsWith('#### ')) {
-      children.push(new Paragraph({ text: trimmed.slice(5), heading: HeadingLevel.HEADING_4, spacing: { before: 120, after: 60 } }));
+      children.push(new Paragraph({ text: trimmed.slice(5), heading: HeadingLevel.HEADING_4, alignment: AlignmentType.CENTER, spacing: { before: 120, after: 60 } }));
     } else if (trimmed.startsWith('### ')) {
-      children.push(new Paragraph({ text: trimmed.slice(4), heading: HeadingLevel.HEADING_3, spacing: { before: 160, after: 80 } }));
+      children.push(new Paragraph({ text: trimmed.slice(4), heading: HeadingLevel.HEADING_3, alignment: AlignmentType.CENTER, spacing: { before: 160, after: 80 } }));
     } else if (trimmed.startsWith('## ')) {
-      children.push(new Paragraph({ text: trimmed.slice(3), heading: HeadingLevel.HEADING_2, spacing: { before: 240, after: 120 } }));
+      children.push(new Paragraph({ text: trimmed.slice(3), heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER, spacing: { before: 240, after: 120 } }));
     } else if (trimmed.startsWith('# ')) {
       children.push(new Paragraph({ text: trimmed.slice(2), heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER, spacing: { before: 240, after: 160 } }));
     } else if (trimmed.startsWith('---')) {
       children.push(new Paragraph({
         border: { bottom: { color: 'CCCCCC', style: BorderStyle.SINGLE, size: 6 } },
         spacing: { before: 120, after: 120 },
+        alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: '' })],
       }));
     } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      children.push(new Paragraph({ bullet: { level: 0 }, children: parseMarkdownLine(trimmed.slice(2)), spacing: { after: 60 } }));
+      children.push(new Paragraph({ bullet: { level: 0 }, children: parseMarkdownLine(trimmed.slice(2)), alignment: AlignmentType.CENTER, spacing: { after: 60 } }));
     } else if (/^\d+[.)]\s/.test(trimmed)) {
       const text = trimmed.replace(/^\d+[.)]\s/, '');
-      children.push(new Paragraph({ numbering: { reference: 'default-numbering', level: 0 }, children: parseMarkdownLine(text), spacing: { after: 60 } }));
+      children.push(new Paragraph({ numbering: { reference: 'default-numbering', level: 0 }, children: parseMarkdownLine(text), alignment: AlignmentType.CENTER, spacing: { after: 60 } }));
     } else if (trimmed === '') {
       children.push(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 60 } }));
     } else {
-      children.push(new Paragraph({ children: parseMarkdownLine(trimmed), spacing: { after: 80 }, alignment: AlignmentType.JUSTIFIED }));
+      children.push(new Paragraph({ children: parseMarkdownLine(trimmed), spacing: { after: 80 }, alignment: AlignmentType.CENTER }));
     }
   }
 
