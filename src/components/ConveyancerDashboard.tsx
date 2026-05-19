@@ -434,7 +434,11 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `conveyancing-document-${transactionId}.pdf`;
+    const label = DOCUMENT_TYPES.find(d => d.id === selectedDocType)?.label || 'Legal Document';
+    const safeLabel = label.replace(/&/g, 'and').replace(/[\\/:*?"<>|]/g, '').trim();
+    const plot = (wizardData?.extractedPlotNumber || '').trim();
+    const context = (plot || transactionId).replace(/[\\/:*?"<>|]/g, '');
+    a.download = `${safeLabel} - ${context}.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

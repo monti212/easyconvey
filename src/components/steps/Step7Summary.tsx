@@ -68,6 +68,18 @@ const DOC_TYPES: { id: DocumentType; label: string; short: string }[] = [
   { id: 'bond_registration', label: 'Bond Registration', short: 'Bond Reg.' },
 ];
 
+// Build a human-readable, filesystem-safe download name like
+// "Deed of Sale and Transfer - LOT 15583.pdf" — falling back to the
+// transaction reference when no plot number is available.
+function buildDownloadName(docType: DocumentType, ext: string, transactionRef: string, plotNumber?: string): string {
+  const label = DOC_TYPES.find(d => d.id === docType)?.label || 'Legal Document';
+  // Sanitise for filesystems: replace & with "and", strip slashes/colons/etc.
+  const safeLabel = label.replace(/&/g, 'and').replace(/[\\/:*?"<>|]/g, '').trim();
+  const contextRaw = (plotNumber && plotNumber.trim()) || transactionRef;
+  const safeContext = contextRaw.replace(/[\\/:*?"<>|]/g, '').trim();
+  return `${safeLabel} - ${safeContext}.${ext.replace(/^\./, '')}`;
+}
+
 const Step7Summary: React.FC<Step7Props> = ({
   transactionData,
   transactionId,
@@ -558,7 +570,7 @@ const Step7Summary: React.FC<Step7Props> = ({
         } catch {
           blob = new Blob([content], { type: 'text/plain' });
         }
-        const fileName = `${docTypeId}-${transactionReferenceId}.pdf`;
+        const fileName = buildDownloadName(docTypeId as DocumentType, 'pdf', transactionReferenceId, (transactionData as any).extractedPlotNumber);
         zip.file(fileName, blob);
       }
 
@@ -566,7 +578,9 @@ const Step7Summary: React.FC<Step7Props> = ({
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `document-pack-${transactionReferenceId}.zip`;
+      const plot = ((transactionData as any).extractedPlotNumber || '').trim();
+      const zipContext = plot || transactionReferenceId;
+      a.download = `Document Pack - ${zipContext.replace(/[\\/:*?"<>|]/g, '')}.zip`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -600,7 +614,7 @@ const Step7Summary: React.FC<Step7Props> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${selectedDocType}-${transactionReferenceId}.pdf`;
+    a.download = buildDownloadName(selectedDocType, 'pdf', transactionReferenceId, (transactionData as any).extractedPlotNumber);
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -612,13 +626,13 @@ const Step7Summary: React.FC<Step7Props> = ({
     await downloadAsWord(
       content,
       docTitle,
-      `${selectedDocType}-${transactionReferenceId}.docx`,
+      buildDownloadName(selectedDocType, 'docx', transactionReferenceId, (transactionData as any).extractedPlotNumber),
       firmName,
       transactionReferenceId,
       resolvedBuyerName,
       resolvedSellerName,
     );
-  }, [activeDocument, generatedDocuments, selectedDocType, transactionReferenceId, firmName, resolvedBuyerName, resolvedSellerName]);
+  }, [activeDocument, generatedDocuments, selectedDocType, transactionReferenceId, firmName, resolvedBuyerName, resolvedSellerName, transactionData]);
 
   const handleDocPrint = () => {
     const content = activeDocument || generatedDocuments[selectedDocType];
