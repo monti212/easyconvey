@@ -212,6 +212,7 @@ const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
                 prose-li:text-[13px] prose-li:leading-[1.8] prose-li:text-gray-700 prose-li:text-center
                 prose-strong:text-gray-900 prose-strong:font-semibold
                 prose-ol:pl-6 prose-ol:list-inside prose-ul:pl-6 prose-ul:list-inside
+                [&_ol]:text-left [&_ol_li]:text-left
                 prose-hr:border-gray-300
                 prose-table:border-collapse prose-table:text-[12px] prose-table:mx-auto
                 prose-thead:bg-[#1a1a2e] prose-thead:text-white

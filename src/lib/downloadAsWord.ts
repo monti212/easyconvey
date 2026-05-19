@@ -87,7 +87,7 @@ export async function downloadAsWord(
       children.push(new Paragraph({ bullet: { level: 0 }, children: parseMarkdownLine(trimmed.slice(2)), alignment: AlignmentType.CENTER, spacing: { after: 60 } }));
     } else if (/^\d+[.)]\s/.test(trimmed)) {
       const text = trimmed.replace(/^\d+[.)]\s/, '');
-      children.push(new Paragraph({ numbering: { reference: 'default-numbering', level: 0 }, children: parseMarkdownLine(text), alignment: AlignmentType.CENTER, spacing: { after: 60 } }));
+      children.push(new Paragraph({ numbering: { reference: 'default-numbering', level: 0 }, children: parseMarkdownLine(text), alignment: AlignmentType.LEFT, spacing: { after: 60 } }));
     } else if (trimmed === '') {
       children.push(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 60 } }));
     } else {
