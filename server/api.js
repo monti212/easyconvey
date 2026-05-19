@@ -27,25 +27,15 @@ app.get('/api/client-info', (req, res) => {
   });
 });
 
-// Helper: call AI Chat Completions API (supports OpenAI and Groq)
+// Helper: call OpenAI Chat Completions API
 async function callOpenAI(apiKey, instructions, input, options = {}) {
-  const groqKey = process.env.GROQ_API_KEY;
+  const { model = 'gpt-4o', max_tokens = 4096, temperature = 0.1, ...rest } = options;
 
-  // Use Groq if available (free tier), fall back to OpenAI
-  const useGroq = !!groqKey;
-  const key = useGroq ? groqKey : apiKey;
-  const baseUrl = useGroq
-    ? 'https://api.groq.com/openai/v1'
-    : 'https://api.openai.com/v1';
-  const defaultModel = useGroq ? 'llama-3.3-70b-versatile' : 'gpt-4o';
-
-  const { model = defaultModel, max_tokens = 4096, temperature = 0.1, ...rest } = options;
-
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${key}`,
+      'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model,
@@ -73,7 +63,7 @@ async function callOpenAI(apiKey, instructions, input, options = {}) {
 
 // ─── Comprehensive conveyancing document generation (streaming, replaces Supabase edge function) ───
 app.post('/api/generate-document', async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'OpenAI API key not configured on server' });
 
   const {
@@ -202,18 +192,11 @@ CRITICAL DATA RULE:
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('Access-Control-Allow-Origin', '*');
 
-      const groqKey = process.env.GROQ_API_KEY;
-      const streamKey = groqKey || apiKey;
-      const streamUrl = groqKey
-        ? 'https://api.groq.com/openai/v1/chat/completions'
-        : 'https://api.openai.com/v1/chat/completions';
-      const streamModel = groqKey ? 'llama-3.3-70b-versatile' : 'gpt-4o';
-
-      const response = await fetch(streamUrl, {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${streamKey}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({
-          model: streamModel,
+          model: 'gpt-4o',
           messages: [
             { role: 'system', content: instructions },
             { role: 'user', content: prompt },
@@ -254,7 +237,7 @@ CRITICAL DATA RULE:
 
 // Analyze uploaded deed via pdf-parse + AI
 app.post('/api/analyze-deed', upload.single('file'), async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'No AI API key configured on server' });
 
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -351,7 +334,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
 
 // Analyze ID / Passport / identity document via pdf-parse + AI
 app.post('/api/analyze-id', upload.single('file'), async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'No AI API key configured on server' });
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
@@ -398,7 +381,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
 
 // Analyze document quality via OpenAI Responses API
 app.post('/api/analyze-document', async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'OpenAI API key not configured on server' });
 
   const { fileName, fileType, fileSize, docType } = req.body;
