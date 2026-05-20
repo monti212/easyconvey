@@ -57,8 +57,11 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
   // Which party future uploads belong to. Defaults to the current user's role; user can switch
   // to upload the other party's documents in the same session.
   const [activeParty, setActiveParty] = useState<'buyer' | 'seller'>(transactionType === 'selling' ? 'seller' : 'buyer');
-  // Track the party each uploaded filename was tagged with — for grouped display
-  const [docsByParty, setDocsByParty] = useState<Record<string, 'buyer' | 'seller'>>({});
+  // Track the party each uploaded filename was tagged with — for grouped display.
+  // Restored from saved transaction data so progress survives resume / refresh.
+  const [docsByParty, setDocsByParty] = useState<Record<string, 'buyer' | 'seller'>>(
+    () => currentTransactionData?.uploadedDocumentsByParty || {}
+  );
   const [showShareModal, setShowShareModal] = useState(false);
   const [partnerEmail, setPartnerEmail] = useState('');
   const [sharedLink, setSharedLink] = useState('');
@@ -525,6 +528,19 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
   const missingDocuments = getMissingDocuments();
   const hasSharedPricing = currentTransactionData?.sellingPrice && parseInt(currentTransactionData.sellingPrice) > 0;
 
+  // Transaction Progress — document readiness split by party. Each upload is
+  // tagged with the party it belongs to (docsByParty); untagged uploads default
+  // to the current user's own side, which is also the default upload target.
+  const ownParty: 'buyer' | 'seller' = transactionType === 'selling' ? 'seller' : 'buyer';
+  const otherParty: 'buyer' | 'seller' = ownParty === 'buyer' ? 'seller' : 'buyer';
+  const requiredDocCount = Math.max(fullRequiredDocuments.length, 1);
+  const ownDocCount = uploadedDocuments.filter(d => (docsByParty[d] ?? ownParty) === ownParty).length;
+  const otherDocCount =
+    uploadedDocuments.filter(d => docsByParty[d] === otherParty).length + otherPartyDocuments.length;
+  const ownProgressPct = Math.min(100, Math.round((ownDocCount / requiredDocCount) * 100));
+  const otherProgressPct = Math.min(100, Math.round((otherDocCount / requiredDocCount) * 100));
+  const bothPartiesReady = ownProgressPct >= 100 && otherProgressPct >= 100;
+
   return (
     <div className="py-4 md:py-8 max-w-4xl mx-auto px-4">
       <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 md:mb-4 text-center">
@@ -944,52 +960,68 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
         </div>
       </div>
 
-      {/* Transaction Progress Area */}
+      {/* Transaction Progress Area — tracks document readiness for both parties.
+          The conveyancer can only complete the transfer once both sides are in. */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-md mb-6 md:mb-8 p-4 md:p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Transaction Progress</h3>
-        
+        <h3 className="text-lg font-semibold text-gray-900 mb-1">Transaction Progress</h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Document readiness for both sides of the transaction. Both parties must be complete before the transfer can proceed.
+        </p>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          {/* Current user's side */}
           <div className="bg-blue-50 rounded-lg p-3 md:p-4 border border-blue-100">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm md:text-base font-medium text-blue-800">Your Documents</h4>
+              <h4 className="text-sm md:text-base font-medium text-blue-800 flex items-center gap-1.5">
+                {ownParty === 'buyer' ? <ShoppingCart className="h-4 w-4" /> : <Tag className="h-4 w-4" />}
+                Your Documents <span className="text-xs font-normal capitalize">({ownParty})</span>
+              </h4>
               <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full">
-                {Math.round((uploadedDocuments.length / fullRequiredDocuments.length) * 100)}% Complete
+                {ownProgressPct}% Complete
               </span>
             </div>
             <div className="relative w-full h-2 bg-blue-200 rounded-full">
               <div
-                className="absolute top-0 left-0 h-full bg-blue-600 rounded-full"
-                style={{
-                  width: `${Math.min(100, (uploadedDocuments.length / fullRequiredDocuments.length) * 100)}%`
-                }}
+                className="absolute top-0 left-0 h-full bg-blue-600 rounded-full transition-all"
+                style={{ width: `${ownProgressPct}%` }}
               ></div>
             </div>
+            <p className="text-xs text-blue-700 mt-1.5">
+              <span className="font-medium">{ownDocCount}</span> of <span className="font-medium">{fullRequiredDocuments.length}</span> documents uploaded
+              {ownProgressPct >= 100 && <span className="ml-1 font-semibold text-green-700">— ready ✓</span>}
+            </p>
           </div>
-          
-          <div className={`rounded-lg p-3 md:p-4 border ${otherPartyDocuments.length > 0 ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-200'}`}>
+
+          {/* Other party's side */}
+          <div className={`rounded-lg p-3 md:p-4 border ${otherDocCount > 0 ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-200'}`}>
             <div className="flex items-center justify-between mb-2">
-              <h4 className={`text-sm md:text-base font-medium ${otherPartyDocuments.length > 0 ? 'text-green-800' : 'text-gray-700'}`}>
-                Other Party's Documents
+              <h4 className={`text-sm md:text-base font-medium flex items-center gap-1.5 ${otherDocCount > 0 ? 'text-green-800' : 'text-gray-700'}`}>
+                {otherParty === 'buyer' ? <ShoppingCart className="h-4 w-4" /> : <Tag className="h-4 w-4" />}
+                Other Party's Documents <span className="text-xs font-normal capitalize">({otherParty})</span>
               </h4>
               <span className={`text-xs px-2 py-0.5 rounded-full ${
-                otherPartyDocuments.length > 0 
-                  ? 'bg-green-200 text-green-800' 
-                  : 'bg-gray-200 text-gray-700'
+                otherDocCount > 0 ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-700'
               }`}>
-                {otherPartyDocuments.length > 0 ? `${otherPartyDocuments.length} Uploaded` : 'Awaiting Upload'}
+                {otherDocCount > 0 ? `${otherProgressPct}% Complete` : 'Awaiting Upload'}
               </span>
             </div>
             <div className="relative w-full h-2 bg-gray-200 rounded-full">
               <div
-                className={`absolute top-0 left-0 h-full rounded-full ${
-                  otherPartyDocuments.length > 0 ? 'bg-green-500' : 'bg-gray-400'
+                className={`absolute top-0 left-0 h-full rounded-full transition-all ${
+                  otherDocCount > 0 ? 'bg-green-500' : 'bg-gray-400'
                 }`}
-                style={{
-                  width: otherPartyDocuments.length > 0 ? '100%' : '0%'
-                }}
+                style={{ width: `${otherProgressPct}%` }}
               ></div>
             </div>
-            
+            <p className={`text-xs mt-1.5 ${otherDocCount > 0 ? 'text-green-700' : 'text-gray-500'}`}>
+              <span className="font-medium">{otherDocCount}</span> of <span className="font-medium">{fullRequiredDocuments.length}</span> documents uploaded
+              {otherDocCount > 0 && otherProgressPct >= 100 && <span className="ml-1 font-semibold text-green-700">— ready ✓</span>}
+            </p>
+            {otherDocCount === 0 && (
+              <p className="text-[11px] text-gray-500 mt-1">
+                Use the Buyer / Seller toggle above to upload on their behalf, or share a link so they can upload themselves.
+              </p>
+            )}
             {!isSharedTransaction && (
               <button
                 onClick={() => setShowShareModal(true)}
@@ -999,6 +1031,22 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
               </button>
             )}
           </div>
+        </div>
+
+        {/* Overall readiness banner */}
+        <div className={`mt-4 flex items-center gap-2 rounded-lg px-3 py-2 text-xs md:text-sm border ${
+          bothPartiesReady
+            ? 'bg-green-50 text-green-800 border-green-200'
+            : 'bg-amber-50 text-amber-800 border-amber-200'
+        }`}>
+          {bothPartiesReady
+            ? <CheckCircle className="h-4 w-4 flex-shrink-0" />
+            : <AlertCircle className="h-4 w-4 flex-shrink-0" />}
+          <span>
+            {bothPartiesReady
+              ? 'All documents for both parties are uploaded — this transaction is ready to submit.'
+              : 'Both parties must upload their required documents before the transaction can be completed.'}
+          </span>
         </div>
       </div>
 

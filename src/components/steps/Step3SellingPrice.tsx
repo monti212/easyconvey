@@ -54,6 +54,20 @@ export interface Step3Props {
 // -----------------------------------------------------------------------------
 const DISBURSEMENTS_AMOUNT = 550; // Standard disbursements amount
 
+// Conveyancing fee scale — Law Society of Botswana conveyancing tariff
+// (TRANSFERS column of the official fee schedule). Each tuple is
+// [maximum property value for the band, fee in Pula]. Fees are exclusive of
+// VAT and disbursements, which are added separately. Property values above
+// P1,000,000 follow a fixed formula — see calculateConveyancingFee.
+const CONVEYANCING_FEE_BANDS: ReadonlyArray<readonly [number, number]> = [
+  [10_000, 800], [12_000, 825], [14_000, 850], [16_000, 875], [18_000, 900],
+  [20_000, 950], [25_000, 1_200], [30_000, 1_450], [35_000, 1_700], [40_000, 1_950],
+  [45_000, 2_200], [50_000, 2_450], [60_000, 2_575], [70_000, 2_700], [80_000, 2_950],
+  [90_000, 3_075], [100_000, 3_200], [150_000, 3_500], [200_000, 3_800], [300_000, 4_300],
+  [400_000, 4_800], [500_000, 5_300], [600_000, 5_650], [700_000, 6_000], [800_000, 6_350],
+  [900_000, 6_700], [1_000_000, 7_050],
+];
+
 // -----------------------------------------------------------------------------
 // Step‑3 component (incorporates transaction‑cost calculator)
 // -----------------------------------------------------------------------------
@@ -192,11 +206,16 @@ const Step3SellingPrice: React.FC<Step3Props> = ({
     }
   };
 
+  // Conveyancing fee per the Law Society of Botswana TRANSFERS scale.
   const calculateConveyancingFee = (value: number) => {
-    if (value <= 500_000) return 9_000;
-    if (value <= 1_000_000) return 12_000;
-    if (value <= 5_000_000) return 15_000;
-    return 20_000;
+    if (value <= 0) return 0;
+    for (const [max, fee] of CONVEYANCING_FEE_BANDS) {
+      if (value <= max) return fee;
+    }
+    // Above P1,000,000: P7,300 for the first P100,000 band above P1,000,000,
+    // increasing by P250 for each further P100,000 band.
+    const bandsAboveOneMillion = Math.ceil((value - 1_000_000) / 100_000) - 1;
+    return 7_300 + bandsAboveOneMillion * 250;
   };
 
   const calculateVAT = (base: number) => base * 0.14; // 14 % VAT
