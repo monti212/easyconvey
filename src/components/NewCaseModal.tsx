@@ -1,19 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { X, Link2, FileText, Copy, Check, Send, ClipboardList } from 'lucide-react';
+import { X, Link2, FileText, Copy, Check, Send, ClipboardList, Building2, MapPin, Banknote } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import * as casesService from '../services/cases.service';
 
 const STORAGE_KEY = 'easyconvey_last_share_links';
 
+type TransferCategory = 'normal_transfer' | 'sectional_title' | 'tribal_grant';
+
+const TRANSFER_CATEGORIES: { id: TransferCategory; label: string; icon: React.ComponentType<any>; short: string }[] = [
+  { id: 'normal_transfer', label: 'Normal Transfer', icon: FileText, short: 'Standard freehold property sale' },
+  { id: 'sectional_title', label: 'Sectional Title', icon: Building2, short: 'Unit within a scheme (flat, townhouse)' },
+  { id: 'tribal_grant', label: 'Tribal Grant', icon: MapPin, short: 'Tribal/customary land grant' },
+];
+
 interface NewCaseModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCaseCreated: (caseId: string, transactionData?: any) => void;
+  /** Pre-selects the transfer type when the modal is opened from a dashboard type card. */
+  initialCategory?: string | null;
 }
 
-export default function NewCaseModal({ isOpen, onClose, onCaseCreated }: NewCaseModalProps) {
+export default function NewCaseModal({ isOpen, onClose, onCaseCreated, initialCategory }: NewCaseModalProps) {
   const { organization, orgUser } = useAuth();
   const [caseType, setCaseType] = useState<'buying' | 'selling'>('buying');
+  const [transferCategory, setTransferCategory] = useState<TransferCategory>('normal_transfer');
+  const [includeBond, setIncludeBond] = useState(false);
   const [clientName, setClientName] = useState('');
   const [mode, setMode] = useState<'manual' | 'links'>('links');
   const [isCreating, setIsCreating] = useState(false);
@@ -33,6 +45,18 @@ export default function NewCaseModal({ isOpen, onClose, onCaseCreated }: NewCase
     }
   }, [isOpen]);
 
+  // Pre-select the transfer type when opened from a dashboard type card
+  useEffect(() => {
+    if (!isOpen || !initialCategory) return;
+    if (initialCategory === 'bond') {
+      setTransferCategory('normal_transfer');
+      setIncludeBond(true);
+    } else if (TRANSFER_CATEGORIES.some(c => c.id === initialCategory)) {
+      setTransferCategory(initialCategory as TransferCategory);
+      setIncludeBond(false);
+    }
+  }, [isOpen, initialCategory]);
+
   if (!isOpen) return null;
 
   const handleCreate = async () => {
@@ -40,22 +64,29 @@ export default function NewCaseModal({ isOpen, onClose, onCaseCreated }: NewCase
     setIsCreating(true);
 
     try {
+      const caseTypeValue = includeBond ? `${transferCategory}_bond` : transferCategory;
+
       if (mode === 'manual') {
         const case_ = await casesService.createCase({
           organization_id: organization.id,
-          case_type: caseType,
+          case_type: caseTypeValue,
           client_name: clientName || 'Client',
           conveyancer_id: orgUser?.id,
           status: 'initiated',
           priority: 'medium',
           documents: [],
         });
-        onCaseCreated(case_.id, { transactionType: caseType, clientName });
+        onCaseCreated(case_.id, {
+          transactionType: caseType,
+          transactionCategory: transferCategory,
+          includeBondRegistration: includeBond,
+          clientName,
+        });
         onClose();
       } else {
         const { case_, buyerToken, sellerToken } = await casesService.createCaseWithTokens({
           organization_id: organization.id,
-          case_type: caseType,
+          case_type: caseTypeValue,
           client_name: clientName || 'Pending',
           conveyancer_id: orgUser?.id,
           status: 'initiated',
@@ -114,6 +145,8 @@ export default function NewCaseModal({ isOpen, onClose, onCaseCreated }: NewCase
       localStorage.removeItem(STORAGE_KEY);
     }
     setCaseType('buying');
+    setTransferCategory('normal_transfer');
+    setIncludeBond(false);
     setClientName('');
     setMode('links');
     setBuyerEmail('');
@@ -151,6 +184,48 @@ export default function NewCaseModal({ isOpen, onClose, onCaseCreated }: NewCase
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Transfer Type</label>
+                <div className="grid grid-cols-1 gap-2">
+                  {TRANSFER_CATEGORIES.map(cat => {
+                    const Icon = cat.icon;
+                    const selected = transferCategory === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        onClick={() => setTransferCategory(cat.id)}
+                        className={`flex items-center p-2.5 rounded-lg border-2 text-left transition-colors ${
+                          selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <Icon className={`h-4 w-4 mr-2.5 flex-shrink-0 ${selected ? 'text-blue-600' : 'text-gray-400'}`} />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{cat.label}</p>
+                          <p className="text-xs text-gray-500">{cat.short}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <label
+                  className={`mt-2 flex items-center p-2.5 rounded-lg border-2 cursor-pointer transition-colors ${
+                    includeBond ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeBond}
+                    onChange={e => setIncludeBond(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <Banknote className={`h-4 w-4 mx-2.5 flex-shrink-0 ${includeBond ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Include Bond Registration</p>
+                    <p className="text-xs text-gray-500">Buyer is financing the purchase with a mortgage</p>
+                  </div>
+                </label>
               </div>
 
               <div>

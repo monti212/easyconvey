@@ -92,6 +92,7 @@ function App() {
   });
   const [clientShareToken, setClientShareToken] = useState<string | null>(null);
   const [clientShareRole, setClientShareRole] = useState<'buyer' | 'seller' | null>(null);
+  const [newTransactionType, setNewTransactionType] = useState<any>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -215,7 +216,8 @@ function App() {
     setShowConveyancerOverview(false);
   };
 
-  const handleStartNewTransaction = (caseId?: string) => {
+  const handleStartNewTransaction = (caseId?: string, typeData?: any) => {
+    setNewTransactionType(typeData || null);
     if (caseId) {
       // caseId is a real Supabase UUID — pass it as both the display ID and the Supabase case ID
       setCurrentTransactionId(caseId);
@@ -357,6 +359,7 @@ function App() {
             <TransactionWizard
               transactionId={currentTransactionId}
               initialCaseId={currentSupabaseCaseId}
+              initialTransactionType={newTransactionType}
               onSharedLink={handleSharedLink}
               sharedTransactionData={sharedTransactionData}
               mode="conveyancer"

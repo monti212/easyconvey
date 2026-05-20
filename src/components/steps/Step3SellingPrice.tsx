@@ -43,6 +43,7 @@ export interface Step3Props {
       valuationAmount: string;
       valuationDocument: string;
       pricingConfirmed: boolean;
+      isFirstTimeBuyer: boolean;
     }>,
   ) => void;
   onNext: () => void;
@@ -511,6 +512,26 @@ const Step3SellingPrice: React.FC<Step3Props> = ({
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* First-time buyer — only for Botswana citizens purchasing property */}
+      {nationality === 'Botswana' && transactionType === 'buying' && (
+        <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isFirstTimeBuyer || false}
+              onChange={(e) => onUpdate({ isFirstTimeBuyer: e.target.checked })}
+              className="h-5 w-5 text-primary border-gray-300 rounded focus:ring-primary"
+            />
+            <span className="ml-3 text-sm font-medium text-gray-700">
+              Buyer is a first-time property buyer
+            </span>
+          </label>
+          <p className="mt-1.5 text-xs text-blue-600 pl-8">
+            Botswana citizens purchasing their first property are exempt from Transfer Duty under Section 20(1)(f) of the Transfer Duty Act.
+          </p>
         </div>
       )}
 

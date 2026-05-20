@@ -24,7 +24,7 @@ interface TransactionTypesProps {
   onSearch: (term: string) => void;
   cases: Case[];
   onViewTransaction: (transactionId: string, transactionData: any) => void;
-  onStartNewTransaction?: () => void;
+  onStartNewTransaction?: (category?: string) => void;
 }
 
 const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
@@ -330,7 +330,7 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onStartNewTransaction?.();
+                      onStartNewTransaction?.(type.id);
                     }}
                     className={`px-4 py-2 bg-white ${colors.accent} rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium border border-current`}
                   >

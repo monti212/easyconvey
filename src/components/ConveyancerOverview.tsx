@@ -32,7 +32,7 @@ interface ConveyancerOverviewProps {
   onLogout: () => void;
   onViewTransaction: (transactionId: string, transactionData: any) => void;
   onBack: () => void;
-  onStartNewTransaction?: (caseId?: string) => void;
+  onStartNewTransaction?: (caseId?: string, typeData?: any) => void;
 }
 
 const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
@@ -67,6 +67,7 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAuditLogger, setShowAuditLogger] = useState(false);
   const [showNewCase, setShowNewCase] = useState(false);
+  const [newCaseCategory, setNewCaseCategory] = useState<string | null>(null);
 
   // Map loans to bank applications format for BankApplicationsSection
   const bankApplications = loans.map(loan => ({
@@ -115,9 +116,14 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
     try {
       // Check if the loan already has a linked case
       const loan = loans.find(l => l.id === applicationId);
+      const loanTypeData = {
+        transactionType: application.transaction_type || 'buying',
+        transactionCategory: 'normal_transfer',
+        includeBondRegistration: false,
+      };
       if (loan?.case_id) {
         // Case already exists — navigate to it
-        onStartNewTransaction(loan.case_id);
+        onStartNewTransaction(loan.case_id, loanTypeData);
         return;
       }
 
@@ -132,7 +138,7 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
         notes: `From ${application.bank_name} — Loan: ${application.case_number}`,
       });
 
-      onStartNewTransaction(newCase.id);
+      onStartNewTransaction(newCase.id, loanTypeData);
     } catch (err) {
       console.error('Failed to create case from application:', err);
     }
@@ -272,7 +278,10 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
             onSearch={setSearchTerm}
             cases={cases}
             onViewTransaction={onViewTransaction}
-            onStartNewTransaction={() => onStartNewTransaction?.()}
+            onStartNewTransaction={(category) => {
+              setNewCaseCategory(category ?? null);
+              setShowNewCase(true);
+            }}
           />
         )}
         
@@ -325,12 +334,14 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
       {/* New Case Modal */}
       <NewCaseModal
         isOpen={showNewCase}
-        onClose={() => setShowNewCase(false)}
+        initialCategory={newCaseCategory}
+        onClose={() => { setShowNewCase(false); setNewCaseCategory(null); }}
         onCaseCreated={(caseId, transactionData) => {
           setShowNewCase(false);
+          setNewCaseCategory(null);
           refetchCases();
           if (transactionData && onStartNewTransaction) {
-            onStartNewTransaction(caseId);
+            onStartNewTransaction(caseId, transactionData);
           }
         }}
       />

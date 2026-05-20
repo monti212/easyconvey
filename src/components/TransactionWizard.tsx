@@ -3,7 +3,6 @@ import { ArrowRight, Upload, CheckCircle, AlertCircle, User, Building, Users, Sh
 import { useTransactions } from '../App';
 import * as casesService from '../services/cases.service';
 import { useAuth } from '../hooks/useAuth';
-import Step1TransactionType from './steps/Step1TransactionType';
 import Step2UploadDeed from './steps/Step2UploadDeed';
 import Step3SellingPrice from './steps/Step3SellingPrice';
 import Step4AgentInformation from './steps/Step4AgentInformation';
@@ -30,6 +29,12 @@ interface SharedTransactionData {
 interface TransactionWizardProps {
   transactionId: string | null;
   initialCaseId?: string | null;
+  /** Transaction type chosen up front in the New Case modal — the wizard no longer asks. */
+  initialTransactionType?: {
+    transactionType?: string;
+    transactionCategory?: string;
+    includeBondRegistration?: boolean;
+  } | null;
   onSharedLink?: (transactionId: string, transactionType: string, sharedPricing?: any) => void;
   sharedTransactionData?: SharedTransactionData;
   mode?: 'conveyancer' | 'client';
@@ -45,6 +50,7 @@ interface TransactionWizardProps {
 const TransactionWizard: React.FC<TransactionWizardProps> = ({
   transactionId,
   initialCaseId,
+  initialTransactionType,
   onSharedLink,
   sharedTransactionData,
   mode = 'conveyancer',
@@ -60,10 +66,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   const { orgUser, organization } = useAuth();
   const supabaseCaseId = useRef<string | null>(initialCaseId || null);
   const [currentStep, setCurrentStep] = useState(1);
-  const [transactionData, setTransactionData] = useState({
-    transactionType: '',
-    transactionCategory: '', // normal_transfer | sectional_title | tribal_grant
-    includeBondRegistration: false,
+  const [transactionData, setTransactionData] = useState(() => ({
+    transactionType: initialTransactionType?.transactionType || '',
+    transactionCategory: initialTransactionType?.transactionCategory || 'normal_transfer', // normal_transfer | sectional_title | tribal_grant
+    includeBondRegistration: initialTransactionType?.includeBondRegistration || false,
     documentUploaded: false,
     documentValid: false,
     skippedDeedUpload: false,
@@ -158,7 +164,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       valuationDocument: string;
     } | null,
     pricingConfirmed: false, // Track if shared pricing has been confirmed
-  });
+  }));
 
   // Initialize with shared transaction data if provided
   useEffect(() => {
@@ -390,23 +396,14 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     
     // If coming from personal details page after selecting individual
     if (currentStep === 5 && transactionData.entityType === 'individual') {
-      // For shared transactions, skip Transaction Type and go directly to Upload Deed
-      if (transactionData.isSharedTransaction) {
-        setCurrentStep(3); // Go to Upload Deed
-      } else {
-        setCurrentStep(2); // Go to Transaction Type
-      }
+      setCurrentStep(3); // Go to Upload Deed
       window.scrollTo(0, 0);
       return;
     }
-    
-    // If coming from entity-specific pages, go to transaction type or upload deed for shared
+
+    // If coming from entity-specific pages, go to upload deed
     if (currentStep >= 8 && currentStep <= 11) {
-      if (transactionData.isSharedTransaction) {
-        setCurrentStep(3); // Skip Transaction Type for shared transactions
-      } else {
-        setCurrentStep(2); // Transaction Type
-      }
+      setCurrentStep(3); // Upload Deed
       window.scrollTo(0, 0);
       return;
     }
@@ -446,44 +443,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       return;
     }
     
-    // If on upload deed page (step 3) and it's a shared transaction
-    if (currentStep === 3 && transactionData.isSharedTransaction) {
+    // If on upload deed page (step 3), go back to the entity-specific page
+    if (currentStep === 3) {
       // Go back to personal details or entity-specific pages
       if (transactionData.hasAgent) {
-        if (transactionData.entityType === 'individual') {
-          setCurrentStep(5); // Back to personal details
-        } else if (transactionData.entityType === 'company') {
-          setCurrentStep(8); // Back to company details
-        } else if (transactionData.entityType === 'trust') {
-          setCurrentStep(9); // Back to trust details
-        } else if (transactionData.entityType === 'estate') {
-          setCurrentStep(10); // Back to estate details
-        } else if (transactionData.entityType === 'society') {
-          setCurrentStep(11); // Back to society details
-        } else {
-          setCurrentStep(12); // Back to agent entity selection if no entity type yet
-        }
-      } else if (!transactionData.hasAgent && transactionData.entityType === 'individual') {
-        setCurrentStep(5); // Go back to personal details
-      } else if (!transactionData.hasAgent) {
-        if (transactionData.entityType === 'company') {
-          setCurrentStep(8); // Company details
-        } else if (transactionData.entityType === 'trust') {
-          setCurrentStep(9); // Trust details
-        } else if (transactionData.entityType === 'estate') {
-          setCurrentStep(10); // Estate details
-        } else if (transactionData.entityType === 'society') {
-          setCurrentStep(11); // Society details
-        }
-      }
-      window.scrollTo(0, 0);
-      return;
-    }
-    
-    // If on transaction type page after coming from personal details (individual flow)
-    if (currentStep === 2) {
-      if (transactionData.hasAgent) {
-        // If has agent, go back based on entity type
         if (transactionData.entityType === 'individual') {
           setCurrentStep(5); // Back to personal details
         } else if (transactionData.entityType === 'company') {
@@ -577,19 +540,6 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             onUpdate={updateTransactionData}
             onNext={nextStep}
             onPrevious={() => {}}
-          />
-        );
-      case 2:
-        return (
-          <Step1TransactionType
-            transactionType={transactionData.transactionType}
-            transactionCategory={transactionData.transactionCategory}
-            includeBondRegistration={transactionData.includeBondRegistration}
-            nationality={transactionData.nationality}
-            isFirstTimeBuyer={transactionData.isFirstTimeBuyer}
-            onUpdate={updateTransactionData}
-            onNext={nextStep}
-            onPrevious={previousStep}
           />
         );
       case 3:
@@ -739,67 +689,36 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
 
   // Check if we're on the individual path
   const isIndividualPath = transactionData.entityType === 'individual';
-  const hasAgent = transactionData.hasAgent;
 
-  // Get workflow position based on current step
+  // Get workflow position based on current step. Transaction Type is chosen up
+  // front in the New Case modal, so the wizard always has 6 visible steps.
   const getWorkflowPosition = () => {
-    // Handle agent entity selection step
-    if (currentStep === 12) {
-      return 1; // Show as part of step 1 (Agent Info)
-    }
-    
-    // For entity-specific pages (8-11), show as part of step 1
-    if (currentStep >= 8 && currentStep <= 11) {
+    // Agent entity selection (12) and entity-specific pages (8-11) all show as step 1
+    if (currentStep === 12 || (currentStep >= 8 && currentStep <= 11)) {
       return 1;
     }
-    
-    // For individual path
+
     if (isIndividualPath) {
-      // For shared transactions, we skip Transaction Type, so adjust mapping
-      if (transactionData.isSharedTransaction) {
-        const sharedIndividualStepMapping = {
-          1: 1, // Agent Info
-          5: 2, // Personal Details
-          3: 3, // Upload Deed (skipping Transaction Type)
-          4: 4, // Selling Price
-          6: 5, // Document Upload
-          7: 6  // Summary
-        };
-        return sharedIndividualStepMapping[currentStep as keyof typeof sharedIndividualStepMapping] || currentStep;
-      } else {
-        const individualStepMapping = {
-          1: 1, // Agent Info
-          5: 2, // Personal Details
-          2: 3, // Transaction Type
-          3: 4, // Upload Deed
-          4: 5, // Selling Price
-          6: 6, // Document Upload
-          7: 7  // Summary
-        };
-        return individualStepMapping[currentStep as keyof typeof individualStepMapping] || currentStep;
-      }
+      const individualStepMapping: Record<number, number> = {
+        1: 1, // Agent Info
+        5: 2, // Personal Details
+        3: 3, // Upload Deed
+        4: 4, // Selling Price
+        6: 5, // Document Upload
+        7: 6, // Summary
+      };
+      return individualStepMapping[currentStep] || currentStep;
     }
-    
-    // For regular flow with agent
-    if (hasAgent) {
-      // For shared transactions, adjust step mapping to account for skipped Transaction Type
-      if (transactionData.isSharedTransaction) {
-        const sharedStepMapping = {
-          1: 1, // Agent Info
-          3: 2, // Upload Deed (skipping Transaction Type)
-          4: 3, // Selling Price
-          5: 4, // Personal Details
-          6: 5, // Document Upload
-          7: 6  // Summary
-        };
-        return sharedStepMapping[currentStep as keyof typeof sharedStepMapping] || currentStep;
-      }
-      // Regular path with agent (same position mapping as base workflow)
-      return currentStep;
-    }
-    
-    // For regular flow without agent
-    return currentStep;
+
+    const baseStepMapping: Record<number, number> = {
+      1: 1, // Agent Info
+      3: 2, // Upload Deed
+      4: 3, // Selling Price
+      5: 4, // Personal Details
+      6: 5, // Document Upload
+      7: 6, // Summary
+    };
+    return baseStepMapping[currentStep] || currentStep;
   };
 
   // Get appropriate step name
@@ -808,70 +727,18 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     if (currentStep === 12 || (currentStep >= 8 && currentStep <= 11)) {
       return 'Agent Information';
     }
-    
-    if (isIndividualPath) {
-      if (transactionData.isSharedTransaction) {
-        const sharedIndividualSteps = [
-          'Agent Information',
-          'Personal Details',
-          'Upload Title Deed',
-          transactionData.transactionType === 'buying' ? 'Buying Price' : 'Selling Price',
-          'Document Upload',
-          'Summary'
-        ];
-        const position = getWorkflowPosition() - 1;
-        return position >= 0 && position < sharedIndividualSteps.length ? sharedIndividualSteps[position] : "Unknown Step";
-      } else {
-        const individualSteps = [
-          'Agent Information',
-          'Personal Details',
-          'Transaction Type',
-          'Upload Title Deed',
-          transactionData.transactionType === 'buying' ? 'Buying Price' : 'Selling Price',
-          'Document Upload',
-          'Summary'
-        ];
-        const position = getWorkflowPosition() - 1;
-        return position >= 0 && position < individualSteps.length ? individualSteps[position] : "Unknown Step";
-      }
-    } else {
-      if (transactionData.isSharedTransaction) {
-        const sharedBaseSteps = [
-          'Agent Information',
-          'Upload Title Deed',
-          transactionData.transactionType === 'buying' ? 'Buying Price' : 'Selling Price',
-          'Personal Details',
-          'Document Upload',
-          'Summary'
-        ];
-        const position = getWorkflowPosition() - 1;
-        return position >= 0 && position < sharedBaseSteps.length ? sharedBaseSteps[position] : "Unknown Step";
-      } else {
-        const baseSteps = [
-          'Agent Information',
-          'Transaction Type',
-          'Upload Title Deed',
-          transactionData.transactionType === 'buying' ? 'Buying Price' : 'Selling Price',
-          'Personal Details',
-          'Document Upload',
-          'Summary'
-        ];
-        const index = currentStep - 1;
-        return index >= 0 && index < baseSteps.length ? baseSteps[index] : "Unknown Step";
-      }
-    }
+
+    const priceLabel = transactionData.transactionType === 'buying' ? 'Buying Price' : 'Selling Price';
+    const steps = isIndividualPath
+      ? ['Agent Information', 'Personal Details', 'Upload Title Deed', priceLabel, 'Document Upload', 'Summary']
+      : ['Agent Information', 'Upload Title Deed', priceLabel, 'Personal Details', 'Document Upload', 'Summary'];
+    const position = getWorkflowPosition() - 1;
+    return position >= 0 && position < steps.length ? steps[position] : 'Unknown Step';
   };
 
-  // Calculate progress percentage
+  // Calculate progress percentage — 6 visible steps (Transaction Type chosen up front)
   const calculateProgress = () => {
-    let totalSteps;
-    if (transactionData.isSharedTransaction) {
-      totalSteps = 6; // One less step for shared transactions (no Transaction Type)
-    } else {
-      totalSteps = 7;
-    }
-    const workflowPosition = getWorkflowPosition();
-    return (workflowPosition / totalSteps) * 100;
+    return (getWorkflowPosition() / 6) * 100;
   };
 
   // Check if a step is active in the navigation
@@ -886,49 +753,25 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
 
   // Get the navigation steps for display
   const getNavigationSteps = () => {
-    if (transactionData.isSharedTransaction) {
-      if (isIndividualPath) {
-        return [
-          { number: 1, name: 'Agent Information' },
-          { number: 2, name: 'Personal Details' },
-          { number: 3, name: 'Upload Title Deed' },
-          { number: 4, name: transactionData.transactionType === 'buying' ? 'Buying Price' : 'Selling Price' },
-          { number: 5, name: 'Document Upload' },
-          { number: 6, name: 'Summary' }
-        ];
-      } else {
-        return [
-          { number: 1, name: 'Agent Information' },
-          { number: 2, name: 'Upload Title Deed' },
-          { number: 3, name: transactionData.transactionType === 'buying' ? 'Buying Price' : 'Selling Price' },
-          { number: 4, name: 'Personal Details' },
-          { number: 5, name: 'Document Upload' },
-          { number: 6, name: 'Summary' }
-        ];
-      }
-    } else {
-      if (isIndividualPath) {
-        return [
-          { number: 1, name: 'Agent Information' },
-          { number: 2, name: 'Personal Details' },
-          { number: 3, name: 'Transaction Type' },
-          { number: 4, name: 'Upload Title Deed' },
-          { number: 5, name: transactionData.transactionType === 'buying' ? 'Buying Price' : 'Selling Price' },
-          { number: 6, name: 'Document Upload' },
-          { number: 7, name: 'Summary' }
-        ];
-      } else {
-        return [
-          { number: 1, name: 'Agent Information' },
-          { number: 2, name: 'Transaction Type' },
-          { number: 3, name: 'Upload Title Deed' },
-          { number: 4, name: transactionData.transactionType === 'buying' ? 'Buying Price' : 'Selling Price' },
-          { number: 5, name: 'Personal Details' },
-          { number: 6, name: 'Document Upload' },
-          { number: 7, name: 'Summary' }
-        ];
-      }
+    const priceLabel = transactionData.transactionType === 'buying' ? 'Buying Price' : 'Selling Price';
+    if (isIndividualPath) {
+      return [
+        { number: 1, name: 'Agent Information' },
+        { number: 2, name: 'Personal Details' },
+        { number: 3, name: 'Upload Title Deed' },
+        { number: 4, name: priceLabel },
+        { number: 5, name: 'Document Upload' },
+        { number: 6, name: 'Summary' }
+      ];
     }
+    return [
+      { number: 1, name: 'Agent Information' },
+      { number: 2, name: 'Upload Title Deed' },
+      { number: 3, name: priceLabel },
+      { number: 4, name: 'Personal Details' },
+      { number: 5, name: 'Document Upload' },
+      { number: 6, name: 'Summary' }
+    ];
   };
 
   const navigationSteps = getNavigationSteps();
