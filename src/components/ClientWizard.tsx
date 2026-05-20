@@ -112,6 +112,7 @@ export default function ClientWizard({ token, role, onComplete }: ClientWizardPr
         caseId={caseData!.id}
         orgId={caseData!.organization_id || caseData!.id}
         caseNumber={caseData?.case_number}
+        caseType={caseData?.case_type}
         onSubmitted={() => {
           setStatus('submitted');
           onComplete();

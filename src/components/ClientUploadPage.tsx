@@ -1,14 +1,21 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, X, ShoppingCart, Tag } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2, X, ShoppingCart, Tag, ClipboardList } from 'lucide-react';
 import * as storageService from '../services/storage.service';
 import * as casesService from '../services/cases.service';
 
 interface ClientUploadPageProps {
-  token: string;
+  /** Share-link token — required for the buyer/seller link flow. */
+  token?: string;
   role: 'buyer' | 'seller';
   caseId: string;
   orgId: string;
   caseNumber?: string;
+  /** Case type (e.g. normal_transfer, sectional_title_bond) — drives the document checklist. */
+  caseType?: string;
+  /** True when the conveyancer is entering a party's details on their behalf. */
+  forConveyancer?: boolean;
+  /** When provided, used instead of the token submission (conveyancer manual entry). */
+  onSubmitParty?: (partyData: any) => Promise<{ success: boolean; error?: string }>;
   onSubmitted: () => void;
 }
 
@@ -24,6 +31,24 @@ interface UploadedFile {
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB per file
 
+// Documents expected from each party, by role and transaction type
+const requiredDocsFor = (role: 'buyer' | 'seller', caseType?: string): string[] => {
+  const ct = (caseType || '').toLowerCase();
+  const docs: string[] = ['Omang (National ID) or Passport', 'Proof of residential address'];
+  if (role === 'buyer') {
+    docs.push('Proof of funds or a recent bank statement');
+    if (ct.includes('bond')) docs.push('Bank bond approval letter');
+  } else {
+    docs.push('Original Title Deed of the property');
+    docs.push('Latest rates & service-charge statement');
+  }
+  docs.push('Marriage certificate (if married)');
+  docs.push('Signed Agreement of Sale / Offer to Purchase');
+  if (ct.includes('sectional')) docs.push('Sectional title plan / scheme rules');
+  if (ct.includes('tribal')) docs.push('Land Board consent for the tribal grant');
+  return docs;
+};
+
 const readDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -38,7 +63,17 @@ const formatSize = (bytes: number) => {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 };
 
-export default function ClientUploadPage({ token, role, caseId, orgId, caseNumber, onSubmitted }: ClientUploadPageProps) {
+export default function ClientUploadPage({
+  token,
+  role,
+  caseId,
+  orgId,
+  caseNumber,
+  caseType,
+  forConveyancer,
+  onSubmitParty,
+  onSubmitted,
+}: ClientUploadPageProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -49,6 +84,9 @@ export default function ClientUploadPage({ token, role, caseId, orgId, caseNumbe
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isBuyer = role === 'buyer';
+  const Role = isBuyer ? 'Buyer' : 'Seller';
+  const possessive = forConveyancer ? `${Role}'s` : 'Your';
+  const checklist = requiredDocsFor(role, caseType);
   const doneFiles = files.filter(f => f.status === 'done');
   const uploadingCount = files.filter(f => f.status === 'uploading').length;
 
@@ -113,18 +151,22 @@ export default function ClientUploadPage({ token, role, caseId, orgId, caseNumbe
         submittedAt: new Date().toISOString(),
       };
 
-      const result = await casesService.submitPartyData(token, partyData);
+      const result = onSubmitParty
+        ? await onSubmitParty(partyData)
+        : await casesService.submitPartyData(token!, partyData);
       if (!result.success) {
         setSubmitError(result.error || 'Submission failed. Please try again.');
         return;
       }
-      casesService.trackLinkActivity({
-        token,
-        case_id: caseId,
-        role,
-        event_type: 'submitted',
-        metadata: { documentCount: doneFiles.length, timestamp: new Date().toISOString() },
-      });
+      if (token) {
+        casesService.trackLinkActivity({
+          token,
+          case_id: caseId,
+          role,
+          event_type: 'submitted',
+          metadata: { documentCount: doneFiles.length, timestamp: new Date().toISOString() },
+        });
+      }
       onSubmitted();
     } catch (err: any) {
       setSubmitError(err?.message || 'An unexpected error occurred. Please try again.');
@@ -142,19 +184,24 @@ export default function ClientUploadPage({ token, role, caseId, orgId, caseNumbe
         </div>
         <div>
           <p className={`text-xs font-semibold uppercase tracking-wide ${isBuyer ? 'text-blue-700' : 'text-green-700'}`}>
-            {isBuyer ? 'Buyer' : 'Seller'} submission
+            {Role} {forConveyancer ? 'details' : 'submission'}
           </p>
           <p className="text-sm text-gray-700">
-            Enter your name and upload your documents{caseNumber ? ` for case ${caseNumber}` : ''}.
+            {forConveyancer
+              ? `Enter the ${role}'s name and upload the documents they provided`
+              : 'Enter your name and upload your documents'}
+            {caseNumber ? ` for case ${caseNumber}` : ''}.
           </p>
         </div>
       </div>
 
-      {/* Your details */}
+      {/* Details */}
       <div className="bg-white rounded-2xl shadow-soft border border-border p-5 md:p-6 mb-5">
-        <h2 className="text-lg font-semibold text-primary mb-1">Your Details</h2>
+        <h2 className="text-lg font-semibold text-primary mb-1">{possessive} Details</h2>
         <p className="text-sm text-gray-500 mb-4">
-          Please enter your full legal name exactly as it appears on your ID or passport.
+          {forConveyancer
+            ? `Enter the ${role}'s full legal name exactly as it appears on their ID or passport.`
+            : 'Please enter your full legal name exactly as it appears on your ID or passport.'}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -192,11 +239,33 @@ export default function ClientUploadPage({ token, role, caseId, orgId, caseNumbe
 
       {/* Documents */}
       <div className="bg-white rounded-2xl shadow-soft border border-border p-5 md:p-6 mb-5">
-        <h2 className="text-lg font-semibold text-primary mb-1">Your Documents</h2>
+        <h2 className="text-lg font-semibold text-primary mb-1">{possessive} Documents</h2>
         <p className="text-sm text-gray-500 mb-4">
-          Upload all documents relevant to this transaction — for example your Omang/ID or passport,
-          proof of address, marriage certificate, and the title deed or agreement of sale.
+          {forConveyancer
+            ? `Upload the documents the ${role} provided. The list below is what is expected for this transaction.`
+            : 'Upload the documents listed below. They are the documents expected for your side of this transaction.'}
         </p>
+
+        {/* Per-party document checklist */}
+        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <ClipboardList className="h-4 w-4 text-blue-600" />
+            <p className="text-sm font-semibold text-blue-800">
+              Documents to upload — {role === 'buyer' ? 'Buyer (Purchaser)' : 'Seller (Transferor)'}
+            </p>
+          </div>
+          <ul className="space-y-1.5">
+            {checklist.map((doc, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-blue-900">
+                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+                <span>{doc}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-blue-600 mt-2">
+            Upload whichever of these apply. You can add more than one file per item.
+          </p>
+        </div>
 
         <div
           onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
@@ -265,15 +334,19 @@ export default function ClientUploadPage({ token, role, caseId, orgId, caseNumbe
         }`}
       >
         {isSubmitting ? (
-          <><Loader2 className="h-4 w-4 animate-spin" /> Submitting...</>
+          <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</>
         ) : uploadingCount > 0 ? (
           <><Loader2 className="h-4 w-4 animate-spin" /> Uploading documents...</>
+        ) : forConveyancer ? (
+          `Save ${Role} Details`
         ) : (
           'Submit to Conveyancer'
         )}
       </button>
       <p className="text-center text-xs text-gray-400 mt-3">
-        Once submitted, your conveyancer will receive your details and documents.
+        {forConveyancer
+          ? `These details are saved to the case as the ${role}'s submission.`
+          : 'Once submitted, your conveyancer will receive your details and documents.'}
       </p>
     </div>
   );

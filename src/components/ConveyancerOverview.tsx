@@ -26,6 +26,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import { useRealtimeSubscription } from '../hooks/useRealtimeSubscription';
 import NotificationCenter from './NotificationCenter';
 import NewCaseModal from './NewCaseModal';
+import ConveyancerPartyEntry from './ConveyancerPartyEntry';
 
 interface ConveyancerOverviewProps {
   user: OrganizationUser;
@@ -68,6 +69,7 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
   const [showAuditLogger, setShowAuditLogger] = useState(false);
   const [showNewCase, setShowNewCase] = useState(false);
   const [newCaseCategory, setNewCaseCategory] = useState<string | null>(null);
+  const [partyEntryCaseId, setPartyEntryCaseId] = useState<string | null>(null);
 
   // Map loans to bank applications format for BankApplicationsSection
   const bankApplications = loans.map(loan => ({
@@ -186,6 +188,15 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
       count: null
     }
   ];
+
+  if (partyEntryCaseId) {
+    return (
+      <ConveyancerPartyEntry
+        caseId={partyEntryCaseId}
+        onDone={() => { setPartyEntryCaseId(null); refetchCases(); }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -333,13 +344,13 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
         isOpen={showNewCase}
         initialCategory={newCaseCategory}
         onClose={() => { setShowNewCase(false); setNewCaseCategory(null); }}
-        onCaseCreated={(caseId, transactionData) => {
+        onCaseCreated={(caseId) => {
           setShowNewCase(false);
           setNewCaseCategory(null);
           refetchCases();
-          if (transactionData && onStartNewTransaction) {
-            onStartNewTransaction(caseId, transactionData);
-          }
+          // Manual mode ("I'll enter the details") — the conveyancer now fills
+          // in the buyer and seller details before the transaction can start.
+          setPartyEntryCaseId(caseId);
         }}
       />
     </div>

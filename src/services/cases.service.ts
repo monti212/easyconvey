@@ -305,6 +305,19 @@ export async function getSubmittedParties(organizationId: string): Promise<Submi
   return parties;
 }
 
+/**
+ * Conveyancer-side direct save of a party's details (manual entry — no share
+ * token). Writes the same buyer_data/seller_data shape a link submission would.
+ */
+export async function savePartyData(caseId: string, role: 'buyer' | 'seller', partyData: object): Promise<void> {
+  await updateCase(
+    caseId,
+    role === 'buyer'
+      ? { buyer_data: partyData, buyer_status: 'completed' }
+      : { seller_data: partyData, seller_status: 'completed' },
+  );
+}
+
 export async function getTokensForCase(caseId: string): Promise<CaseShareToken[]> {
   const { data, error } = await supabase
     .from('case_share_tokens')
