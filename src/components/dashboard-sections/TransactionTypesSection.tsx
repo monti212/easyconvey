@@ -24,7 +24,6 @@ interface TransactionTypesProps {
   onSearch: (term: string) => void;
   cases: Case[];
   onViewTransaction: (transactionId: string, transactionData: any) => void;
-  onStartNewTransaction?: (category?: string) => void;
 }
 
 const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
@@ -32,7 +31,6 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
   onSearch,
   cases,
   onViewTransaction,
-  onStartNewTransaction,
 }) => {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [typeSearchTerm, setTypeSearchTerm] = useState('');
@@ -326,16 +324,7 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
                   <p className={`text-sm ${colors.accent} leading-relaxed`}>{type.description}</p>
                 </div>
 
-                <div className="mt-6 flex items-center justify-between">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onStartNewTransaction?.(type.id);
-                    }}
-                    className={`px-4 py-2 bg-white ${colors.accent} rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium border border-current`}
-                  >
-                    Start New Transaction
-                  </button>
+                <div className="mt-6 flex items-center justify-end">
                   <div className="flex items-center">
                     <span className={`text-sm font-medium ${colors.accent}`}>View All</span>
                     <ChevronRight className={`h-5 w-5 ${colors.accent} group-hover:translate-x-1 transition-transform duration-200 ml-1`} />

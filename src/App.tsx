@@ -320,6 +320,39 @@ function App() {
     getCompletedTransactions
   };
 
+  // A buyer/seller share link always shows the client submission page,
+  // regardless of any conveyancer session active in the same browser.
+  if (clientShareToken && clientShareRole) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="bg-white shadow-soft">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center py-4 md:py-5">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                  <span className="text-secondary font-serif font-bold text-sm">M</span>
+                </div>
+                <span className="text-lg md:text-xl font-serif font-semibold text-primary tracking-tight">
+                  Minchin &amp; Kelly<span className="text-secondary">.</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
+          <ClientWizard
+            token={clientShareToken}
+            role={clientShareRole}
+            onComplete={() => {
+              setClientShareToken(null);
+              setClientShareRole(null);
+            }}
+          />
+        </main>
+      </div>
+    );
+  }
+
   // Show loading while auth initializes
   if (loading) {
     return (
@@ -528,16 +561,7 @@ function App() {
         </header>
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
-          {clientShareToken && clientShareRole ? (
-            <ClientWizard
-              token={clientShareToken}
-              role={clientShareRole}
-              onComplete={() => {
-                setClientShareToken(null);
-                setClientShareRole(null);
-              }}
-            />
-          ) : !started ? (
+          {!started ? (
             <WelcomePage onStart={() => setShowPortalLogin(true)} />
           ) : (
             <TransactionWizard
