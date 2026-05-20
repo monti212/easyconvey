@@ -278,6 +278,7 @@ const ConveyancerOverview: React.FC<ConveyancerOverviewProps> = ({
             onSearch={setSearchTerm}
             cases={cases}
             onViewTransaction={onViewTransaction}
+            onStartTransaction={(caseId, typeData) => onStartNewTransaction?.(caseId, typeData)}
           />
         )}
         

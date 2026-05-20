@@ -8,6 +8,8 @@ import {
   Eye,
   Search,
   ArrowRight,
+  CheckCircle,
+  Clock,
 } from 'lucide-react';
 import type { Case } from '../../types/database';
 
@@ -24,6 +26,8 @@ interface TransactionTypesProps {
   onSearch: (term: string) => void;
   cases: Case[];
   onViewTransaction: (transactionId: string, transactionData: any) => void;
+  /** Opens the transaction wizard for an existing case (steps 1-6). */
+  onStartTransaction?: (caseId: string, typeData?: any) => void;
 }
 
 const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
@@ -31,6 +35,7 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
   onSearch,
   cases,
   onViewTransaction,
+  onStartTransaction,
 }) => {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [typeSearchTerm, setTypeSearchTerm] = useState('');
@@ -216,62 +221,125 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
 
   const filteredCases = getFilteredCases();
 
+  // Transaction type data the wizard needs (it no longer asks for it)
+  const deriveTypeData = (c: Case) => {
+    const ct = (c.case_type || '').toLowerCase();
+    let transactionCategory = 'normal_transfer';
+    if (ct.includes('sectional')) transactionCategory = 'sectional_title';
+    else if (ct.includes('tribal')) transactionCategory = 'tribal_grant';
+    return {
+      transactionType: 'selling',
+      transactionCategory,
+      includeBondRegistration: ct.includes('bond'),
+    };
+  };
+
   // Render a single case card
-  const renderCaseCard = (c: Case) => (
-    <div key={c.id} className="border border-gray-200 rounded-xl p-6 hover:shadow-soft transition-shadow">
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h4 className="text-lg font-semibold text-primary">{c.case_number}</h4>
-          <p className="text-gray-600">{c.client_name}</p>
-        </div>
-        <div className="flex space-x-2">
-          <span className={`px-3 py-1 text-xs rounded-full ${getPriorityColor(c.priority)}`}>
-            {c.priority}
-          </span>
-          <span className={`px-3 py-1 text-xs rounded-full ${getStatusColor(c.status)}`}>
-            {getStatusDisplay(c.status)}
-          </span>
-        </div>
-      </div>
+  const renderCaseCard = (c: Case) => {
+    const buyerDone = c.buyer_status === 'completed';
+    const sellerDone = c.seller_status === 'completed';
+    const bothSubmitted = buyerDone && sellerDone;
+    const isInitiated = c.status === 'initiated';
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-        <div>
-          <span className="text-sm text-gray-500">Client:</span>
-          <span className="text-sm font-medium text-gray-900 ml-2">{c.client_name}</span>
+    return (
+      <div key={c.id} className="border border-gray-200 rounded-xl p-6 hover:shadow-soft transition-shadow">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h4 className="text-lg font-semibold text-primary">{c.case_number}</h4>
+            <p className="text-gray-600">{c.client_name}</p>
+          </div>
+          <div className="flex space-x-2">
+            <span className={`px-3 py-1 text-xs rounded-full ${getPriorityColor(c.priority)}`}>
+              {c.priority}
+            </span>
+            <span className={`px-3 py-1 text-xs rounded-full ${getStatusColor(c.status)}`}>
+              {getStatusDisplay(c.status)}
+            </span>
+          </div>
         </div>
-        <div>
-          <span className="text-sm text-gray-500">Property:</span>
-          <span className="text-sm font-medium text-gray-900 ml-2">{getPropertyAddress(c)}</span>
-        </div>
-        <div>
-          <span className="text-sm text-gray-500">Assignee:</span>
-          <span className="text-sm font-medium text-gray-900 ml-2">{getConveyancerName(c)}</span>
-        </div>
-      </div>
 
-      <div className="flex justify-between items-center">
-        <span className="text-sm text-gray-500">Updated {getRelativeTime(c.updated_at)}</span>
-        <div className="flex space-x-3">
-          <button
-            onClick={() => handleViewDetails(c)}
-            className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            View Details
-          </button>
-          {(c.status === 'initiated' || c.status === 'in_progress') && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div>
+            <span className="text-sm text-gray-500">Client:</span>
+            <span className="text-sm font-medium text-gray-900 ml-2">{c.client_name}</span>
+          </div>
+          <div>
+            <span className="text-sm text-gray-500">Property:</span>
+            <span className="text-sm font-medium text-gray-900 ml-2">{getPropertyAddress(c)}</span>
+          </div>
+          <div>
+            <span className="text-sm text-gray-500">Assignee:</span>
+            <span className="text-sm font-medium text-gray-900 ml-2">{getConveyancerName(c)}</span>
+          </div>
+        </div>
+
+        {/* Client submission status — the conveyancer can start once both parties submit */}
+        {isInitiated && (
+          <div className="mb-4 rounded-lg bg-gray-50 border border-gray-200 p-3">
+            <p className="text-xs font-medium text-gray-500 mb-2">Client submissions</p>
+            <div className="flex flex-wrap gap-2">
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                buyerDone ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+              }`}>
+                {buyerDone ? <CheckCircle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
+                Buyer — {buyerDone ? 'documents submitted' : 'awaiting documents'}
+              </span>
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                sellerDone ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+              }`}>
+                {sellerDone ? <CheckCircle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
+                Seller — {sellerDone ? 'documents submitted' : 'awaiting documents'}
+              </span>
+            </div>
+            <p className={`text-xs mt-2 font-medium ${bothSubmitted ? 'text-green-700' : 'text-gray-500'}`}>
+              {bothSubmitted
+                ? 'Both parties have submitted — you can start the transaction.'
+                : 'Waiting for both the buyer and seller to submit before the transaction can start.'}
+            </p>
+          </div>
+        )}
+
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500">Updated {getRelativeTime(c.updated_at)}</span>
+          <div className="flex space-x-3">
             <button
               onClick={() => handleViewDetails(c)}
-              className="inline-flex items-center px-4 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium"
+              className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
             >
-              <ArrowRight className="h-4 w-4 mr-2" />
-              Continue
+              <Eye className="h-4 w-4 mr-2" />
+              View Details
             </button>
-          )}
+            {isInitiated && (
+              <button
+                onClick={() => bothSubmitted && onStartTransaction?.(c.id, deriveTypeData(c))}
+                disabled={!bothSubmitted}
+                title={bothSubmitted
+                  ? 'Start the transaction process'
+                  : 'Waiting for both parties to submit their documents'}
+                className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                  bothSubmitted
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                <ArrowRight className="h-4 w-4 mr-2" />
+                Start Transaction
+              </button>
+            )}
+            {c.status === 'in_progress' && (
+              <button
+                onClick={() => onStartTransaction?.(c.id, deriveTypeData(c))}
+                className="inline-flex items-center px-4 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium"
+              >
+                <ArrowRight className="h-4 w-4 mr-2" />
+                Continue
+              </button>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ── Main Overview (no type selected) ──
   if (!selectedType) {
