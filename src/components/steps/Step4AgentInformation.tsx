@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, User, Building, Users, Mail, Phone, Percent, Banknote, CreditCard, FileText, HelpCircle, Home, Briefcase, Scale, Calculator, AlertCircle, ShoppingCart, Tag } from 'lucide-react';
+import { ArrowLeft, ArrowRight, User, Building, Users, Mail, Phone, Percent, Banknote, CreditCard, FileText, HelpCircle, Home, Briefcase, Scale, Calculator, AlertCircle, CheckCircle, ShoppingCart, Tag } from 'lucide-react';
 
 interface Step4Props {
   hasAgent: boolean;
@@ -121,17 +121,23 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
     onUpdate({ entityType: type });
   };
 
-  const validateAgentInfo = () => {
+  // Validation error keys that belong to the buyer side — used to decide which
+  // side to surface when the user tries to proceed with errors still open.
+  const BUYER_ERROR_KEYS = ['agentName', 'agentContact', 'agentCompany', 'commissionType', 'commissionValue', 'entityType'];
+
+  // Pure validation — BOTH the buyer and seller sides must be complete before
+  // the transaction can move on. Returns the error map without touching state.
+  const collectErrors = (): Record<string, string> => {
     const newErrors: Record<string, string> = {};
 
+    // ---- Buyer side ----
     if (hasAgent) {
       if (!agentName.trim()) newErrors.agentName = "Agent name is required";
       if (!agentContact.trim()) newErrors.agentContact = "Contact number is required";
       if (!agentCompany.trim()) newErrors.agentCompany = "Company name is required";
-
       if (!commissionType) newErrors.commissionType = "Please select commission type";
       // Commission value only required when type is percentage or fixed (not N/A)
-      if (commissionType !== 'na') {
+      if (commissionType && commissionType !== 'na') {
         if (!commissionValue.trim()) {
           newErrors.commissionValue = "Commission value is required";
         } else if (parseFloat(commissionValue) <= 0) {
@@ -140,17 +146,51 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
           newErrors.commissionValue = "Percentage cannot exceed 100%";
         }
       }
-    } else {
-      if (!entityType) newErrors.entityType = "Please select your entity type";
+    } else if (!entityType) {
+      newErrors.entityType = "Please select the buyer's entity type";
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    // ---- Seller side ----
+    if (sellerHasAgent) {
+      if (!sellerAgentName.trim()) newErrors.sellerAgentName = "Agent name is required";
+      if (!sellerAgentContact.trim()) newErrors.sellerAgentContact = "Contact number is required";
+      if (!sellerAgentCompany.trim()) newErrors.sellerAgentCompany = "Company name is required";
+      if (!sellerCommissionType) newErrors.sellerCommissionType = "Please select commission type";
+      if (sellerCommissionType && sellerCommissionType !== 'na') {
+        if (!sellerCommissionValue.trim()) {
+          newErrors.sellerCommissionValue = "Commission value is required";
+        } else if (parseFloat(sellerCommissionValue) <= 0) {
+          newErrors.sellerCommissionValue = "Commission must be greater than zero";
+        } else if (sellerCommissionType === 'percentage' && parseFloat(sellerCommissionValue) > 100) {
+          newErrors.sellerCommissionValue = "Percentage cannot exceed 100%";
+        }
+      }
+    } else if (!sellerEntityType) {
+      newErrors.sellerEntityType = "Please select the seller's entity type";
+    }
+
+    return newErrors;
   };
 
+  // Live completion state for each side — drives the toggle badges and banner.
+  const liveErrors = collectErrors();
+  const buyerSideComplete = !BUYER_ERROR_KEYS.some(key => liveErrors[key]);
+  const sellerSideComplete = !Object.keys(liveErrors).some(key => key.startsWith('seller'));
+
   const handleNext = () => {
-    if (validateAgentInfo()) {
+    const newErrors = collectErrors();
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length === 0) {
       onNext();
+      return;
+    }
+    // Surface whichever side still needs attention so its errors are visible.
+    const hasBuyerError = BUYER_ERROR_KEYS.some(key => newErrors[key]);
+    const hasSellerError = Object.keys(newErrors).some(key => key.startsWith('seller'));
+    if (activeSide === 'buyer' && !hasBuyerError && hasSellerError) {
+      setActiveSide('seller');
+    } else if (activeSide === 'seller' && !hasSellerError && hasBuyerError) {
+      setActiveSide('buyer');
     }
   };
 
@@ -230,6 +270,9 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
             >
               <ShoppingCart className="h-4 w-4" />
               Buyer
+              {buyerSideComplete
+                ? <CheckCircle className="h-4 w-4 text-green-600" />
+                : <AlertCircle className="h-4 w-4 text-amber-500" />}
             </button>
             <button
               type="button"
@@ -242,9 +285,29 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
             >
               <Tag className="h-4 w-4" />
               Seller
+              {sellerSideComplete
+                ? <CheckCircle className="h-4 w-4 text-green-600" />
+                : <AlertCircle className="h-4 w-4 text-amber-500" />}
             </button>
           </div>
         </div>
+
+        {/* Both sides must be completed before the transaction can proceed */}
+        {buyerSideComplete && sellerSideComplete ? (
+          <p className="mt-3 text-xs font-medium text-green-700 flex items-center gap-1.5">
+            <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
+            Both the Buyer and Seller sides are complete — you can continue.
+          </p>
+        ) : (
+          <p className="mt-3 text-xs text-amber-700 flex items-center gap-1.5">
+            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+            <span>
+              Complete both the Buyer and Seller sides before continuing —{' '}
+              <span className="font-semibold">{buyerSideComplete ? 'Buyer ✓' : 'Buyer incomplete'}</span>,{' '}
+              <span className="font-semibold">{sellerSideComplete ? 'Seller ✓' : 'Seller incomplete'}</span>.
+            </span>
+          </p>
+        )}
       </div>
 
       {activeSide === 'buyer' && (
@@ -769,7 +832,7 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
               <h3 className="text-base font-medium text-primary font-serif">Seller's Agent Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Agent's Full Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Agent's Full Name <span className="text-error">*</span></label>
                   <div className="relative rounded-lg shadow-sm">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <User className="h-4 w-4 text-primary" />
@@ -778,13 +841,16 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
                       type="text"
                       value={sellerAgentName}
                       onChange={e => onUpdate({ sellerAgentName: e.target.value })}
-                      className="focus:ring-primary focus:border-primary block w-full pl-10 py-2 text-sm border-border rounded-lg"
+                      className={`focus:ring-primary focus:border-primary block w-full pl-10 py-2 text-sm border-border rounded-lg ${
+                        errors.sellerAgentName ? 'border-error ring-1 ring-error' : ''
+                      }`}
                       placeholder="Agent name"
                     />
                   </div>
+                  {errors.sellerAgentName && <p className="mt-1 text-xs text-error">{errors.sellerAgentName}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Company Name <span className="text-error">*</span></label>
                   <div className="relative rounded-lg shadow-sm">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Building className="h-4 w-4 text-primary" />
@@ -793,13 +859,16 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
                       type="text"
                       value={sellerAgentCompany}
                       onChange={e => onUpdate({ sellerAgentCompany: e.target.value })}
-                      className="focus:ring-primary focus:border-primary block w-full pl-10 py-2 text-sm border-border rounded-lg"
+                      className={`focus:ring-primary focus:border-primary block w-full pl-10 py-2 text-sm border-border rounded-lg ${
+                        errors.sellerAgentCompany ? 'border-error ring-1 ring-error' : ''
+                      }`}
                       placeholder="Agency company"
                     />
                   </div>
+                  {errors.sellerAgentCompany && <p className="mt-1 text-xs text-error">{errors.sellerAgentCompany}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Contact Number <span className="text-error">*</span></label>
                   <div className="relative rounded-lg shadow-sm">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Phone className="h-4 w-4 text-primary" />
@@ -808,14 +877,17 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
                       type="text"
                       value={sellerAgentContact}
                       onChange={e => onUpdate({ sellerAgentContact: e.target.value })}
-                      className="focus:ring-primary focus:border-primary block w-full pl-10 py-2 text-sm border-border rounded-lg"
+                      className={`focus:ring-primary focus:border-primary block w-full pl-10 py-2 text-sm border-border rounded-lg ${
+                        errors.sellerAgentContact ? 'border-error ring-1 ring-error' : ''
+                      }`}
                       placeholder="+267 7X XXX XXX"
                     />
                   </div>
+                  {errors.sellerAgentContact && <p className="mt-1 text-xs text-error">{errors.sellerAgentContact}</p>}
                 </div>
               </div>
               <div>
-                <span className="block text-sm font-medium text-gray-700 mb-2">Commission Type</span>
+                <span className="block text-sm font-medium text-gray-700 mb-2">Commission Type <span className="text-error">*</span></span>
                 <div className="flex flex-wrap gap-3">
                   {(['percentage', 'fixed', 'na'] as const).map(type => (
                     <label key={type} className={`flex items-center p-3 border-2 rounded-lg ${
@@ -832,19 +904,23 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
                     </label>
                   ))}
                 </div>
+                {errors.sellerCommissionType && <p className="mt-1 text-xs text-error">{errors.sellerCommissionType}</p>}
               </div>
               {sellerCommissionType && sellerCommissionType !== 'na' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {sellerCommissionType === 'percentage' ? 'Commission %' : 'Fixed Amount (BWP)'}
+                    {sellerCommissionType === 'percentage' ? 'Commission %' : 'Fixed Amount (BWP)'} <span className="text-error">*</span>
                   </label>
                   <input
                     type="text"
                     value={sellerCommissionValue}
                     onChange={e => onUpdate({ sellerCommissionValue: e.target.value.replace(/[^0-9.]/g, '') })}
-                    className="focus:ring-primary focus:border-primary block w-full py-2 px-3 text-sm border-border rounded-lg"
+                    className={`focus:ring-primary focus:border-primary block w-full py-2 px-3 text-sm border-border rounded-lg ${
+                      errors.sellerCommissionValue ? 'border-error ring-1 ring-error' : ''
+                    }`}
                     placeholder={sellerCommissionType === 'percentage' ? 'e.g. 5.5' : 'e.g. 50000'}
                   />
+                  {errors.sellerCommissionValue && <p className="mt-1 text-xs text-error">{errors.sellerCommissionValue}</p>}
                 </div>
               )}
             </div>
@@ -888,6 +964,9 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
               </label>
             ))}
           </div>
+          {errors.sellerEntityType && (
+            <p className="mt-3 text-xs text-center text-error">{errors.sellerEntityType}</p>
+          )}
         </div>
       )}
       </>)}
