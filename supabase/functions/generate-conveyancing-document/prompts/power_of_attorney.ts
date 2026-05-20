@@ -101,9 +101,7 @@ SUBJECT TO all such conditions as the aforesaid Deed will more fully point out;
 
 AND, further to cede and transfer the said ground in full and free property to the said **[PURCHASER NAME]** and to renounce all the right and title and interest I heretofore had in and to the said property, to promise to free and warrant the said property thus transferred and also to clear the same from all encumbrances and hypothecations according to law, to draw, sign and pass, the necessary acts and deeds or other instruments and documents, to make such variations and alterations to such documents and generally for effecting the purposes aforesaid, to do or cause to be done whatsoever shall be requisite as fully and effectually to all intents and purposes as I might or could do if personally present and acting therein; hereby ratifying, allowing and confirming all and whatsoever its said Attorney and Agent shall lawfully do or cause to be done in the premises by virtue of these presents.
 
-### EXECUTION
-
-SIGNED **[CITY/TOWN]** ON THE _______ DAY OF _________________ [YEAR]
+SIGNED at **[CITY/TOWN]** on this _______ day of _________________ [YEAR]
 
 **AS WITNESSES**
 

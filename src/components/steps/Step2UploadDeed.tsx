@@ -301,6 +301,42 @@ const Step2UploadDeed: React.FC<Step2Props> = ({
     }
   };
 
+  const isBuying = transactionType === 'buying';
+
+  // Buyer side never holds the property's title deed — the registered owner (seller) does.
+  // Show a short notice and a Continue button instead of the upload UI.
+  if (isBuying) {
+    return (
+      <div className="py-4 md:py-8 max-w-3xl mx-auto px-4">
+        <h2 className="text-2xl md:text-3xl font-bold text-primary mb-3 md:mb-4 text-center font-serif">
+          Title Deed
+        </h2>
+        <div className="bg-primary/5 border-l-4 border-primary rounded-lg p-5 md:p-6 mb-6">
+          <h3 className="text-base md:text-lg font-semibold text-primary mb-2">Not required for the buyer side</h3>
+          <p className="text-sm md:text-base text-gray-700 leading-relaxed">
+            The title deed is held by the property's current registered owner (the <strong>seller</strong>) and is uploaded on the seller side of this transaction. As the buyer, you can skip this step.
+          </p>
+        </div>
+        <div className="mt-8 md:mt-12 flex justify-between">
+          <button
+            onClick={onPrevious}
+            className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-gray-300 rounded-lg text-sm md:text-base font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors"
+          >
+            <ArrowLeft className="mr-1 md:mr-2 h-4 w-4" />
+            Back
+          </button>
+          <button
+            onClick={handleSkipUpload}
+            className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-transparent rounded-lg text-sm md:text-base font-medium shadow-md text-white bg-primary hover:bg-primary-dark transition-colors"
+          >
+            Continue
+            <ArrowRight className="ml-1 md:ml-2 h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="py-4 md:py-8 max-w-3xl mx-auto px-4">
       <h2 className="text-2xl md:text-3xl font-bold text-primary mb-3 md:mb-4 text-center font-serif">

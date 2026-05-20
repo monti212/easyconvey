@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, User, Building, Users, Mail, Phone, Percent, Banknote, CreditCard, FileText, HelpCircle, Home, Briefcase, Scale, Calculator, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, User, Building, Users, Mail, Phone, Percent, Banknote, CreditCard, FileText, HelpCircle, Home, Briefcase, Scale, Calculator, AlertCircle, ShoppingCart, Tag } from 'lucide-react';
 
 interface Step4Props {
   hasAgent: boolean;
@@ -20,6 +20,8 @@ interface Step4Props {
   sellerAgentContact?: string;
   sellerCommissionType?: string;
   sellerCommissionValue?: string;
+  sellerEntityType?: string;
+  transactionType?: string;
   onUpdate: (data: Partial<{
     hasAgent: boolean;
     agentName: string;
@@ -38,6 +40,7 @@ interface Step4Props {
     sellerAgentContact: string;
     sellerCommissionType: string;
     sellerCommissionValue: string;
+    sellerEntityType: string;
   }>) => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -62,6 +65,8 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
   sellerAgentContact = '',
   sellerCommissionType = '',
   sellerCommissionValue = '',
+  sellerEntityType = '',
+  transactionType = '',
   onUpdate,
   onNext,
   onPrevious
@@ -71,6 +76,9 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
   const [showEstateInfo, setShowEstateInfo] = useState(false);
   const [showSocietyInfo, setShowSocietyInfo] = useState(false);
   const [calculatedCommission, setCalculatedCommission] = useState("0");
+  // Which side the conveyancer is currently filling. Defaults to the user's
+  // own role so the active side matches the transaction type they picked.
+  const [activeSide, setActiveSide] = useState<'buyer' | 'seller'>(transactionType === 'selling' ? 'seller' : 'buyer');
 
   // Calculate commission amount when type, value, or selling price changes
   useEffect(() => {
@@ -200,6 +208,46 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
         Please provide information about who is participating in this transaction.
       </p>
 
+      {/* BUYER / SELLER side toggle — capture agent + entity-type for both sides in one step */}
+      <div className="mb-6 md:mb-8 bg-white rounded-xl shadow-md border border-gray-200 p-4 md:p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-gray-500">Capturing for</p>
+            <p className="text-base md:text-lg font-bold text-primary mt-0.5">
+              {activeSide === 'buyer' ? 'BUYER side' : 'SELLER side'}
+              <span className="ml-2 text-xs font-normal text-gray-500">— switch to fill the other party's agent + entity type</span>
+            </p>
+          </div>
+          <div className="inline-flex rounded-lg bg-gray-100 p-1 self-start sm:self-auto" role="tablist" aria-label="Participant side selector">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeSide === 'buyer'}
+              onClick={() => setActiveSide('buyer')}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
+                activeSide === 'buyer' ? 'bg-secondary text-primary shadow-sm' : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <ShoppingCart className="h-4 w-4" />
+              Buyer
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeSide === 'seller'}
+              onClick={() => setActiveSide('seller')}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
+                activeSide === 'seller' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <Tag className="h-4 w-4" />
+              Seller
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {activeSide === 'buyer' && (
       <div className="bg-background rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8">
         <fieldset>
           <legend className="text-lg md:text-xl font-semibold text-primary mb-4 md:mb-6 font-serif">
@@ -667,6 +715,9 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
         )}
       </div>
 
+      )}
+
+      {activeSide === 'seller' && (<>
       {/* Seller's Estate Agent section */}
       <div className="bg-background rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8">
         <fieldset>
@@ -800,6 +851,46 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
           )}
         </fieldset>
       </div>
+
+      {/* Seller's entity type — only meaningful when the seller has no agent */}
+      {!sellerHasAgent && (
+        <div className="bg-background rounded-2xl p-5 md:p-8 shadow-lg mb-6 md:mb-8">
+          <legend className="text-base md:text-lg font-medium text-primary mb-4 md:mb-6 font-serif">
+            Seller is acting as:
+          </legend>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 md:gap-4">
+            {[
+              { id: 'individual', label: 'Individual', icon: User },
+              { id: 'company', label: 'Company', icon: Building },
+              { id: 'trust', label: 'Trust', icon: Scale },
+              { id: 'estate', label: 'Estate', icon: Briefcase },
+              { id: 'society', label: 'Society', icon: Users },
+            ].map(({ id, label, icon: Icon }) => (
+              <label
+                key={id}
+                className={`flex flex-col items-center p-3 md:p-5 border-2 rounded-xl cursor-pointer transition-all duration-300 ${
+                  sellerEntityType === id
+                    ? 'border-secondary bg-secondary/10 shadow-md'
+                    : 'border-gray-300 hover:border-secondary hover:bg-gray-50 hover:shadow-sm'
+                }`}
+                onClick={() => onUpdate({ sellerEntityType: id })}
+              >
+                <div className="w-10 h-10 md:w-14 md:h-14 rounded-full bg-primary/10 flex items-center justify-center mb-2 md:mb-4">
+                  <Icon className="h-5 w-5 md:h-7 md:w-7 text-primary" />
+                </div>
+                <span className="text-sm md:text-base font-medium text-primary">{label}</span>
+                <input
+                  type="radio"
+                  className="mt-2 md:mt-3 h-4 w-4 text-secondary focus:ring-secondary border-gray-300"
+                  checked={sellerEntityType === id}
+                  readOnly
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+      </>)}
 
       <div className="mt-8 md:mt-12 flex justify-between">
         <button

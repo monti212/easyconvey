@@ -89,6 +89,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     sellerAgentContact: '',
     sellerCommissionType: '',
     sellerCommissionValue: '',
+    sellerEntityType: '',
     // OCR-extracted deed fields
     extractedOwnerName: '',
     extractedOwnerIdNumber: '',
@@ -177,6 +178,19 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       }));
     }
   }, [sharedTransactionData]);
+
+  // In client mode the share link already declares the party's role. Pre-set
+  // transactionType so the wizard treats it as a shared transaction and skips
+  // the Step 1 buying/selling question entirely.
+  useEffect(() => {
+    if (mode === 'client' && clientRole) {
+      setTransactionData(prev => ({
+        ...prev,
+        transactionType: clientRole === 'buyer' ? 'buying' : 'selling',
+        isSharedTransaction: true,
+      }));
+    }
+  }, [mode, clientRole]);
 
   const updateTransactionData = (data: Partial<typeof transactionData>) => {
     // Append documentFilePaths and documentDataUrls rather than replacing
@@ -558,6 +572,8 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             sellerAgentContact={transactionData.sellerAgentContact}
             sellerCommissionType={transactionData.sellerCommissionType}
             sellerCommissionValue={transactionData.sellerCommissionValue}
+            sellerEntityType={transactionData.sellerEntityType}
+            transactionType={transactionData.transactionType}
             onUpdate={updateTransactionData}
             onNext={nextStep}
             onPrevious={() => {}}

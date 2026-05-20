@@ -31,6 +31,7 @@ import TransactionLogger from './TransactionLogger';
 import { useAuth } from '../hooks/useAuth';
 import { pdf } from '@react-pdf/renderer';
 import DeedOfSalePDF from '../lib/pdf/deedOfSale';
+import { downloadAsWord } from '../lib/downloadAsWord';
 import * as casesService from '../services/cases.service';
 import { supabase } from '../lib/supabase';
 import type { CaseDocument } from '../services/cases.service';
@@ -445,6 +446,30 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  const downloadDocumentWord = async () => {
+    if (!generatedDocument) return;
+    TransactionLogger.log(
+      transactionId,
+      currentUser,
+      TransactionLogger.ActionTypes.DOCUMENT_DOWNLOAD,
+      'Downloaded conveyancing document (Word)',
+      { document_type: 'conveyancing_document', format: 'docx' }
+    );
+    const label = DOCUMENT_TYPES.find(d => d.id === selectedDocType)?.label || 'Legal Document';
+    const safeLabel = label.replace(/&/g, 'and').replace(/[\\/:*?"<>|]/g, '').trim();
+    const plot = (wizardData?.extractedPlotNumber || '').trim();
+    const context = (plot || transactionId).replace(/[\\/:*?"<>|]/g, '');
+    await downloadAsWord(
+      generatedDocument,
+      label,
+      `${safeLabel} - ${context}.docx`,
+      authOrg?.name,
+      transactionId,
+      currentTransaction?.buyerName || 'Buyer',
+      currentTransaction?.sellerName || 'Seller',
+    );
+  };
+
   const printDocument = () => {
     if (!generatedDocument) return;
     
@@ -759,7 +784,14 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                       className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center"
                     >
                       <Download className="h-4 w-4 mr-1" />
-                      Download
+                      PDF
+                    </button>
+                    <button
+                      onClick={downloadDocumentWord}
+                      className="px-3 py-1 text-sm bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors flex items-center"
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Word
                     </button>
                   </div>
                 )}
