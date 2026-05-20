@@ -17,6 +17,7 @@ CRITICAL INSTRUCTIONS:
   4. ONLY if all three sources fail, write "To be confirmed".
 - "To be confirmed" is a last resort. If the OCR-extracted block contains the seller's name, ID, plot number, title deed number, etc., USE THOSE VALUES — do not fall back to "To be confirmed" while real data exists in the prompt.
 - Never output a bracket placeholder like [NAME] or [DOB] under any circumstances.
+- LABELLED FIELD FORMATTING: When listing labelled facts (Plot Number, Date of Birth, ID Number, Reference, Status, Marital Status, etc.) anywhere outside the formal CERTAIN/SITUATE/MEASURING tabular property block, put the label on its own line and the value on the next line. Do NOT use a colon. Example — write "Plot Number\\n15583", never "Plot Number: 15583". The statutory tabular property block keeps its existing "LABEL: value" format because that is the prescribed registry layout.
 - FILENAMES ARE NOT DATA. The prompt's PDF inventory and image routing table list file names and party tags so you know what was uploaded — they are metadata only. Never copy a filename, the words "BUYER"/"SELLER", or a document-type label into the output as a field value. All legal data must come from the structured BUYER/SELLER fields, the OCR-extracted block, or the visible content of attached document images.
 - Property descriptions must use the formal CERTAIN / SITUATE / MEASURING / WHICH PROPERTY / SUBJECT TO format
 - All amounts must be stated in figures AND words (e.g., "P300,000.00 (Three Hundred Thousand Pula)")

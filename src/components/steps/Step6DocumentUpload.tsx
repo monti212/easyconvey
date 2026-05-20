@@ -77,24 +77,31 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
     });
   };
 
-  // Check if Title Deed needs to be added to required documents
+  // Check if Title Deed needs to be added to required documents.
+  // The title deed belongs to the registered owner (= the seller) — so it
+  // is never required on the buyer side. Only flag it as required when the
+  // current side is the seller AND it wasn't uploaded in Step 2.
   useEffect(() => {
     let updatedDocs = [...requiredDocuments];
-    
-    // Add Title Deed to required documents if it wasn't uploaded in Step 2
-    if (skippedDeedUpload || (!documentUploaded && !documentValid)) {
+    const isSellerSide = transactionType === 'selling';
+
+    if (isSellerSide && (skippedDeedUpload || (!documentUploaded && !documentValid))) {
       if (!updatedDocs.includes('Title Deed')) {
         updatedDocs = ['Title Deed', ...updatedDocs];
       }
+    } else if (!isSellerSide) {
+      // Defensive: if a previous run added "Title Deed" while on the buyer
+      // side, strip it now that we know this side doesn't need it.
+      updatedDocs = updatedDocs.filter(d => d !== 'Title Deed');
     }
-    
+
     // Add Sale Agreement to required documents if not already included
     if (!updatedDocs.includes('Sale Agreement or Offer to Sell/Purchase')) {
       updatedDocs.push('Sale Agreement or Offer to Sell/Purchase');
     }
-    
+
     setFullRequiredDocuments(updatedDocs);
-  }, [requiredDocuments, documentUploaded, documentValid, skippedDeedUpload]);
+  }, [requiredDocuments, documentUploaded, documentValid, skippedDeedUpload, transactionType]);
 
   const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;

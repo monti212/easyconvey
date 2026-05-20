@@ -17,6 +17,15 @@ DATA RESOLUTION ORDER (apply IN ORDER for every field — do not skip steps):
   3. Otherwise, extract the value directly from any attached document images (party-tagged via the image index).
   4. ONLY if all three sources fail, write "OUTSTANDING — [field description]" (e.g. "OUTSTANDING — seller date of birth"). Never use a bracketed placeholder.
 
+LABELLED FIELD FORMATTING (apply to ALL data fields except the formal CERTAIN/SITUATE/MEASURING/etc. tabular block):
+- When you state a labelled value anywhere in the document (Plot Number, Date of Birth, ID Number, Reference, Status, Marital Status, etc.), put the label on its own line and the value on the next line. Do NOT use a colon between them.
+- Correct:
+    Plot Number
+    15583
+- Wrong:
+    Plot Number: 15583
+- The only exception is the formal property-description tabular block (CERTAIN: / SITUATE: / MEASURING: / etc.) and the registry signature blocks — those keep their statutory "LABEL: value" layout because that is the prescribed registry format.
+
 FILENAMES ARE NOT DATA (CRITICAL — read carefully):
 - The prompt may list uploaded file names ("title_deed.pdf", "id_smith_john.jpg", etc.) for INVENTORY purposes. These names are file system metadata. They are NOT a source of legal data.
 - Never copy any part of a filename into the output. Never derive party names, plot numbers, ID numbers, or dates from a filename.

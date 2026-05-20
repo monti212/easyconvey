@@ -27,9 +27,14 @@ GENERATE THE FOLLOWING CHECKLIST:
 
 # TRANSACTION READINESS CHECKLIST
 
-Reference: [Transaction ID]
-Date of Review: [Today's date]
-Status: [READY FOR TRANSFER / ITEMS OUTSTANDING / CRITICAL ITEMS MISSING]
+Reference
+[Transaction ID]
+
+Date of Review
+[Today's date]
+
+Status
+[READY FOR TRANSFER / ITEMS OUTSTANDING / CRITICAL ITEMS MISSING]
 
 ---
 
