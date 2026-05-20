@@ -1,39 +1,13 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import * as casesService from '../services/cases.service';
-import TransactionWizard from './TransactionWizard';
+import ClientUploadPage from './ClientUploadPage';
 import type { Case } from '../types/database';
 
 interface ClientWizardProps {
   token: string;
   role: 'buyer' | 'seller';
   onComplete: () => void;
-}
-
-// Minimal TransactionContext for the client wizard (the wizard requires it)
-const ClientTransactionContext = createContext<any>(null);
-
-function ClientTransactionProvider({ children }: { children: React.ReactNode }) {
-  const [transactions, setTransactions] = useState<any[]>([]);
-
-  const value = {
-    transactions,
-    addTransaction: (t: any) => setTransactions(prev => [...prev, t]),
-    updateTransaction: (_id: string, updates: any) => {
-      setTransactions(prev => prev.map(t => ({ ...t, ...updates })));
-    },
-    updateTransactionProgress: () => {},
-    markTransactionComplete: () => {},
-    getTransaction: () => undefined,
-    getActiveTransactions: () => [],
-    getCompletedTransactions: () => [],
-  };
-
-  return (
-    <ClientTransactionContext.Provider value={value}>
-      {children}
-    </ClientTransactionContext.Provider>
-  );
 }
 
 export default function ClientWizard({ token, role, onComplete }: ClientWizardProps) {
@@ -62,7 +36,6 @@ export default function ClientWizard({ token, role, onComplete }: ClientWizardPr
         }
         setCaseData(result.case_);
         setStatus('valid');
-        // Track link opened
         casesService.trackLinkActivity({
           token,
           case_id: result.case_.id,
@@ -96,7 +69,7 @@ export default function ClientWizard({ token, role, onComplete }: ClientWizardPr
           <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-green-800 mb-2">Information Submitted</h2>
           <p className="text-sm text-green-700">
-            Your {role} information has been submitted to the conveyancer for case {caseData?.case_number}.
+            Your {role} details and documents have been submitted to the conveyancer for case {caseData?.case_number}.
             They will contact you with next steps.
           </p>
         </div>
@@ -121,39 +94,29 @@ export default function ClientWizard({ token, role, onComplete }: ClientWizardPr
   return (
     <div>
       {/* Banner */}
-      <div className="bg-blue-600 text-white px-4 py-3 mb-4 rounded-lg shadow-md">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium">
-              You are filling in details as the <span className="font-bold capitalize">{role}</span> for
-              case <span className="font-bold">{caseData?.case_number}</span>
-            </p>
-            <p className="text-xs text-blue-200 mt-0.5">
-              Submitted by {caseData?.organization?.name || 'your conveyancer'}
-            </p>
-          </div>
+      <div className="bg-blue-600 text-white px-4 py-3 mb-6 rounded-lg shadow-md">
+        <div className="max-w-2xl mx-auto">
+          <p className="text-sm font-medium">
+            You are submitting details as the <span className="font-bold capitalize">{role}</span> for
+            case <span className="font-bold">{caseData?.case_number}</span>
+          </p>
+          <p className="text-xs text-blue-200 mt-0.5">
+            Requested by {caseData?.organization?.name || 'your conveyancer'}
+          </p>
         </div>
       </div>
 
-      {/* The wizard in client mode */}
-      <ClientTransactionProvider>
-        <TransactionWizard
-          transactionId={caseData?.case_number || token}
-          mode="client"
-          clientToken={token}
-          clientCaseId={caseData?.id}
-          clientRole={role}
-          onClientSubmitComplete={() => {
-            setStatus('submitted');
-            onComplete();
-          }}
-        />
-      </ClientTransactionProvider>
+      <ClientUploadPage
+        token={token}
+        role={role}
+        caseId={caseData!.id}
+        orgId={caseData!.organization_id}
+        caseNumber={caseData?.case_number}
+        onSubmitted={() => {
+          setStatus('submitted');
+          onComplete();
+        }}
+      />
     </div>
   );
-}
-
-// Re-export the context hook so TransactionWizard can use it in client mode
-export function useClientTransactions() {
-  return useContext(ClientTransactionContext);
 }
