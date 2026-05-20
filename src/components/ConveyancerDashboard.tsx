@@ -33,6 +33,7 @@ import { pdf } from '@react-pdf/renderer';
 import DeedOfSalePDF from '../lib/pdf/deedOfSale';
 import { downloadAsWord } from '../lib/downloadAsWord';
 import * as casesService from '../services/cases.service';
+import * as storageService from '../services/storage.service';
 import { supabase } from '../lib/supabase';
 import type { CaseDocument } from '../services/cases.service';
 import type { CaseShareToken } from '../types/database';
@@ -57,6 +58,15 @@ const DOCUMENT_TYPES: { id: DocumentType; label: string; description: string }[]
   { id: 'affidavit', label: 'Affidavit', description: 'Sworn statement supporting the property transaction' },
   { id: 'bond_registration', label: 'Bond Registration', description: 'Mortgage bond registration document for the property' },
 ];
+
+// Build a viewable document list from a party's submitted data
+const docListFrom = (data: any): { name: string; doc: any }[] => {
+  if (!data) return [];
+  const paths = (data.documentFilePaths || []).map((d: any) => ({ name: d.name || 'Document', doc: d }));
+  const urls = (data.documentDataUrls || []).map((d: any) => ({ name: d.name || 'Document', doc: d }));
+  if (paths.length || urls.length) return [...paths, ...urls];
+  return (data.uploadedDocuments || []).map((n: string) => ({ name: n, doc: null }));
+};
 
 const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
   transactionId,
@@ -151,8 +161,16 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
       const bd = dbBuyerData;
       const sd = dbSellerData;
 
+      // Buyer/seller chosen by the conveyancer on Step 6 (each is a SubmittedParty
+      // with .name, .caseNumber and .data). This is the authoritative selection.
+      const selBuyer = wd?.selectedParties?.buyer || null;
+      const selSeller = wd?.selectedParties?.seller || null;
+
       const getBuyerName = () => {
-        // Client wizard submission (highest priority)
+        // Conveyancer's Step 6 selection (highest priority)
+        if (selBuyer?.name) return selBuyer.name;
+        // Client wizard submission
+        if (bd?.fullName) return bd.fullName;
         if (bd?.clientName) return bd.clientName;
         if (bd?.hasAgent && bd?.agentName) return bd.agentName;
         // Party-tagged ID OCR (Step 6 BUYER toggle), then legacy single bucket
@@ -164,7 +182,10 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
       };
 
       const getSellerName = () => {
-        // Client wizard submission (highest priority)
+        // Conveyancer's Step 6 selection (highest priority)
+        if (selSeller?.name) return selSeller.name;
+        // Client wizard submission
+        if (sd?.fullName) return sd.fullName;
         if (sd?.clientName) return sd.clientName;
         if (sd?.hasAgent && sd?.agentName) return sd.agentName;
         // Party-tagged seller ID OCR (Step 6 SELLER toggle), then deed-extracted registered owner
@@ -173,13 +194,32 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         return sellerData?.agentName || 'Pending';
       };
 
-      // Split wizard-uploaded documents by party tag (uploadedDocumentsByParty was set
-      // in Step 6 by the BUYER/SELLER toggle). Falls back to all-uploads when no tags.
+      // Legacy fallback — split wizard-uploaded documents by party tag for cases
+      // captured before the Step 6 client-selection flow.
       const wdByParty: Record<string, 'buyer' | 'seller'> = wd?.uploadedDocumentsByParty || {};
       const allWdDocs: string[] = wd?.uploadedDocuments || [];
-      const taggedBuyerDocs = allWdDocs.filter((d: string) => wdByParty[d] === 'buyer');
-      const taggedSellerDocs = allWdDocs.filter((d: string) => wdByParty[d] === 'seller');
       const hasAnyTags = Object.keys(wdByParty).length > 0;
+      const wdBuyerData = {
+        documentFilePaths: (wd?.documentFilePaths || []).filter((d: any) => d.party === 'buyer'),
+        documentDataUrls: (wd?.documentDataUrls || []).filter((d: any) => d.party === 'buyer'),
+        uploadedDocuments: hasAnyTags ? allWdDocs.filter((d: string) => wdByParty[d] === 'buyer') : allWdDocs,
+      };
+      const wdSellerData = {
+        documentFilePaths: (wd?.documentFilePaths || []).filter((d: any) => d.party === 'seller'),
+        documentDataUrls: (wd?.documentDataUrls || []).filter((d: any) => d.party === 'seller'),
+        uploadedDocuments: hasAnyTags ? allWdDocs.filter((d: string) => wdByParty[d] === 'seller') : [],
+      };
+
+      // Authoritative party data: Step 6 selection → this case's own submission → wizard uploads
+      const buyerPartyData = selBuyer?.data || bd || wdBuyerData;
+      const sellerPartyData = selSeller?.data || sd || wdSellerData;
+      const buyerDocs = docListFrom(buyerPartyData);
+      const sellerDocs = docListFrom(sellerPartyData);
+
+      // A selected party counts as a completed side even when this case's own
+      // buyer_data/seller_data is empty (the party submitted on another case).
+      if (selBuyer) setBuyerStatus('completed');
+      if (selSeller) setSellerStatus('completed');
 
       const price = wd?.sellingPrice || bd?.sellingPrice || sd?.sellingPrice
         || caseRecord?.property?.price?.toString() || '0';
@@ -188,17 +228,18 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         id: transactionId,
         buyerName: getBuyerName(),
         sellerName: getSellerName(),
+        buyerCaseNumber: selBuyer?.caseNumber || null,
+        sellerCaseNumber: selSeller?.caseNumber || null,
         propertyPrice: price,
         propertyAddress: wd?.extractedPropertyAddress || caseRecord?.property?.address || 'Address pending',
         status: caseRecord?.status === 'in_progress' ? 'In Progress' : caseRecord?.status === 'completed' ? 'Completed' : 'Documents Uploaded',
-        progress: caseRecord?.status === 'completed' ? 100 : (bd && sd ? 75 : bd || sd ? 50 : 25),
+        progress: caseRecord?.status === 'completed' ? 100
+          : ((selBuyer || bd) && (selSeller || sd) ? 75 : (selBuyer || bd || selSeller || sd) ? 50 : 25),
         submissionDate: caseRecord?.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-        // Use party-tagged splits when the wizard tagged uploads. Otherwise fall back to
-        // the legacy behaviour (all wizard docs counted as buyer's, none as seller's).
-        buyerDocuments: bd?.uploadedDocuments || (hasAnyTags ? taggedBuyerDocs : (wd?.uploadedDocuments || [])),
-        sellerDocuments: sd?.uploadedDocuments || (hasAnyTags ? taggedSellerDocs : []),
-        buyerDetails: bd || wd,
-        sellerDetails: sd,
+        buyerDocs,
+        sellerDocs,
+        buyerDetails: buyerPartyData || wd,
+        sellerDetails: sellerPartyData,
         wizardData: wd,
         caseNumber: caseRecord?.case_number || transactionId,
         transactionCategory: wd?.transactionCategory || caseRecord?.case_type || 'normal_transfer',
@@ -231,6 +272,24 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
 
   const isTokenExpired = (token: any) =>
     token?.expires_at && new Date(token.expires_at) < new Date();
+
+  // Open a submitted document in a new tab (storage path or embedded data URL)
+  const viewDoc = async (doc: any) => {
+    if (!doc) return;
+    try {
+      if (doc.dataUrl) {
+        const blob = await (await fetch(doc.dataUrl)).blob();
+        window.open(URL.createObjectURL(blob), '_blank');
+        return;
+      }
+      if (doc.path) {
+        const url = await storageService.getSignedUrl(doc.path, doc.bucket || 'documents');
+        window.open(url, '_blank');
+      }
+    } catch {
+      alert('Unable to open this document.');
+    }
+  };
 
   const handleRegenerateLinks = async () => {
     try {
@@ -648,6 +707,9 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                     {(wizardData?.extractedBuyerName || wizardData?.extractedClientName) && (wizardData?.extractedBuyerName || wizardData?.extractedClientName) !== currentTransaction.buyerName && (
                       <p className="text-xs text-blue-600 mt-0.5">ID OCR: {wizardData?.extractedBuyerName || wizardData?.extractedClientName}</p>
                     )}
+                    {currentTransaction.buyerCaseNumber && (
+                      <p className="text-xs text-gray-400 mt-0.5">Submitted on case {currentTransaction.buyerCaseNumber}</p>
+                    )}
                   </div>
                   {wizardData?.extractedBuyerIdNumber && (
                     <div>
@@ -680,18 +742,26 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                   )}
 
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Documents ({currentTransaction.buyerDocuments.length})</p>
-                    {currentTransaction.buyerDocuments.length === 0 ? (
-                      <p className="text-xs text-amber-600 mt-1">Awaiting document upload</p>
+                    <p className="text-sm font-medium text-gray-700 mb-1">Documents ({currentTransaction.buyerDocs.length})</p>
+                    {currentTransaction.buyerDocs.length === 0 ? (
+                      <p className="text-xs text-amber-600">Awaiting document upload</p>
                     ) : (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {currentTransaction.buyerDocuments.slice(0, 3).map((doc: string, index: number) => (
-                          <span key={index} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">{doc}</span>
+                      <ul className="space-y-1.5">
+                        {currentTransaction.buyerDocs.map((d: { name: string; doc: any }, index: number) => (
+                          <li key={index} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-200">
+                            <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <span className="text-xs text-gray-700 truncate flex-1">{d.name}</span>
+                            {d.doc && (
+                              <button
+                                onClick={() => viewDoc(d.doc)}
+                                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 flex-shrink-0"
+                              >
+                                <Eye className="h-3.5 w-3.5" /> View
+                              </button>
+                            )}
+                          </li>
                         ))}
-                        {currentTransaction.buyerDocuments.length > 3 && (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">+{currentTransaction.buyerDocuments.length - 3} more</span>
-                        )}
-                      </div>
+                      </ul>
                     )}
                   </div>
                 </div>
@@ -713,6 +783,9 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                     )}
                     {wizardData?.extractedOwnerName && wizardData.extractedOwnerName !== currentTransaction.sellerName && wizardData.extractedOwnerName !== wizardData.extractedSellerName && (
                       <p className="text-xs text-blue-600 mt-0.5">From deed: {wizardData.extractedOwnerName}</p>
+                    )}
+                    {currentTransaction.sellerCaseNumber && (
+                      <p className="text-xs text-gray-400 mt-0.5">Submitted on case {currentTransaction.sellerCaseNumber}</p>
                     )}
                   </div>
 
@@ -738,18 +811,26 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                   )}
 
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Documents ({currentTransaction.sellerDocuments.length})</p>
-                    {currentTransaction.sellerDocuments.length === 0 ? (
-                      <p className="text-xs text-amber-600 mt-1">Awaiting document upload</p>
+                    <p className="text-sm font-medium text-gray-700 mb-1">Documents ({currentTransaction.sellerDocs.length})</p>
+                    {currentTransaction.sellerDocs.length === 0 ? (
+                      <p className="text-xs text-amber-600">Awaiting document upload</p>
                     ) : (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {currentTransaction.sellerDocuments.slice(0, 3).map((doc: string, index: number) => (
-                          <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">{doc}</span>
+                      <ul className="space-y-1.5">
+                        {currentTransaction.sellerDocs.map((d: { name: string; doc: any }, index: number) => (
+                          <li key={index} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-200">
+                            <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <span className="text-xs text-gray-700 truncate flex-1">{d.name}</span>
+                            {d.doc && (
+                              <button
+                                onClick={() => viewDoc(d.doc)}
+                                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 flex-shrink-0"
+                              >
+                                <Eye className="h-3.5 w-3.5" /> View
+                              </button>
+                            )}
+                          </li>
                         ))}
-                        {currentTransaction.sellerDocuments.length > 3 && (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">+{currentTransaction.sellerDocuments.length - 3} more</span>
-                        )}
-                      </div>
+                      </ul>
                     )}
                   </div>
                 </div>
