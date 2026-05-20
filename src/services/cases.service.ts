@@ -238,6 +238,73 @@ export async function submitPartyData(token: string, wizardData: object): Promis
   return { success: true, case_id: data?.case_id };
 }
 
+// --- Submitted parties (clients who completed a share link) ---
+
+export interface SubmittedParty {
+  caseId: string;
+  caseNumber: string;
+  caseType: string;
+  role: 'buyer' | 'seller';
+  name: string;
+  data: any;
+  submittedAt: string;
+}
+
+function derivePartyName(data: any): string {
+  if (!data) return 'Unnamed party';
+  const composed = `${data.firstName || ''} ${data.lastName || ''}`.trim();
+  return (
+    data.fullName ||
+    composed ||
+    data.extractedBuyerName ||
+    data.extractedSellerName ||
+    data.extractedClientName ||
+    'Unnamed party'
+  );
+}
+
+/**
+ * Every buyer/seller across the organisation's cases who has completed their
+ * share-link submission. Used by the conveyancer's client-selection step.
+ */
+export async function getSubmittedParties(organizationId: string): Promise<SubmittedParty[]> {
+  const { data, error } = await supabase
+    .from('cases')
+    .select('id, case_number, case_type, buyer_data, seller_data, buyer_status, seller_status, updated_at')
+    .eq('organization_id', organizationId)
+    .order('updated_at', { ascending: false });
+  if (error) {
+    console.warn('Unable to load submitted parties:', error.message);
+    return [];
+  }
+  const parties: SubmittedParty[] = [];
+  for (const c of (data || []) as any[]) {
+    if (c.buyer_status === 'completed' && c.buyer_data) {
+      parties.push({
+        caseId: c.id,
+        caseNumber: c.case_number,
+        caseType: c.case_type,
+        role: 'buyer',
+        name: derivePartyName(c.buyer_data),
+        data: c.buyer_data,
+        submittedAt: c.buyer_data.submittedAt || c.updated_at,
+      });
+    }
+    if (c.seller_status === 'completed' && c.seller_data) {
+      parties.push({
+        caseId: c.id,
+        caseNumber: c.case_number,
+        caseType: c.case_type,
+        role: 'seller',
+        name: derivePartyName(c.seller_data),
+        data: c.seller_data,
+        submittedAt: c.seller_data.submittedAt || c.updated_at,
+      });
+    }
+  }
+  return parties;
+}
+
 export async function getTokensForCase(caseId: string): Promise<CaseShareToken[]> {
   const { data, error } = await supabase
     .from('case_share_tokens')

@@ -7,7 +7,7 @@ import Step2UploadDeed from './steps/Step2UploadDeed';
 import Step3SellingPrice from './steps/Step3SellingPrice';
 import Step4AgentInformation from './steps/Step4AgentInformation';
 import Step5PersonalDetails from './steps/Step5PersonalDetails';
-import Step6DocumentUpload from './steps/Step6DocumentUpload';
+import Step6SelectClients from './steps/Step6SelectClients';
 import Step7Summary from './steps/Step7Summary';
 import CompanyDetails from './steps/CompanyDetails';
 import TrustDetails from './steps/TrustDetails';
@@ -128,6 +128,8 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     documentFilePaths: [] as { path: string; bucket: string; name: string; type: string; party?: 'buyer' | 'seller' }[],
     documentDataUrls: [] as { dataUrl: string; name: string; docType: string; party?: 'buyer' | 'seller' }[],
     uploadedDocumentsByParty: {} as Record<string, 'buyer' | 'seller'>,
+    // Buyer/seller chosen on Step 6 from the clients who submitted via share links
+    selectedParties: null as { buyer: any; seller: any } | null,
     otherPartyDocuments: [] as string[], // Track other party's documents
     isFirstTimeBuyer: false,  // Added for first time buyer status
     // Company specific fields
@@ -229,6 +231,15 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     if (mode === 'conveyancer' && organization?.id) {
       persistToSupabase(merged);
     }
+  };
+
+  // Replace (not append) the document sets — used by the Step 6 client-selection
+  // view, which derives the full document list from the selected buyer & seller.
+  const setPartyDocuments = (
+    filePaths: typeof transactionData.documentFilePaths,
+    dataUrls: typeof transactionData.documentDataUrls,
+  ) => {
+    setTransactionData(prev => ({ ...prev, documentFilePaths: filePaths, documentDataUrls: dataUrls }));
   };
 
   const persistToSupabase = async (data: typeof transactionData, stepOverride?: number) => {
@@ -585,21 +596,14 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         );
       case 6:
         return (
-          <Step6DocumentUpload
-            requiredDocuments={transactionData.requiredDocuments}
-            uploadedDocuments={transactionData.uploadedDocuments}
-            otherPartyDocuments={transactionData.otherPartyDocuments}
-            documentUploaded={transactionData.documentUploaded}
-            documentValid={transactionData.documentValid}
-            skippedDeedUpload={transactionData.skippedDeedUpload}
+          <Step6SelectClients
+            orgId={organization?.id}
             transactionType={transactionData.transactionType}
-            originalTransactionId={transactionData.originalTransactionId}
-            isSharedTransaction={transactionData.isSharedTransaction || mode === 'client'}
             currentTransactionData={transactionData}
             onUpdate={updateTransactionData}
+            onSetDocuments={setPartyDocuments}
             onNext={nextStep}
             onPrevious={previousStep}
-            onSharedLink={onSharedLink}
           />
         );
       case 7:
