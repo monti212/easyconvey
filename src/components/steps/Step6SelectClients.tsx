@@ -111,25 +111,49 @@ const Step6SelectClients: React.FC<Step6SelectClientsProps> = ({
     }
   };
 
-  // Best-effort AI extraction across a party's documents
+  // Best-effort AI extraction across a party's documents — ID details for both
+  // parties, plus title-deed details from the seller's documents.
   const runExtraction = async (role: 'buyer' | 'seller', party: SubmittedParty) => {
     setExtracting(prev => ({ ...prev, [role]: true }));
     const docs = [...(party.data?.documentFilePaths || []), ...(party.data?.documentDataUrls || [])];
     const found: Extracted = {};
+    const deed: Record<string, string> = {};
+    const ok = (v: any) => v && v !== 'Unknown';
     for (const doc of docs) {
       const file = await fetchBlob(doc);
       if (!file) continue;
+      // Identity OCR
       try {
         const fd = new FormData();
         fd.append('file', file);
         const res = await fetch('/api/analyze-id', { method: 'POST', body: fd });
         if (res.ok) {
           const d = await res.json();
-          if (d.fullName && d.fullName !== 'Unknown') found.fullName = d.fullName;
-          if (d.idNumber && d.idNumber !== 'Unknown') found.idNumber = d.idNumber;
-          if (d.dateOfBirth && d.dateOfBirth !== 'Unknown') found.dateOfBirth = d.dateOfBirth;
+          if (ok(d.fullName)) found.fullName = d.fullName;
+          if (ok(d.idNumber)) found.idNumber = d.idNumber;
+          if (ok(d.dateOfBirth)) found.dateOfBirth = d.dateOfBirth;
         }
       } catch { /* non-blocking */ }
+      // Title-deed OCR — only the seller submits the title deed
+      if (role === 'seller') {
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          const res = await fetch('/api/analyze-deed', { method: 'POST', body: fd });
+          if (res.ok) {
+            const d = await res.json();
+            if (ok(d.ownerName)) deed.extractedOwnerName = d.ownerName;
+            if (ok(d.ownerIdNumber)) deed.extractedOwnerIdNumber = d.ownerIdNumber;
+            if (ok(d.plotNumber)) deed.extractedPlotNumber = d.plotNumber;
+            if (ok(d.propertyAddress)) deed.extractedPropertyAddress = d.propertyAddress;
+            if (ok(d.propertyDescription)) deed.extractedPropertyDescription = d.propertyDescription;
+            if (ok(d.titleDeedNumber)) deed.extractedTitleDeedNumber = d.titleDeedNumber;
+            if (ok(d.administrativeDistrict)) deed.extractedAdministrativeDistrict = d.administrativeDistrict;
+            if (ok(d.extent)) deed.extractedExtent = d.extent;
+            if (ok(d.purchasePrice)) deed.extractedPurchasePrice = d.purchasePrice;
+          }
+        } catch { /* non-blocking */ }
+      }
     }
     setExtracted(prev => ({ ...prev, [role]: found }));
     setExtracting(prev => ({ ...prev, [role]: false }));
@@ -145,6 +169,7 @@ const Step6SelectClients: React.FC<Step6SelectClientsProps> = ({
       if (found.dateOfBirth) payload.extractedSellerDateOfBirth = found.dateOfBirth;
     }
     if (Object.keys(payload).length) onUpdate(payload);
+    if (Object.keys(deed).length) onUpdate(deed);
   };
 
   const handleSelect = (role: 'buyer' | 'seller', party: SubmittedParty) => {

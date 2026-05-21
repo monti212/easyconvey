@@ -3,7 +3,6 @@ import { ArrowRight, Upload, CheckCircle, AlertCircle, User, Building, Users, Sh
 import { useTransactions } from '../App';
 import * as casesService from '../services/cases.service';
 import { useAuth } from '../hooks/useAuth';
-import Step2UploadDeed from './steps/Step2UploadDeed';
 import Step3SellingPrice from './steps/Step3SellingPrice';
 import Step4AgentInformation from './steps/Step4AgentInformation';
 import Step5PersonalDetails from './steps/Step5PersonalDetails';
@@ -407,28 +406,21 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     
     // If coming from personal details page after selecting individual
     if (currentStep === 5 && transactionData.entityType === 'individual') {
-      setCurrentStep(3); // Go to Upload Deed
-      window.scrollTo(0, 0);
-      return;
-    }
-
-    // If coming from entity-specific pages, go to upload deed
-    if (currentStep >= 8 && currentStep <= 11) {
-      setCurrentStep(3); // Upload Deed
-      window.scrollTo(0, 0);
-      return;
-    }
-    
-    // If on Upload Deed page (step 3), go to selling price
-    if (currentStep === 3) {
       setCurrentStep(4); // Go to Selling Price
       window.scrollTo(0, 0);
       return;
     }
-    
-    // If on selling price page (step 4), go directly to document upload
+
+    // If coming from entity-specific pages, go to selling price
+    if (currentStep >= 8 && currentStep <= 11) {
+      setCurrentStep(4); // Selling Price
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    // If on selling price page (step 4), go to the buyer/seller selection step
     if (currentStep === 4) {
-      setCurrentStep(6); // Go to Document Upload
+      setCurrentStep(6);
       window.scrollTo(0, 0);
       return;
     }
@@ -447,42 +439,20 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       return;
     }
     
-    // If on selling price page (step 4), go back to upload deed
+    // If on selling price page (step 4), go back to the entity-specific page
     if (currentStep === 4) {
-      setCurrentStep(3); // Go back to upload deed
-      window.scrollTo(0, 0);
-      return;
-    }
-    
-    // If on upload deed page (step 3), go back to the entity-specific page
-    if (currentStep === 3) {
-      // Go back to personal details or entity-specific pages
-      if (transactionData.hasAgent) {
-        if (transactionData.entityType === 'individual') {
-          setCurrentStep(5); // Back to personal details
-        } else if (transactionData.entityType === 'company') {
-          setCurrentStep(8); // Back to company details
-        } else if (transactionData.entityType === 'trust') {
-          setCurrentStep(9); // Back to trust details
-        } else if (transactionData.entityType === 'estate') {
-          setCurrentStep(10); // Back to estate details
-        } else if (transactionData.entityType === 'society') {
-          setCurrentStep(11); // Back to society details
-        } else {
-          setCurrentStep(12); // Back to agent entity selection if no entity type yet
-        }
-      } else if (!transactionData.hasAgent && transactionData.entityType === 'individual') {
-        setCurrentStep(5); // Go back to personal details
-      } else if (!transactionData.hasAgent) {
-        if (transactionData.entityType === 'company') {
-          setCurrentStep(8); // Company details
-        } else if (transactionData.entityType === 'trust') {
-          setCurrentStep(9); // Trust details
-        } else if (transactionData.entityType === 'estate') {
-          setCurrentStep(10); // Estate details
-        } else if (transactionData.entityType === 'society') {
-          setCurrentStep(11); // Society details
-        }
+      if (transactionData.entityType === 'individual') {
+        setCurrentStep(5); // Back to personal details
+      } else if (transactionData.entityType === 'company') {
+        setCurrentStep(8);
+      } else if (transactionData.entityType === 'trust') {
+        setCurrentStep(9);
+      } else if (transactionData.entityType === 'estate') {
+        setCurrentStep(10);
+      } else if (transactionData.entityType === 'society') {
+        setCurrentStep(11);
+      } else {
+        setCurrentStep(transactionData.hasAgent ? 12 : 1);
       }
       window.scrollTo(0, 0);
       return;
@@ -548,21 +518,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             sellerCommissionValue={transactionData.sellerCommissionValue}
             sellerEntityType={transactionData.sellerEntityType}
             transactionType={transactionData.transactionType}
+            caseId={supabaseCaseId.current}
             onUpdate={updateTransactionData}
             onNext={nextStep}
             onPrevious={() => {}}
-          />
-        );
-      case 3:
-        return (
-          <Step2UploadDeed
-            documentUploaded={transactionData.documentUploaded}
-            documentValid={transactionData.documentValid}
-            skippedDeedUpload={transactionData.skippedDeedUpload}
-            transactionType={transactionData.transactionType}
-            onUpdate={updateTransactionData}
-            onNext={nextStep}
-            onPrevious={previousStep}
           />
         );
       case 4:
@@ -694,8 +653,9 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   // Check if we're on the individual path
   const isIndividualPath = transactionData.entityType === 'individual';
 
-  // Get workflow position based on current step. Transaction Type is chosen up
-  // front in the New Case modal, so the wizard always has 6 visible steps.
+  // Get workflow position based on current step. Transaction type is chosen up
+  // front and the title deed arrives with the seller's documents, so the wizard
+  // has 5 visible steps.
   const getWorkflowPosition = () => {
     // Agent entity selection (12) and entity-specific pages (8-11) all show as step 1
     if (currentStep === 12 || (currentStep >= 8 && currentStep <= 11)) {
@@ -706,21 +666,19 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       const individualStepMapping: Record<number, number> = {
         1: 1, // Agent Info
         5: 2, // Personal Details
-        3: 3, // Upload Deed
-        4: 4, // Selling Price
-        6: 5, // Document Upload
-        7: 6, // Summary
+        4: 3, // Selling Price
+        6: 4, // Buyer & Seller
+        7: 5, // Summary
       };
       return individualStepMapping[currentStep] || currentStep;
     }
 
     const baseStepMapping: Record<number, number> = {
       1: 1, // Agent Info
-      3: 2, // Upload Deed
-      4: 3, // Selling Price
-      5: 4, // Personal Details
-      6: 5, // Document Upload
-      7: 6, // Summary
+      4: 2, // Selling Price
+      5: 3, // Personal Details
+      6: 4, // Buyer & Seller
+      7: 5, // Summary
     };
     return baseStepMapping[currentStep] || currentStep;
   };
@@ -734,15 +692,15 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
 
     const priceLabel = transactionData.transactionType === 'buying' ? 'Buying Price' : 'Selling Price';
     const steps = isIndividualPath
-      ? ['Agent Information', 'Personal Details', 'Upload Title Deed', priceLabel, 'Document Upload', 'Summary']
-      : ['Agent Information', 'Upload Title Deed', priceLabel, 'Personal Details', 'Document Upload', 'Summary'];
+      ? ['Agent Information', 'Personal Details', priceLabel, 'Buyer & Seller', 'Summary']
+      : ['Agent Information', priceLabel, 'Personal Details', 'Buyer & Seller', 'Summary'];
     const position = getWorkflowPosition() - 1;
     return position >= 0 && position < steps.length ? steps[position] : 'Unknown Step';
   };
 
-  // Calculate progress percentage — 6 visible steps (Transaction Type chosen up front)
+  // Calculate progress percentage — 5 visible steps
   const calculateProgress = () => {
-    return (getWorkflowPosition() / 6) * 100;
+    return (getWorkflowPosition() / 5) * 100;
   };
 
   // Check if a step is active in the navigation
@@ -762,19 +720,17 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       return [
         { number: 1, name: 'Agent Information' },
         { number: 2, name: 'Personal Details' },
-        { number: 3, name: 'Upload Title Deed' },
-        { number: 4, name: priceLabel },
-        { number: 5, name: 'Document Upload' },
-        { number: 6, name: 'Summary' }
+        { number: 3, name: priceLabel },
+        { number: 4, name: 'Buyer & Seller' },
+        { number: 5, name: 'Summary' }
       ];
     }
     return [
       { number: 1, name: 'Agent Information' },
-      { number: 2, name: 'Upload Title Deed' },
-      { number: 3, name: priceLabel },
-      { number: 4, name: 'Personal Details' },
-      { number: 5, name: 'Document Upload' },
-      { number: 6, name: 'Summary' }
+      { number: 2, name: priceLabel },
+      { number: 3, name: 'Personal Details' },
+      { number: 4, name: 'Buyer & Seller' },
+      { number: 5, name: 'Summary' }
     ];
   };
 
@@ -872,11 +828,17 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           </div>
           
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex justify-between items-center py-6">
+          <nav className="hidden md:flex justify-between items-center py-6 relative">
+            {/* Connecting line — runs through the centre of the step circles */}
+            <div
+              className="absolute h-0.5 bg-secondary/30"
+              style={{ left: '0', right: '0', top: '2.75rem', zIndex: 0 }}
+            ></div>
+
             {navigationSteps.map((step, index) => (
-              <div key={index} className="flex flex-col items-center">
+              <div key={index} className="relative z-10 flex flex-col items-center">
                 <div className={`rounded-full h-10 w-10 flex items-center justify-center shadow-lg ${
-                  isStepComplete(step.number) ? 'bg-success text-white' : 
+                  isStepComplete(step.number) ? 'bg-success text-white' :
                   isStepActive(step.number) ? 'bg-secondary text-primary ring-4 ring-secondary/30' :
                   'bg-gray-200 text-primary'
                 } transition-all duration-300`}>
@@ -886,17 +848,6 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                   {step.name}
                 </span>
               </div>
-            ))}
-            
-            {/* Connecting lines between steps */}
-            {[...Array(navigationSteps.length - 1)].map((_, index) => (
-              <div key={index} className="hidden md:block absolute h-0.5 bg-secondary/30" style={{
-                width: `${100 / navigationSteps.length}%`,
-                left: `${(100 / navigationSteps.length) * 0.5 + (index * (100 / navigationSteps.length))}%`,
-                top: '1.25rem',
-                transform: 'translateX(-50%)',
-                zIndex: 0
-              }}></div>
             ))}
           </nav>
         </div>

@@ -1,5 +1,67 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, User, Building, Users, Mail, Phone, Percent, Banknote, CreditCard, FileText, HelpCircle, Home, Briefcase, Scale, Calculator, AlertCircle, CheckCircle, ShoppingCart, Tag } from 'lucide-react';
+import { ArrowLeft, ArrowRight, User, Building, Users, Mail, Phone, Percent, Banknote, CreditCard, FileText, HelpCircle, Home, Briefcase, Scale, Calculator, AlertCircle, CheckCircle, ShoppingCart, Tag, Link2 } from 'lucide-react';
+
+// Sends an agent a read-only link to follow the case's progress.
+// The conveyancer dispatches it via WhatsApp, email, or by copying the link.
+const AgentLinkShare: React.FC<{ caseId?: string | null; phone?: string; email?: string }> = ({ caseId, phone, email }) => {
+  const [copied, setCopied] = useState(false);
+  const phoneDigits = (phone || '').replace(/[^0-9]/g, '');
+  const hasEmail = !!(email && email.trim());
+  if (!phoneDigits && !hasEmail) return null;
+
+  const link = caseId ? `${window.location.origin}?conveyancer=${caseId}` : '';
+  const message = `Hello, you can follow the progress of this property transaction here: ${link}`;
+
+  return (
+    <div className="bg-blue-50 rounded-lg p-3 border border-blue-200 mt-4">
+      <div className="flex items-start gap-2">
+        <Link2 className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+        <div className="flex-1">
+          <p className="text-sm font-medium text-blue-800">Keep the agent updated</p>
+          <p className="text-xs text-blue-600 mb-2">
+            Send the agent a link so they can follow how this case is progressing.
+          </p>
+          {!caseId ? (
+            <p className="text-xs text-gray-500">The tracking link becomes available once the case has been saved.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {phoneDigits && (
+                <a
+                  href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(message)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 transition-colors"
+                >
+                  <Phone className="h-3.5 w-3.5" /> WhatsApp
+                </a>
+              )}
+              {hasEmail && (
+                <a
+                  href={`mailto:${email}?subject=${encodeURIComponent('Your property transaction — follow the progress')}&body=${encodeURIComponent(message)}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-md hover:bg-primary-dark transition-colors"
+                >
+                  <Mail className="h-3.5 w-3.5" /> Email
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(link);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-300 text-blue-700 text-xs font-medium rounded-md hover:bg-blue-100 transition-colors"
+              >
+                {copied ? <CheckCircle className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
+                {copied ? 'Copied' : 'Copy link'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface Step4Props {
   hasAgent: boolean;
@@ -22,6 +84,7 @@ interface Step4Props {
   sellerCommissionValue?: string;
   sellerEntityType?: string;
   transactionType?: string;
+  caseId?: string | null;
   onUpdate: (data: Partial<{
     hasAgent: boolean;
     agentName: string;
@@ -67,6 +130,7 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
   sellerCommissionValue = '',
   sellerEntityType = '',
   transactionType = '',
+  caseId,
   onUpdate,
   onNext,
   onPrevious
@@ -597,6 +661,8 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
                 </p>
               </div>
             </div>
+
+            <AgentLinkShare caseId={caseId} phone={agentContact} email={agentEmail} />
           </div>
         ) : (
           <div className="mt-6 md:mt-8 bg-white rounded-xl p-4 md:p-6 border border-blue-200">
@@ -923,6 +989,7 @@ const Step4AgentInformation: React.FC<Step4Props> = ({
                   {errors.sellerCommissionValue && <p className="mt-1 text-xs text-error">{errors.sellerCommissionValue}</p>}
                 </div>
               )}
+              <AgentLinkShare caseId={caseId} phone={sellerAgentContact} />
             </div>
           )}
         </fieldset>
