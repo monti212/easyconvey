@@ -332,8 +332,9 @@ const Step6SelectClients: React.FC<Step6SelectClientsProps> = ({
               {ex.dateOfBirth && <p><span className="text-gray-400">Date of birth:</span> {ex.dateOfBirth}</p>}
             </div>
           ) : (
-            <p className="text-xs text-gray-400">
-              No identity details could be read automatically — they can be entered manually later.
+            <p className="text-xs text-gray-500">
+              {docs.length} document{docs.length === 1 ? '' : 's'} attached — the AI reads these
+              directly when it generates each legal document.
             </p>
           )}
         </div>

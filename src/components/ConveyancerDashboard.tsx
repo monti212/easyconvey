@@ -335,6 +335,17 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const { data: { session } } = await supabase.auth.getSession();
+
+      // Buyer & seller documents come from their share-link / manual
+      // submissions (buyer_data / seller_data). Pass them so the AI can
+      // read and extract identity and property details.
+      const bd: any = currentTransaction?.buyerDetails || {};
+      const sd: any = currentTransaction?.sellerDetails || {};
+      const partyFilePaths = [...(bd.documentFilePaths || []), ...(sd.documentFilePaths || [])]
+        .map((fp: any) => ({ path: fp.path, bucket: fp.bucket || 'documents', name: fp.name, type: fp.type, party: fp.party }));
+      const partyImages = [...(bd.documentDataUrls || []), ...(sd.documentDataUrls || [])]
+        .map((d: any) => ({ dataUrl: d.dataUrl, name: d.name, docType: d.docType, party: d.party }));
+
       const response = await fetch(`${supabaseUrl}/functions/v1/generate-conveyancing-document`, {
         method: 'POST',
         headers: {
@@ -350,7 +361,11 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
           sellerDetails: currentTransaction?.sellerDetails || null,
           buyerName: currentTransaction?.buyerName || 'Not specified',
           sellerName: currentTransaction?.sellerName || 'Not specified',
-          documentPaths: caseDocuments.map(d => ({ path: d.file_path, bucket: 'documents', name: d.document_name, type: d.document_type })),
+          documentPaths: [
+            ...caseDocuments.map(d => ({ path: d.file_path, bucket: 'documents', name: d.document_name, type: d.document_type })),
+            ...partyFilePaths,
+          ],
+          documentImages: partyImages,
           stream: true,
           // Conveyancer identity
           conveyancerName: orgUser ? `${orgUser.first_name || ''} ${orgUser.last_name || ''}`.trim() : 'Conveyancer',
