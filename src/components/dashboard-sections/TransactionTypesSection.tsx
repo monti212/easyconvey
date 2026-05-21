@@ -80,19 +80,8 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
   const activeCases = useMemo(
     () => allCases
       .filter(c => recognizedStatuses.includes(c.status))
-      .sort((a, b) => {
-        // Active cases first (initiated/in_progress), then completed, then cancelled
-        const statusOrder: Record<string, number> = { in_progress: 0, initiated: 1, submitted_to_conveyancer: 2, completed: 3, cancelled: 4 };
-        const sa = statusOrder[a.status] ?? 2;
-        const sb = statusOrder[b.status] ?? 2;
-        if (sa !== sb) return sa - sb;
-        // Within same status: high priority first, then by most recently updated
-        const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-        const pa = priorityOrder[a.priority] ?? 1;
-        const pb = priorityOrder[b.priority] ?? 1;
-        if (pa !== pb) return pa - pb;
-        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
-      }),
+      // Newest transaction first — ordered by when the case was created
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
     [allCases]
   );
 
@@ -293,8 +282,8 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
             </div>
             <p className={`text-xs mt-2 font-medium ${bothSubmitted ? 'text-green-700' : 'text-gray-500'}`}>
               {bothSubmitted
-                ? 'Both parties have submitted — you can start the transaction.'
-                : 'Waiting for both the buyer and seller to submit before the transaction can start.'}
+                ? 'Both parties have submitted — ready to select on Step 6.'
+                : 'Client submissions are still pending — you can still begin the transaction.'}
             </p>
           </div>
         )}
@@ -311,16 +300,9 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
             </button>
             {isInitiated && (
               <button
-                onClick={() => bothSubmitted && onStartTransaction?.(c.id, deriveTypeData(c))}
-                disabled={!bothSubmitted}
-                title={bothSubmitted
-                  ? 'Start the transaction process'
-                  : 'Waiting for both parties to submit their documents'}
-                className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
-                  bothSubmitted
-                    ? 'bg-green-600 text-white hover:bg-green-700'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                }`}
+                onClick={() => onStartTransaction?.(c.id, deriveTypeData(c))}
+                title="Start the transaction process"
+                className="inline-flex items-center px-4 py-2 rounded-lg transition-colors text-sm font-medium bg-green-600 text-white hover:bg-green-700"
               >
                 <ArrowRight className="h-4 w-4 mr-2" />
                 Start Transaction
