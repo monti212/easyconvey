@@ -100,8 +100,16 @@ export async function downloadAsWord(
     } else if (trimmed === '') {
       children.push(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 60 } }));
     } else {
+      const markerMatch = trimmed.match(/^\[\[(C|R)\]\]\s*(.*)/);
       const depth = clauseDepth(trimmed);
-      if (depth !== null) {
+      if (markerMatch) {
+        // Explicit alignment marker from the AI
+        children.push(new Paragraph({
+          children: parseMarkdownLine(markerMatch[2]),
+          alignment: markerMatch[1] === 'C' ? AlignmentType.CENTER : AlignmentType.RIGHT,
+          spacing: { after: 80 },
+        }));
+      } else if (depth !== null) {
         // Numbered/lettered clause — left-aligned and indented by depth
         children.push(new Paragraph({
           children: parseMarkdownLine(trimmed),
@@ -109,6 +117,9 @@ export async function downloadAsWord(
           indent: { left: depth * 360 },
           spacing: { after: 80 },
         }));
+      } else if (trimmed.startsWith('**')) {
+        // Line opening with a bold label (CERTAIN:, SITUATE: …) — left-aligned
+        children.push(new Paragraph({ children: parseMarkdownLine(trimmed), spacing: { after: 80 }, alignment: AlignmentType.LEFT }));
       } else {
         children.push(new Paragraph({ children: parseMarkdownLine(trimmed), spacing: { after: 80 }, alignment: AlignmentType.JUSTIFIED }));
       }

@@ -312,6 +312,7 @@ interface ParsedBlock {
   ordered?: boolean;
   index?: number;
   indent?: number;
+  align?: 'center' | 'right';
 }
 
 // Indent depth of a numbered/lettered clause line (null = plain prose)
@@ -378,6 +379,15 @@ function parseMarkdownToBlocks(markdown: string): ParsedBlock[] {
     if (olMatch) {
       flushParagraph();
       blocks.push({ type: 'list-item', text: olMatch[2], ordered: true, index: parseInt(olMatch[1]) });
+      i++;
+      continue;
+    }
+
+    // Explicit alignment marker emitted by the AI ([[C]] centre, [[R]] right)
+    const markerMatch = trimmed.match(/^\[\[(C|R)\]\]\s*(.*)/);
+    if (markerMatch) {
+      flushParagraph();
+      blocks.push({ type: 'paragraph', text: markerMatch[2], align: markerMatch[1] === 'C' ? 'center' : 'right' });
       i++;
       continue;
     }
@@ -546,17 +556,14 @@ export default function DeedOfSalePDF(props: DeedOfSaleProps) {
           return <Text key={idx} style={styles.h3}>{renderInlineText(block.text)}</Text>;
         case 'h4':
           return <Text key={idx} style={styles.h4}>{renderInlineText(block.text)}</Text>;
-        case 'paragraph':
-          return (
-            <Text
-              key={idx}
-              style={block.indent
-                ? [styles.paragraph, { textAlign: 'left' as const, marginLeft: block.indent * 18 }]
-                : styles.paragraph}
-            >
-              {renderInlineText(block.text)}
-            </Text>
-          );
+        case 'paragraph': {
+          let pStyle: any = styles.paragraph;
+          if (block.align === 'center') pStyle = [styles.paragraph, { textAlign: 'center' as const }];
+          else if (block.align === 'right') pStyle = [styles.paragraph, { textAlign: 'right' as const }];
+          else if (block.indent) pStyle = [styles.paragraph, { textAlign: 'left' as const, marginLeft: block.indent * 18 }];
+          else if (block.text.trimStart().startsWith('**')) pStyle = [styles.paragraph, { textAlign: 'left' as const }];
+          return <Text key={idx} style={pStyle}>{renderInlineText(block.text)}</Text>;
+        }
         case 'list-item':
           return (
             <View key={idx} style={styles.listItem}>

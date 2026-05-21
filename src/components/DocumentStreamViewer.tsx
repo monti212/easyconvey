@@ -243,10 +243,22 @@ const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
                   remarkPlugins={[remarkGfm]}
                   components={{
                     p: ({ children }) => {
-                      const d = clauseDepth(leadingText(children));
-                      return d !== null
-                        ? <p style={{ textAlign: 'left', paddingLeft: `${d * 1.5}rem` }}>{children}</p>
-                        : <p>{children}</p>;
+                      const kids = Array.isArray(children) ? [...children] : [children];
+                      // Explicit alignment markers emitted by the AI
+                      let marker = '';
+                      if (typeof kids[0] === 'string') {
+                        const m = kids[0].match(/^\[\[(C|R)\]\]\s*/);
+                        if (m) { marker = m[1]; kids[0] = kids[0].slice(m[0].length); }
+                      }
+                      if (marker === 'C') return <p style={{ textAlign: 'center' }}>{kids}</p>;
+                      if (marker === 'R') return <p style={{ textAlign: 'right' }}>{kids}</p>;
+                      const lead = leadingText(kids);
+                      const d = clauseDepth(lead);
+                      if (d !== null) return <p style={{ textAlign: 'left', paddingLeft: `${d * 1.5}rem` }}>{kids}</p>;
+                      // A paragraph that opens with a bold label (e.g. CERTAIN:,
+                      // SITUATE:) — left-align it as a tabular line.
+                      if (lead.trim() === '') return <p style={{ textAlign: 'left' }}>{kids}</p>;
+                      return <p>{kids}</p>;
                     },
                   }}
                 >{content}</ReactMarkdown>

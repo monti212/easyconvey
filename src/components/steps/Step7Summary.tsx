@@ -646,6 +646,8 @@ const Step7Summary: React.FC<Step7Props> = ({
         .replace(/^### (.*$)/gm, '<h3>$1</h3>')
         .replace(/^## (.*$)/gm, '<h2>$1</h2>')
         .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+        .replace(/^\[\[C\]\]\s*(.*)$/gm, '<p class="doc-center">$1</p>')
+        .replace(/^\[\[R\]\]\s*(.*)$/gm, '<p class="doc-right">$1</p>')
         .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -668,6 +670,8 @@ const Step7Summary: React.FC<Step7Props> = ({
   h4 { font-size: 10pt; color: #444; margin-top: 12px; }
   p { text-align: justify; margin-bottom: 8px; }
   p.clause { text-align: left; margin-left: 1.6em; }
+  p.doc-center { text-align: center; }
+  p.doc-right { text-align: right; }
   li { margin-bottom: 4px; text-align: left; }
   ol, ul { padding-left: 1.8em; }
   hr { border: none; border-top: 0.5px solid #ddd; margin: 16px 0; }

@@ -64,9 +64,9 @@ Generate BOTH documents below in sequence. Use the exact phrasing and structure 
 
 Use this exact structure:
 
-Prepared by me
+[[R]] Prepared by me
 
-Conveyancer
+[[R]] **[CONVEYANCER FULL NAME]**, Conveyancer
 
 ## POWER OF ATTORNEY TO GIVE TRANSFER
 

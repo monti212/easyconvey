@@ -347,6 +347,21 @@ Where information from uploaded documents conflicts with form data, prefer the d
 
     // ─── Get document type specific instructions and prompts ─────────
     const config = getDocumentConfig(documentType, transactionBlock);
+
+    // Alignment markers — markdown cannot express alignment, so the document
+    // renderers honour these line prefixes. Applied to every document type.
+    const globalFormatting = `
+
+${"═".repeat(39)}
+PAGE ALIGNMENT MARKERS — APPLY TO THIS DOCUMENT
+${"═".repeat(39)}
+Markdown cannot express alignment, so use these line-start markers:
+- "[[C]] " at the very start of a line CENTRES that line. Use it for deed cover lines such as "by", "in favour of", "in respect of", the party-name lines, the lot/property line, and the deed-number line.
+- "[[R]] " at the very start of a line RIGHT-ALIGNS it. Use it for the "Prepared by me" block and the conveyancer name/"Conveyancer" line on a deed cover.
+- Do NOT mark ordinary body paragraphs, numbered/lettered clauses (1, 1.1, 2, a, etc.) or the CERTAIN/SITUATE/MEASURING property block — the renderer automatically justifies body prose, left-indents numbered clauses, and left-aligns bold-labelled lines.
+- A marker must be the FIRST characters on the line, followed by exactly one space, then the text. Never put a marker on a "#" heading line — headings are centred automatically.`;
+    config.instructions = config.instructions + globalFormatting;
+
     const instructions = knowledgeBaseContent
       ? `${config.instructions}\n\n${"═".repeat(39)}\nKNOWLEDGE BASE — STRUCTURAL REFERENCE ONLY\n${"═".repeat(39)}\nThe following is an authoritative STRUCTURAL TEMPLATE from the Minchin & Kelly knowledge base showing the correct format, section order, legal phrasing style, and clause structure for Botswana conveyancing documents.\n\nCRITICAL RULES:\n- Use this ONLY as a structural and stylistic guide — learn the format, section headings, clause ordering, and legal language patterns.\n- NEVER copy placeholder text (e.g. "[FULL NAME OF TRANSFEROR]", "[GABORONE / FRANCISTOWN / LOBATSE]") into your output.\n- NEVER reproduce the template content verbatim. Every sentence must be generated fresh using the ACTUAL transaction data provided by the user.\n- Replace ALL bracketed placeholders with real data from the transaction details and uploaded documents.\n- For every field, follow the DATA RESOLUTION ORDER from the document-specific instructions: party block → OCR-extracted block → attached image extraction → "To be confirmed" (last resort only). Do NOT write "To be confirmed" while real data exists in the OCR-extracted block or attached images.\n- Never output a bracket placeholder like [NAME] or [DOB] under any circumstances.\n- FILENAMES ARE NOT DATA. The PDF inventory and image routing table list file names / party tags only so you know what was uploaded. Never copy a filename, party-tag word ("BUYER" / "SELLER"), or document type label into the output as a field value. Read values from inside the images and from the OCR-extracted block.\n- LABELLED FIELD FORMATTING. When stating any labelled fact (Plot Number, Date of Birth, ID Number, Reference, Status, etc.) outside the formal CERTAIN/SITUATE/MEASURING tabular property block, put the label on its own line and the value on the next line — no colon. Write "Plot Number\\\\n15583", never "Plot Number: 15583". The statutory CERTAIN/SITUATE/etc. property block keeps its same-line tabular registry format.\n\n${knowledgeBaseContent}`
       : config.instructions;

@@ -75,28 +75,27 @@ ${transactionBlock}
 REQUIRED DOCUMENT STRUCTURE — REPRODUCE THIS LAYOUT EXACTLY (substitute real values for the sample placeholders, never copy the placeholder words themselves)
 ═══════════════════════════════════════
 
-DEED OF TRANSFER
+[[C]] DEED OF TRANSFER
 
-by
+[[C]] by
 
-**[SELLER FULL NAME IN CAPS]**
+[[C]] **[SELLER FULL NAME IN CAPS]**
 
-in favour of
+[[C]] in favour of
 
-**[BUYER FULL NAME IN CAPS]**
+[[C]] **[BUYER FULL NAME IN CAPS]**
 
-in respect of
+[[C]] in respect of
 
-**LOT [PLOT NUMBER] [LOCATION IN CAPS]**
+[[C]] **LOT [PLOT NUMBER] [LOCATION IN CAPS]**
 
-                                               Prepared by me
+[[R]] Prepared by me
 
-                                               Conveyancer
+[[R]] **[CONVEYANCER FULL NAME]**, Conveyancer
 
-DEED OF TRANSFER NO. ___________
+[[C]] DEED OF TRANSFER NO. ___________
 
-**Be it hereby made known:**
-
+[[C]] **Be it hereby made known:**
 THAT **[CONVEYANCER FULL NAME IN CAPS]** appeared before me, the Registrar of Deeds for Botswana at **[PLACE]**, he the said Appearer, being duly authorised thereto by a Power of Attorney granted to him by
 
 **[SELLER FULL NAME IN CAPS]**
