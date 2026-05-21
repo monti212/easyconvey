@@ -667,7 +667,9 @@ const Step7Summary: React.FC<Step7Props> = ({
   h3 { font-size: 11pt; color: #333; margin-top: 16px; }
   h4 { font-size: 10pt; color: #444; margin-top: 12px; }
   p { text-align: justify; margin-bottom: 8px; }
-  li { margin-bottom: 4px; }
+  p.clause { text-align: left; margin-left: 1.6em; }
+  li { margin-bottom: 4px; text-align: left; }
+  ol, ul { padding-left: 1.8em; }
   hr { border: none; border-top: 0.5px solid #ddd; margin: 16px 0; }
   strong { color: #1a1a2e; }
   .prepared-by { text-align: right; font-size: 7pt; color: #999; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }

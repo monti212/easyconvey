@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     color: '#333333',
     lineHeight: 1.7,
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: 'justify',
   },
   bold: {
     fontFamily: 'Helvetica-Bold',
@@ -311,6 +311,15 @@ interface ParsedBlock {
   text: string;
   ordered?: boolean;
   index?: number;
+  indent?: number;
+}
+
+// Indent depth of a numbered/lettered clause line (null = plain prose)
+function clauseDepth(text: string): number | null {
+  const numeric = text.match(/^(\d+(?:\.\d+)+)[.)]?\s/);
+  if (numeric) return (numeric[1].match(/\./g) || []).length;
+  if (/^(\([a-zA-Z0-9]{1,4}\)|[a-zA-Z][.)])\s/.test(text)) return 1;
+  return null;
 }
 
 function parseMarkdownToBlocks(markdown: string): ParsedBlock[] {
@@ -369,6 +378,15 @@ function parseMarkdownToBlocks(markdown: string): ParsedBlock[] {
     if (olMatch) {
       flushParagraph();
       blocks.push({ type: 'list-item', text: olMatch[2], ordered: true, index: parseInt(olMatch[1]) });
+      i++;
+      continue;
+    }
+
+    // Numbered/lettered clause line (1.1, 2.3.1, a., (i)) — left-indented block
+    const cd = clauseDepth(trimmed);
+    if (cd !== null) {
+      flushParagraph();
+      blocks.push({ type: 'paragraph', text: trimmed, indent: cd });
       i++;
       continue;
     }
@@ -529,7 +547,16 @@ export default function DeedOfSalePDF(props: DeedOfSaleProps) {
         case 'h4':
           return <Text key={idx} style={styles.h4}>{renderInlineText(block.text)}</Text>;
         case 'paragraph':
-          return <Text key={idx} style={styles.paragraph}>{renderInlineText(block.text)}</Text>;
+          return (
+            <Text
+              key={idx}
+              style={block.indent
+                ? [styles.paragraph, { textAlign: 'left' as const, marginLeft: block.indent * 18 }]
+                : styles.paragraph}
+            >
+              {renderInlineText(block.text)}
+            </Text>
+          );
         case 'list-item':
           return (
             <View key={idx} style={styles.listItem}>

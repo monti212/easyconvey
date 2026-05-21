@@ -21,6 +21,22 @@ interface DocumentStreamViewerProps {
   queueProgress?: { current: number; total: number } | null;
 }
 
+// Indentation depth of a numbered/lettered clause line — null if it is plain
+// prose. e.g. "1.1" → 1, "2.3.1" → 2, "(a)"/"a." → 1.
+const clauseDepth = (text: string): number | null => {
+  const numeric = text.match(/^(\d+(?:\.\d+)+)[.)]?\s/);
+  if (numeric) return (numeric[1].match(/\./g) || []).length;
+  if (/^(\([a-zA-Z0-9]{1,4}\)|[a-zA-Z][.)])\s/.test(text)) return 1;
+  return null;
+};
+
+const leadingText = (children: any): string => {
+  const arr = Array.isArray(children) ? children : [children];
+  let s = '';
+  for (const n of arr) { if (typeof n === 'string') s += n; else break; }
+  return s;
+};
+
 const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
   isOpen,
   isStreaming,
@@ -205,17 +221,17 @@ const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
                 </div>
               )}
 
-              <article className="prose prose-gray max-w-none text-center
+              <article className="prose prose-gray max-w-none
                 prose-headings:font-serif prose-headings:tracking-tight prose-headings:text-center
                 prose-h1:text-[1.1rem] prose-h1:font-bold prose-h1:text-[#1a1a2e] prose-h1:mb-8 prose-h1:uppercase prose-h1:tracking-[0.15em]
                 prose-h2:text-[0.95rem] prose-h2:font-bold prose-h2:text-[#1a1a2e] prose-h2:border-b prose-h2:border-gray-300 prose-h2:pb-2 prose-h2:mt-10 prose-h2:uppercase prose-h2:tracking-wide
                 prose-h3:text-base prose-h3:font-semibold prose-h3:text-gray-800 prose-h3:mt-6
                 prose-h4:text-sm prose-h4:font-semibold prose-h4:text-gray-700 prose-h4:mt-4
-                prose-p:text-[13px] prose-p:leading-[1.8] prose-p:text-gray-700 prose-p:text-center
-                prose-li:text-[13px] prose-li:leading-[1.8] prose-li:text-gray-700 prose-li:text-center
+                prose-p:text-[13px] prose-p:leading-[1.8] prose-p:text-gray-700 prose-p:text-justify
+                prose-li:text-[13px] prose-li:leading-[1.8] prose-li:text-gray-700 prose-li:text-left
                 prose-strong:text-gray-900 prose-strong:font-semibold
-                prose-ol:pl-6 prose-ol:list-inside prose-ul:pl-6 prose-ul:list-inside
-                [&_ol]:text-left [&_ol_li]:text-left
+                prose-ol:pl-8 prose-ul:pl-8
+                [&_ol]:text-left [&_ol_li]:text-left [&_ul]:text-left [&_ul_li]:text-left
                 prose-hr:border-gray-300
                 prose-table:border-collapse prose-table:text-[12px] prose-table:mx-auto
                 prose-thead:bg-[#1a1a2e] prose-thead:text-white
@@ -223,7 +239,17 @@ const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
                 prose-td:px-3 prose-td:py-2 prose-td:border prose-td:border-gray-200 prose-td:text-[12px] prose-td:align-top prose-td:text-center
                 prose-tr:even:bg-gray-50
               ">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    p: ({ children }) => {
+                      const d = clauseDepth(leadingText(children));
+                      return d !== null
+                        ? <p style={{ textAlign: 'left', paddingLeft: `${d * 1.5}rem` }}>{children}</p>
+                        : <p>{children}</p>;
+                    },
+                  }}
+                >{content}</ReactMarkdown>
               </article>
 
               {/* Streaming cursor */}

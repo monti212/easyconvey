@@ -27,6 +27,14 @@ function parseMarkdownLine(line: string): TextRun[] {
   return runs.length > 0 ? runs : [new TextRun({ text: '' })];
 }
 
+// Indent depth of a numbered/lettered clause line (null = plain prose)
+function clauseDepth(text: string): number | null {
+  const numeric = text.match(/^(\d+(?:\.\d+)+)[.)]?\s/);
+  if (numeric) return (numeric[1].match(/\./g) || []).length;
+  if (/^(\([a-zA-Z0-9]{1,4}\)|[a-zA-Z][.)])\s/.test(text)) return 1;
+  return null;
+}
+
 export async function downloadAsWord(
   content: string,
   documentTitle: string,
@@ -85,14 +93,25 @@ export async function downloadAsWord(
         children: [new TextRun({ text: '' })],
       }));
     } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      children.push(new Paragraph({ bullet: { level: 0 }, children: parseMarkdownLine(trimmed.slice(2)), alignment: AlignmentType.CENTER, spacing: { after: 60 } }));
+      children.push(new Paragraph({ bullet: { level: 0 }, children: parseMarkdownLine(trimmed.slice(2)), alignment: AlignmentType.LEFT, spacing: { after: 60 } }));
     } else if (/^\d+[.)]\s/.test(trimmed)) {
       const text = trimmed.replace(/^\d+[.)]\s/, '');
       children.push(new Paragraph({ numbering: { reference: 'default-numbering', level: 0 }, children: parseMarkdownLine(text), alignment: AlignmentType.LEFT, spacing: { after: 60 } }));
     } else if (trimmed === '') {
       children.push(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 60 } }));
     } else {
-      children.push(new Paragraph({ children: parseMarkdownLine(trimmed), spacing: { after: 80 }, alignment: AlignmentType.CENTER }));
+      const depth = clauseDepth(trimmed);
+      if (depth !== null) {
+        // Numbered/lettered clause — left-aligned and indented by depth
+        children.push(new Paragraph({
+          children: parseMarkdownLine(trimmed),
+          alignment: AlignmentType.LEFT,
+          indent: { left: depth * 360 },
+          spacing: { after: 80 },
+        }));
+      } else {
+        children.push(new Paragraph({ children: parseMarkdownLine(trimmed), spacing: { after: 80 }, alignment: AlignmentType.JUSTIFIED }));
+      }
     }
   }
 
