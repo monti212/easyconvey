@@ -397,9 +397,17 @@ function App() {
               sharedTransactionData={sharedTransactionData}
               mode="conveyancer"
               onComplete={() => {
+                // Transaction submitted — close the wizard and open this
+                // case's dashboard (view details + generate documents).
+                const completedCaseId = currentSupabaseCaseId;
                 setShowConveyancerWizard(false);
                 setStarted(false);
                 setCurrentSupabaseCaseId(null);
+                if (completedCaseId) {
+                  handleConveyancerDashboard(completedCaseId, {});
+                } else {
+                  setShowConveyancerOverview(true);
+                }
               }}
             />
           </TransactionContext.Provider>

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, X, ShoppingCart, Tag, ClipboardList } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Trash2, ShoppingCart, Tag, ClipboardList } from 'lucide-react';
 import * as storageService from '../services/storage.service';
 import * as casesService from '../services/cases.service';
 
@@ -308,10 +308,11 @@ export default function ClientUploadPage({
                 </div>
                 <button
                   onClick={e => { e.stopPropagation(); removeFile(f.id); }}
-                  className="flex-shrink-0 p-1 text-gray-400 hover:text-error transition-colors"
-                  aria-label="Remove file"
+                  className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error border border-error/30 rounded-md hover:bg-error/10 transition-colors"
+                  aria-label="Delete file"
                 >
-                  <X className="h-4 w-4" />
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
                 </button>
               </li>
             ))}

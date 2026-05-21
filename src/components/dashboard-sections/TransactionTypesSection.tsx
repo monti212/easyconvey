@@ -307,7 +307,7 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
               className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
             >
               <Eye className="h-4 w-4 mr-2" />
-              View Details
+              {c.status === 'completed' ? 'Open Dashboard' : 'View Details'}
             </button>
             {isInitiated && (
               <button

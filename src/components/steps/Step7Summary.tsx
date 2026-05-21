@@ -711,6 +711,9 @@ const Step7Summary: React.FC<Step7Props> = ({
         await onFinalSubmit();
       }
       setIsSubmitted(true);
+      // Transaction is now closed — leave the wizard and open the dashboard,
+      // where the conveyancer views the transaction and generates documents.
+      onComplete?.();
     }
   };
 
