@@ -860,29 +860,6 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         </div>
       )}
 
-      {/* Role Banner — visible on every step so the user always knows whose side is being captured */}
-      {transactionData.transactionType && (() => {
-        const isBuyer = transactionData.transactionType === 'buying';
-        return (
-          <div className={`px-4 py-3 md:px-6 md:py-4 border-b ${isBuyer ? 'bg-secondary/10 border-secondary/30' : 'bg-primary/5 border-primary/20'}`}>
-            <div className="max-w-5xl mx-auto flex items-center gap-3">
-              <div className={`flex-shrink-0 rounded-full h-10 w-10 flex items-center justify-center ${isBuyer ? 'bg-secondary text-primary' : 'bg-primary text-white'}`}>
-                {isBuyer ? <ShoppingCart className="h-5 w-5" /> : <Tag className="h-5 w-5" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className={`text-[10px] font-semibold tracking-[0.2em] uppercase ${isBuyer ? 'text-secondary-dark' : 'text-primary'}`}>
-                  Capturing
-                </p>
-                <p className={`text-base md:text-lg font-bold leading-tight ${isBuyer ? 'text-primary' : 'text-primary'}`}>
-                  {isBuyer ? 'BUYER side' : 'SELLER side'}
-                  <span className="ml-2 text-xs font-normal text-gray-600">— all fields and uploads on this step belong to the {isBuyer ? 'buyer (purchaser)' : 'seller (transferor)'}</span>
-                </p>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
       {/* Progress Bar - Mobile optimized version */}
       <div className="bg-gradient-to-r from-primary via-primary to-primary-dark relative overflow-hidden">
         <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
