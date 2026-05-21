@@ -62,7 +62,8 @@ NUMBERS AND DATES:
 - Dates use ordinal day form: "16th day of October 1994" (not "16 October 1994").
 
 FORMATTING:
-- The cover page (top): document title, "by", seller name, "in favour of", buyer name, "in respect of", lot description — each centred on its own line. Then a right-aligned "Prepared by me" / "Conveyancer" block.
+- The cover page (top): document title, "by", seller name, "in favour of", buyer name, "in respect of", lot description — each centred on its own line. Then a right-aligned "Prepared by me" line, a blank gap, then a right-aligned "Conveyancer" line.
+- CATCHWORDS: registry deeds carry a "catchword" at the foot of each section that previews the opening of the next section. Emit these as RIGHT-ALIGNED lines using the exact form "[[R]] …/" followed by the opening words of the section that follows. Place a catchword immediately before: condition 6, the WHEREFORE clause, the THUS DONE AND EXECUTED clause, and (where the deed uses a WHEREAS recital) the WHEREAS section. Examples: "[[R]] …/6. Connection of services", "[[R]] …/WHEREFORE", "[[R]] …/WHEREAS". The "…/" must use the ellipsis character.
 - The body uses paragraph prose for the "appeared before me" / "AND the said Appearer declared" / "WHEREFORE the Appearer" sections, and tabular prose for the property description block (CERTAIN/SITUATE/etc.).
 - Signature block at the end uses dotted/underscored signature lines (use "______________________________" for the lines).
 - Use Markdown bold (**…**) ONLY for party names, plot/lot numbers, deed numbers, and key amounts.
@@ -91,7 +92,9 @@ REQUIRED DOCUMENT STRUCTURE — REPRODUCE THIS LAYOUT EXACTLY (substitute real v
 
 [[R]] Prepared by me
 
-[[R]] **[CONVEYANCER FULL NAME]**, Conveyancer
+
+
+[[R]] Conveyancer
 
 [[C]] DEED OF TRANSFER NO. ___________
 
@@ -151,7 +154,11 @@ AND FURTHER SUBJECT TO the following conditions:
 
 5. The Government or any lawfully established public authority authorised thereto by the Government shall at all times have the power of constructing on or through any part of the property pipe lines, aqueducts, drains or telephone or telegraph lines required for public purposes. No compensation shall be payable by the Government or other authority aforesaid in the exercise of any of its rights under this paragraph except in respect of the value of any damage to improvements actually sustained by reason of the exercise of these rights.
 
+[[R]] …/6. Connection of services
+
 6. Connection of services to individual plots shall be the responsibility of the Purchaser.
+
+[[R]] …/WHEREFORE
 
 WHEREFORE the Appearer, renouncing all the right, title and interest which his Principal heretofore had to the premises did in consequence also acknowledge him to be entirely dispossessed of and disentitled to the same and that by virtue of these presents, the said
 
@@ -164,6 +171,8 @@ WHEREFORE the Appearer, renouncing all the right, title and interest which his P
 AND, finally, acknowledging that the property was sold on the [ordinal] day of [Month] [Year] for the sum of **P[SALE PRICE FIGURES] ([SALE PRICE IN WORDS])** [if valuation differs: but valued at **P[VALUATION FIGURES] ([VALUATION IN WORDS])** for transfer duty purposes].
 
 In witness whereof I; the said Registrar, together with the Appearer q.q. have subscribed to these presents, and have caused the Seal of Office to be affixed hereto.
+
+[[R]] …/THUS DONE AND EXECUTED
 
 THUS DONE AND EXECUTED at the Office of the Registrar of Deeds for Botswana at **GABORONE** on this [ordinal] day of [Month] in the Year of Our Lord **[YEAR IN WORDS] (20[YEAR])**.
 

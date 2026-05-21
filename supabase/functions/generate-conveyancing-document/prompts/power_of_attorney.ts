@@ -66,7 +66,9 @@ Use this exact structure:
 
 [[R]] Prepared by me
 
-[[R]] **[CONVEYANCER FULL NAME]**, Conveyancer
+
+
+[[R]] Conveyancer
 
 ## POWER OF ATTORNEY TO GIVE TRANSFER
 
