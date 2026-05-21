@@ -140,19 +140,19 @@ const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
             <button
               onClick={onDownload}
               disabled={isStreaming || !content}
-              className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30"
-              title="Download PDF"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 text-xs font-medium"
+              title="Download as PDF"
             >
-              <Download className="h-4 w-4" />
+              <Download className="h-4 w-4" /> PDF
             </button>
             {onDownloadWord && (
               <button
                 onClick={onDownloadWord}
                 disabled={isStreaming || !content}
-                className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30"
-                title="Download Word (.docx)"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 text-xs font-medium"
+                title="Download as Word"
               >
-                <FileDown className="h-4 w-4" />
+                <FileDown className="h-4 w-4" /> Word
               </button>
             )}
             <button

@@ -1168,6 +1168,7 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         content={streamingContent || generatedDocument || ''}
         onClose={() => setShowDocumentViewer(false)}
         onDownload={downloadDocument}
+        onDownloadWord={downloadDocumentWord}
         onPrint={printDocument}
         caseNumber={currentTransaction?.caseNumber || transactionId}
         buyerName={currentTransaction?.buyerName || 'Buyer'}
