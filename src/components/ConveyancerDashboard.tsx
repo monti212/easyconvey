@@ -151,6 +151,18 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         // Documents may not exist yet
       }
 
+      // Load previously generated AI documents so they can be reopened anytime
+      try {
+        const genDocs = await casesService.getGeneratedDocuments(transactionId);
+        const map: Record<string, string> = {};
+        for (const g of genDocs) {
+          if (g.status === 'completed' && g.content) map[g.document_type] = g.content;
+        }
+        if (Object.keys(map).length > 0) setGeneratedDocuments(map as Record<DocumentType, string>);
+      } catch {
+        // generated_documents table may not exist yet
+      }
+
       // Extract wizard data stored by the conveyancer during the transaction wizard
       const wd = Array.isArray(caseRecord?.documents) && caseRecord.documents.length > 0
         ? caseRecord.documents[caseRecord.documents.length - 1]?.wizardData
@@ -455,6 +467,11 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         `Successfully generated ${docLabel}`,
         { document_type: typeToGenerate, document_size: finalText.length }
       );
+
+      // Persist the generated document so it can be reopened anytime
+      if (finalText) {
+        casesService.upsertGeneratedDocument(transactionId, typeToGenerate, docLabel, finalText, 'completed').catch(() => {});
+      }
     } catch (error) {
       console.error('Error generating document:', error);
       setDocumentError(

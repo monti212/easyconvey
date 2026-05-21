@@ -1,20 +1,19 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Trash2, ShoppingCart, Tag, ClipboardList } from 'lucide-react';
+import {
+  Upload, FileText, CheckCircle, AlertCircle, Loader2, Trash2,
+  ShoppingCart, Tag, ClipboardList, UserCircle, Globe, Heart,
+} from 'lucide-react';
 import * as storageService from '../services/storage.service';
 import * as casesService from '../services/cases.service';
 
 interface ClientUploadPageProps {
-  /** Share-link token — required for the buyer/seller link flow. */
   token?: string;
   role: 'buyer' | 'seller';
   caseId: string;
   orgId: string;
   caseNumber?: string;
-  /** Case type (e.g. normal_transfer, sectional_title_bond) — drives the document checklist. */
   caseType?: string;
-  /** True when the conveyancer is entering a party's details on their behalf. */
   forConveyancer?: boolean;
-  /** When provided, used instead of the token submission (conveyancer manual entry). */
   onSubmitParty?: (partyData: any) => Promise<{ success: boolean; error?: string }>;
   onSubmitted: () => void;
 }
@@ -29,12 +28,62 @@ interface UploadedFile {
   dataUrl?: string;
 }
 
-const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB per file
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
-// Documents expected from each party, by role and transaction type
-const requiredDocsFor = (role: 'buyer' | 'seller', caseType?: string): string[] => {
+const NATIONALITIES = [
+  'Botswana',
+  'Afghan', 'Albanian', 'Algerian', 'American', 'Andorran', 'Angolan', 'Antiguan', 'Argentine', 'Armenian', 'Australian',
+  'Austrian', 'Azerbaijani', 'Bahamian', 'Bahraini', 'Bangladeshi', 'Barbadian', 'Belarusian', 'Belgian', 'Belizean',
+  'Beninese', 'Bhutanese', 'Bolivian', 'Bosnian', 'Brazilian', 'British', 'Bruneian', 'Bulgarian', 'Burkinabe',
+  'Burmese', 'Burundian', 'Cambodian', 'Cameroonian', 'Canadian', 'Cape Verdean', 'Central African', 'Chadian', 'Chilean',
+  'Chinese', 'Colombian', 'Comoran', 'Congolese', 'Costa Rican', 'Croatian', 'Cuban', 'Cypriot', 'Czech', 'Danish', 'Djibouti',
+  'Dominican', 'Dutch', 'East Timorese', 'Ecuadorean', 'Egyptian', 'Emirian', 'Equatorial Guinean', 'Eritrean', 'Estonian',
+  'Ethiopian', 'Fijian', 'Filipino', 'Finnish', 'French', 'Gabonese', 'Gambian', 'Georgian', 'German', 'Ghanaian', 'Greek',
+  'Grenadian', 'Guatemalan', 'Guinea-Bissauan', 'Guinean', 'Guyanese', 'Haitian', 'Honduran', 'Hungarian',
+  'Icelander', 'Indian', 'Indonesian', 'Iranian', 'Iraqi', 'Irish', 'Israeli', 'Italian', 'Ivorian', 'Jamaican', 'Japanese',
+  'Jordanian', 'Kazakhstani', 'Kenyan', 'Kuwaiti', 'Kyrgyz', 'Laotian', 'Latvian', 'Lebanese',
+  'Liberian', 'Libyan', 'Liechtensteiner', 'Lithuanian', 'Luxembourger', 'Macedonian', 'Malagasy', 'Malawian', 'Malaysian',
+  'Maldivan', 'Malian', 'Maltese', 'Marshallese', 'Mauritanian', 'Mauritian', 'Mexican', 'Moldovan', 'Monacan',
+  'Mongolian', 'Moroccan', 'Mosotho', 'Motswana', 'Mozambican', 'Namibian', 'Nepalese', 'New Zealander',
+  'Nicaraguan', 'Nigerian', 'Nigerien', 'North Korean', 'Norwegian', 'Omani', 'Pakistani', 'Panamanian',
+  'Paraguayan', 'Peruvian', 'Polish', 'Portuguese', 'Qatari', 'Romanian', 'Russian', 'Rwandan',
+  'Salvadoran', 'Samoan', 'Saudi', 'Senegalese', 'Serbian', 'Seychellois', 'Sierra Leonean',
+  'Singaporean', 'Slovakian', 'Slovenian', 'Somali', 'South African', 'South Korean', 'Spanish', 'Sri Lankan',
+  'Sudanese', 'Swazi', 'Swedish', 'Swiss', 'Syrian', 'Taiwanese', 'Tajik', 'Tanzanian', 'Thai', 'Togolese', 'Tongan',
+  'Tunisian', 'Turkish', 'Ugandan', 'Ukrainian', 'Uruguayan', 'Uzbekistani', 'Venezuelan',
+  'Vietnamese', 'Yemenite', 'Zambian', 'Zimbabwean',
+];
+
+const MARITAL_OPTIONS = [
+  { value: 'single', label: 'Single' },
+  { value: 'married_in', label: 'Married (In Community)' },
+  { value: 'married_out', label: 'Married (Out of Community)' },
+  { value: 'divorced', label: 'Divorced' },
+  { value: 'widowed', label: 'Widowed' },
+];
+
+// Documents expected from each party — depends on role, transaction type,
+// nationality and marital status.
+const requiredDocsFor = (
+  role: 'buyer' | 'seller',
+  caseType?: string,
+  nationality?: string,
+  maritalStatus?: string,
+): string[] => {
   const ct = (caseType || '').toLowerCase();
-  const docs: string[] = ['Omang (National ID) or Passport', 'Proof of residential address'];
+  const docs: string[] = ['Proof of residential address (utility bill or affidavit)'];
+
+  // Identity — by nationality
+  if (nationality === 'Botswana') {
+    docs.push('Certified copy of Omang (National ID)');
+  } else if (nationality) {
+    docs.push('Certified passport copy');
+    docs.push('Residence / immigration permit');
+  } else {
+    docs.push('Omang (ID) or passport copy');
+  }
+
+  // Role-specific
   if (role === 'buyer') {
     docs.push('Proof of funds or a recent bank statement');
     if (ct.includes('bond')) docs.push('Bank bond approval letter');
@@ -42,7 +91,19 @@ const requiredDocsFor = (role: 'buyer' | 'seller', caseType?: string): string[] 
     docs.push('Original Title Deed of the property');
     docs.push('Latest rates & service-charge statement');
   }
-  docs.push('Marriage certificate (if married)');
+
+  // Marital status
+  if (maritalStatus === 'married_in' || maritalStatus === 'married_out') {
+    docs.push('Marriage certificate');
+    docs.push(nationality === 'Botswana' ? "Spouse's Omang (ID) copy" : "Spouse's passport / ID copy");
+    docs.push('Spouse consent form');
+    if (maritalStatus === 'married_out') docs.push('Antenuptial contract');
+  } else if (maritalStatus === 'divorced') {
+    docs.push('Divorce decree / court order');
+  } else if (maritalStatus === 'widowed') {
+    docs.push("Death certificate of the deceased spouse");
+  }
+
   docs.push('Signed Agreement of Sale / Offer to Purchase');
   if (ct.includes('sectional')) docs.push('Sectional title plan / scheme rules');
   if (ct.includes('tribal')) docs.push('Land Board consent for the tribal grant');
@@ -64,18 +125,13 @@ const formatSize = (bytes: number) => {
 };
 
 export default function ClientUploadPage({
-  token,
-  role,
-  caseId,
-  orgId,
-  caseNumber,
-  caseType,
-  forConveyancer,
-  onSubmitParty,
-  onSubmitted,
+  token, role, caseId, orgId, caseNumber, caseType, forConveyancer, onSubmitParty, onSubmitted,
 }: ClientUploadPageProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [gender, setGender] = useState('');
+  const [nationality, setNationality] = useState('');
+  const [maritalStatus, setMaritalStatus] = useState('');
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [touched, setTouched] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -86,20 +142,20 @@ export default function ClientUploadPage({
   const isBuyer = role === 'buyer';
   const Role = isBuyer ? 'Buyer' : 'Seller';
   const possessive = forConveyancer ? `${Role}'s` : 'Your';
-  const checklist = requiredDocsFor(role, caseType);
+  const checklist = requiredDocsFor(role, caseType, nationality, maritalStatus);
   const doneFiles = files.filter(f => f.status === 'done');
   const uploadingCount = files.filter(f => f.status === 'uploading').length;
 
   const firstNameError = touched && !firstName.trim() ? 'First name is required' : '';
   const lastNameError = touched && !lastName.trim() ? 'Surname is required' : '';
+  const genderError = touched && !gender ? 'Please select a gender' : '';
+  const nationalityError = touched && !nationality ? 'Please select a nationality' : '';
+  const maritalError = touched && !maritalStatus ? 'Please select a marital status' : '';
   const documentsError = touched && doneFiles.length === 0 ? 'Please upload at least one document' : '';
 
   const processFile = async (file: File) => {
     if (file.size > MAX_FILE_BYTES) {
-      setFiles(prev => [
-        ...prev,
-        { id: crypto.randomUUID(), name: file.name, size: file.size, status: 'error' },
-      ]);
+      setFiles(prev => [...prev, { id: crypto.randomUUID(), name: file.name, size: file.size, status: 'error' }]);
       return;
     }
     const id = crypto.randomUUID();
@@ -108,7 +164,6 @@ export default function ClientUploadPage({
       const { path } = await storageService.uploadFile(file, orgId, caseId, `${role}_documents`);
       setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'done', path, bucket: 'documents' } : f)));
     } catch {
-      // Storage may be unavailable for an unauthenticated client — embed the file instead
       try {
         const dataUrl = await readDataUrl(file);
         setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'done', dataUrl } : f)));
@@ -128,7 +183,8 @@ export default function ClientUploadPage({
   const handleSubmit = async () => {
     setTouched(true);
     setSubmitError(null);
-    if (!firstName.trim() || !lastName.trim() || doneFiles.length === 0 || uploadingCount > 0) return;
+    if (!firstName.trim() || !lastName.trim() || !gender || !nationality || !maritalStatus
+      || doneFiles.length === 0 || uploadingCount > 0) return;
 
     setIsSubmitting(true);
     try {
@@ -138,7 +194,10 @@ export default function ClientUploadPage({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         fullName,
-        // Name keys the conveyancer side and document generation read from
+        gender,
+        nationality,
+        maritalStatus,
+        requiredDocuments: checklist,
         extractedClientName: fullName,
         [isBuyer ? 'extractedBuyerName' : 'extractedSellerName']: fullName,
         documentFilePaths: doneFiles
@@ -160,9 +219,7 @@ export default function ClientUploadPage({
       }
       if (token) {
         casesService.trackLinkActivity({
-          token,
-          case_id: caseId,
-          role,
+          token, case_id: caseId, role,
           event_type: 'submitted',
           metadata: { documentCount: doneFiles.length, timestamp: new Date().toISOString() },
         });
@@ -174,6 +231,11 @@ export default function ClientUploadPage({
       setIsSubmitting(false);
     }
   };
+
+  const fieldClass = (err: string) =>
+    `w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary ${
+      err ? 'border-error ring-1 ring-error' : 'border-gray-300'
+    }`;
 
   return (
     <div className="max-w-2xl mx-auto px-4 pb-12">
@@ -188,8 +250,8 @@ export default function ClientUploadPage({
           </p>
           <p className="text-sm text-gray-700">
             {forConveyancer
-              ? `Enter the ${role}'s name and upload the documents they provided`
-              : 'Enter your name and upload your documents'}
+              ? `Enter the ${role}'s details and upload the documents they provided`
+              : 'Enter your details and upload your documents'}
             {caseNumber ? ` for case ${caseNumber}` : ''}.
           </p>
         </div>
@@ -200,40 +262,78 @@ export default function ClientUploadPage({
         <h2 className="text-lg font-semibold text-primary mb-1">{possessive} Details</h2>
         <p className="text-sm text-gray-500 mb-4">
           {forConveyancer
-            ? `Enter the ${role}'s full legal name exactly as it appears on their ID or passport.`
-            : 'Please enter your full legal name exactly as it appears on your ID or passport.'}
+            ? `Enter the ${role}'s details — these determine which documents are required.`
+            : 'Your details determine which documents are required for this transaction.'}
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               First Name <span className="text-error">*</span>
             </label>
-            <input
-              type="text"
-              value={firstName}
-              onChange={e => setFirstName(e.target.value)}
-              placeholder="e.g. Kabo"
-              className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary ${
-                firstNameError ? 'border-error ring-1 ring-error' : 'border-gray-300'
-              }`}
-            />
+            <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)}
+              placeholder="e.g. Kabo" className={fieldClass(firstNameError)} />
             {firstNameError && <p className="mt-1 text-xs text-error">{firstNameError}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Surname <span className="text-error">*</span>
             </label>
-            <input
-              type="text"
-              value={lastName}
-              onChange={e => setLastName(e.target.value)}
-              placeholder="e.g. Molefe"
-              className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary ${
-                lastNameError ? 'border-error ring-1 ring-error' : 'border-gray-300'
-              }`}
-            />
+            <input type="text" value={lastName} onChange={e => setLastName(e.target.value)}
+              placeholder="e.g. Molefe" className={fieldClass(lastNameError)} />
             {lastNameError && <p className="mt-1 text-xs text-error">{lastNameError}</p>}
           </div>
+        </div>
+
+        {/* Gender */}
+        <div className="mb-4">
+          <label className="flex items-center text-sm font-medium text-gray-700 mb-1.5">
+            <UserCircle className="h-4 w-4 mr-1.5 text-primary" /> Gender <span className="text-error ml-1">*</span>
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            {['male', 'female'].map(g => (
+              <button key={g} type="button" onClick={() => setGender(g)}
+                className={`py-2 px-4 rounded-lg text-sm font-medium border-2 capitalize transition-colors ${
+                  gender === g ? 'border-primary bg-primary/5 text-primary' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}>
+                {g}
+              </button>
+            ))}
+          </div>
+          {genderError && <p className="mt-1 text-xs text-error">{genderError}</p>}
+        </div>
+
+        {/* Nationality */}
+        <div className="mb-4">
+          <label className="flex items-center text-sm font-medium text-gray-700 mb-1.5">
+            <Globe className="h-4 w-4 mr-1.5 text-primary" /> Nationality <span className="text-error ml-1">*</span>
+          </label>
+          <select value={nationality} onChange={e => setNationality(e.target.value)} className={fieldClass(nationalityError)}>
+            <option value="">Select nationality</option>
+            {NATIONALITIES.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+          {nationalityError && <p className="mt-1 text-xs text-error">{nationalityError}</p>}
+          {nationality && nationality !== 'Botswana' && (
+            <p className="mt-1.5 text-xs text-blue-600">Non-citizens must provide a passport and residence permit.</p>
+          )}
+        </div>
+
+        {/* Marital status */}
+        <div>
+          <label className="flex items-center text-sm font-medium text-gray-700 mb-1.5">
+            <Heart className="h-4 w-4 mr-1.5 text-primary" /> Marital Status <span className="text-error ml-1">*</span>
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {MARITAL_OPTIONS.map(({ value, label }) => (
+              <button key={value} type="button" onClick={() => setMaritalStatus(value)}
+                className={`py-2 px-3 rounded-lg text-xs font-medium border-2 text-left transition-colors ${
+                  maritalStatus === value ? 'border-primary bg-primary/5 text-primary' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {maritalError && <p className="mt-1 text-xs text-error">{maritalError}</p>}
         </div>
       </div>
 
@@ -241,12 +341,9 @@ export default function ClientUploadPage({
       <div className="bg-white rounded-2xl shadow-soft border border-border p-5 md:p-6 mb-5">
         <h2 className="text-lg font-semibold text-primary mb-1">{possessive} Documents</h2>
         <p className="text-sm text-gray-500 mb-4">
-          {forConveyancer
-            ? `Upload the documents the ${role} provided. The list below is what is expected for this transaction.`
-            : 'Upload the documents listed below. They are the documents expected for your side of this transaction.'}
+          The list below updates based on the details above. Upload whichever apply.
         </p>
 
-        {/* Per-party document checklist */}
         <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
           <div className="flex items-center gap-2 mb-2">
             <ClipboardList className="h-4 w-4 text-blue-600" />
@@ -262,9 +359,6 @@ export default function ClientUploadPage({
               </li>
             ))}
           </ul>
-          <p className="text-xs text-blue-600 mt-2">
-            Upload whichever of these apply. You can add more than one file per item.
-          </p>
         </div>
 
         <div
@@ -279,14 +373,8 @@ export default function ClientUploadPage({
           <Upload className="h-7 w-7 text-primary mb-2" />
           <p className="text-sm font-medium text-gray-700">Drop files here or click to browse</p>
           <p className="text-xs text-gray-400 mt-1">PDF, JPG or PNG — up to 20 MB each. You can select multiple files.</p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-            onChange={e => { handleFiles(e.target.files); e.target.value = ''; }}
-            className="hidden"
-          />
+          <input ref={fileInputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+            onChange={e => { handleFiles(e.target.files); e.target.value = ''; }} className="hidden" />
         </div>
         {documentsError && <p className="mt-2 text-xs text-error">{documentsError}</p>}
 
@@ -311,8 +399,7 @@ export default function ClientUploadPage({
                   className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error border border-error/30 rounded-md hover:bg-error/10 transition-colors"
                   aria-label="Delete file"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete
+                  <Trash2 className="h-3.5 w-3.5" /> Delete
                 </button>
               </li>
             ))}

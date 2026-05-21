@@ -5,7 +5,6 @@ import * as casesService from '../services/cases.service';
 import { useAuth } from '../hooks/useAuth';
 import Step3SellingPrice from './steps/Step3SellingPrice';
 import Step4AgentInformation from './steps/Step4AgentInformation';
-import Step5PersonalDetails from './steps/Step5PersonalDetails';
 import Step6SelectClients from './steps/Step6SelectClients';
 import Step7Summary from './steps/Step7Summary';
 import CompanyDetails from './steps/CompanyDetails';
@@ -351,24 +350,21 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     stepStartTimeRef.current = Date.now();
   }, [currentStep, mode, clientToken, clientCaseId, clientRole]);
 
-  // The wizard captures both parties. These resolve which detail step each
-  // party uses — individual → personal details, otherwise the entity step.
-  const getBuyerDetailStep = (): number => {
+  // Detail step for each party. Individuals submit their own personal details
+  // via the client/manual submission, so only entity parties get a wizard step.
+  const getBuyerDetailStep = (): number | null => {
     switch (transactionData.entityType) {
       case 'company': return 8;
       case 'trust': return 9;
       case 'estate': return 10;
       case 'society': return 11;
-      case 'individual': return 5;
-      default: return transactionData.hasAgent ? 12 : 1;
+      default: return null;
     }
   };
 
-  // Seller detail step — only when the seller is not represented by an agent.
   const getSellerDetailStep = (): number | null => {
     if (transactionData.sellerHasAgent) return null;
     switch (transactionData.sellerEntityType) {
-      case 'individual': return 13;
       case 'company': return 14;
       case 'trust': return 15;
       case 'estate': return 16;
@@ -383,75 +379,35 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   };
 
   const nextStep = () => {
-    // If on Agent Info step (1)
+    // From Agent Info (1): a represented buyer picks the agent's entity type
+    // first (12); otherwise go straight to the first applicable detail step.
     if (currentStep === 1) {
       if (transactionData.hasAgent) {
-        // If using an agent, go to agent entity selection
-        setCurrentStep(12); // New step for agent entity selection
+        setCurrentStep(12);
         window.scrollTo(0, 0);
         return;
-      } else if (!transactionData.hasAgent) {
-        if (transactionData.entityType === 'individual') {
-          // If individual, go to personal details
-          setCurrentStep(5);
-          window.scrollTo(0, 0);
-          return;
-        } else if (transactionData.entityType === 'company') {
-          setCurrentStep(8); // Company details
-          window.scrollTo(0, 0);
-          return;
-        } else if (transactionData.entityType === 'trust') {
-          setCurrentStep(9); // Trust details
-          window.scrollTo(0, 0);
-          return;
-        } else if (transactionData.entityType === 'estate') {
-          setCurrentStep(10); // Estate details
-          window.scrollTo(0, 0);
-          return;
-        } else if (transactionData.entityType === 'society') {
-          setCurrentStep(11); // Society details
-          window.scrollTo(0, 0);
-          return;
-        }
       }
+      setCurrentStep(getBuyerDetailStep() ?? getSellerDetailStep() ?? 4);
+      window.scrollTo(0, 0);
+      return;
     }
-    
-    // If coming from agent entity selection (step 12)
+
+    // From Agent Entity Selection (12)
     if (currentStep === 12) {
-      if (transactionData.entityType === 'individual') {
-        // If individual, go to personal details
-        setCurrentStep(5);
-        window.scrollTo(0, 0);
-        return;
-      } else if (transactionData.entityType === 'company') {
-        setCurrentStep(8); // Company details
-        window.scrollTo(0, 0);
-        return;
-      } else if (transactionData.entityType === 'trust') {
-        setCurrentStep(9); // Trust details
-        window.scrollTo(0, 0);
-        return;
-      } else if (transactionData.entityType === 'estate') {
-        setCurrentStep(10); // Estate details
-        window.scrollTo(0, 0);
-        return;
-      } else if (transactionData.entityType === 'society') {
-        setCurrentStep(11); // Society details
-        window.scrollTo(0, 0);
-        return;
-      }
+      setCurrentStep(getBuyerDetailStep() ?? getSellerDetailStep() ?? 4);
+      window.scrollTo(0, 0);
+      return;
     }
-    
-    // After the buyer's detail step (personal details or entity step), capture
-    // the seller's details next — otherwise go straight to the selling price.
-    if (currentStep === 5 || (currentStep >= 8 && currentStep <= 11)) {
+
+    // After the buyer's entity detail step (8-11), capture the seller's next
+    if (currentStep >= 8 && currentStep <= 11) {
       setCurrentStep(getSellerDetailStep() ?? 4);
       window.scrollTo(0, 0);
       return;
     }
 
-    // After the seller's detail step (13-17), go to the selling price
-    if (currentStep >= 13 && currentStep <= 17) {
+    // After the seller's entity detail step (14-17), go to the selling price
+    if (currentStep >= 14 && currentStep <= 17) {
       setCurrentStep(4);
       window.scrollTo(0, 0);
       return;
@@ -479,27 +435,16 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     }
     
     // If on selling price page (step 4), go back to the last detail step —
-    // the seller's if they have one, otherwise the buyer's.
+    // the seller's if they have one, otherwise the buyer's, else Agent Info.
     if (currentStep === 4) {
-      setCurrentStep(getSellerDetailStep() ?? getBuyerDetailStep());
+      setCurrentStep(getSellerDetailStep() ?? getBuyerDetailStep() ?? (transactionData.hasAgent ? 12 : 1));
       window.scrollTo(0, 0);
       return;
     }
 
-    // If on a seller detail step (13-17), go back to the buyer's detail step
-    if (currentStep >= 13 && currentStep <= 17) {
-      setCurrentStep(getBuyerDetailStep());
-      window.scrollTo(0, 0);
-      return;
-    }
-    
-    // If on personal details page (individual flow)
-    if (currentStep === 5) {
-      if (transactionData.hasAgent) {
-        setCurrentStep(12); // Go back to agent entity selection
-      } else {
-        setCurrentStep(1); // Go back to agent information
-      }
+    // If on a seller entity detail step (14-17), go back to the buyer's
+    if (currentStep >= 14 && currentStep <= 17) {
+      setCurrentStep(getBuyerDetailStep() ?? (transactionData.hasAgent ? 12 : 1));
       window.scrollTo(0, 0);
       return;
     }
@@ -571,18 +516,6 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             sharedPricing={transactionData.sharedPricing}
             isSharedTransaction={transactionData.isSharedTransaction}
             pricingConfirmed={transactionData.pricingConfirmed}
-            onUpdate={updateTransactionData}
-            onNext={nextStep}
-            onPrevious={previousStep}
-          />
-        );
-      case 5:
-        return (
-          <Step5PersonalDetails
-            gender={transactionData.gender}
-            nationality={transactionData.nationality}
-            maritalStatus={transactionData.maritalStatus}
-            requiredDocuments={transactionData.requiredDocuments}
             onUpdate={updateTransactionData}
             onNext={nextStep}
             onPrevious={previousStep}
@@ -680,18 +613,6 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             onPrevious={previousStep}
           />
         );
-      case 13: // Seller — Personal Details
-        return (
-          <Step5PersonalDetails
-            gender={sellerEntity.gender || ''}
-            nationality={sellerEntity.nationality || ''}
-            maritalStatus={sellerEntity.maritalStatus || ''}
-            requiredDocuments={sellerEntity.requiredDocuments || []}
-            onUpdate={updateSellerEntity}
-            onNext={nextStep}
-            onPrevious={previousStep}
-          />
-        );
       case 14: // Seller — Company Details
         return (
           <CompanyDetails
@@ -750,62 +671,36 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     }
   };
 
-  // Check if we're on the individual path
-  const isIndividualPath = transactionData.entityType === 'individual';
-
-  // Get workflow position based on current step. Transaction type is chosen up
-  // front and the title deed arrives with the seller's documents, so the wizard
-  // has 5 visible steps.
+  // Get workflow position. Personal details are submitted by the parties
+  // themselves, so the wizard has 4 visible steps; entity detail steps fold
+  // into the Agent Information position.
   const getWorkflowPosition = () => {
-    // Agent entity selection (12) and entity-specific pages (8-11) all show as step 1
-    if (currentStep === 12 || (currentStep >= 8 && currentStep <= 11)) {
+    if (currentStep === 12 || (currentStep >= 8 && currentStep <= 17)) {
       return 1;
     }
-
-    // Seller detail steps (13-17) sit alongside the buyer's detail step
-    if (currentStep >= 13 && currentStep <= 17) {
-      return isIndividualPath ? 2 : 3;
-    }
-
-    if (isIndividualPath) {
-      const individualStepMapping: Record<number, number> = {
-        1: 1, // Agent Info
-        5: 2, // Personal Details
-        4: 3, // Selling Price
-        6: 4, // Buyer & Seller
-        7: 5, // Summary
-      };
-      return individualStepMapping[currentStep] || currentStep;
-    }
-
-    const baseStepMapping: Record<number, number> = {
+    const map: Record<number, number> = {
       1: 1, // Agent Info
       4: 2, // Selling Price
-      5: 3, // Personal Details
-      6: 4, // Buyer & Seller
-      7: 5, // Summary
+      6: 3, // Buyer & Seller
+      7: 4, // Summary
     };
-    return baseStepMapping[currentStep] || currentStep;
+    return map[currentStep] || currentStep;
   };
 
   // Get appropriate step name
   const getCurrentStepName = () => {
-    // For entity-specific pages (8-11), or agent entity selection (12), return "Agent Information"
-    if (currentStep === 12 || (currentStep >= 8 && currentStep <= 11)) {
+    if (currentStep === 12 || (currentStep >= 8 && currentStep <= 17)) {
       return 'Agent Information';
     }
-
     const priceLabel = transactionData.transactionType === 'buying' ? 'Buying Price' : 'Selling Price';
-    const steps = isIndividualPath
-      ? ['Agent Information', 'Personal Details', priceLabel, 'Buyer & Seller', 'Summary']
-      : ['Agent Information', priceLabel, 'Personal Details', 'Buyer & Seller', 'Summary'];
+    const steps = ['Agent Information', priceLabel, 'Buyer & Seller', 'Summary'];
     const position = getWorkflowPosition() - 1;
     return position >= 0 && position < steps.length ? steps[position] : 'Unknown Step';
   };
 
-  // Calculate progress percentage — 5 visible steps
+  // Calculate progress percentage — 4 visible steps
   const calculateProgress = () => {
-    return (getWorkflowPosition() / 5) * 100;
+    return (getWorkflowPosition() / 4) * 100;
   };
 
   // Check if a step is active in the navigation
@@ -821,21 +716,11 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   // Get the navigation steps for display
   const getNavigationSteps = () => {
     const priceLabel = transactionData.transactionType === 'buying' ? 'Buying Price' : 'Selling Price';
-    if (isIndividualPath) {
-      return [
-        { number: 1, name: 'Agent Information' },
-        { number: 2, name: 'Personal Details' },
-        { number: 3, name: priceLabel },
-        { number: 4, name: 'Buyer & Seller' },
-        { number: 5, name: 'Summary' }
-      ];
-    }
     return [
       { number: 1, name: 'Agent Information' },
       { number: 2, name: priceLabel },
-      { number: 3, name: 'Personal Details' },
-      { number: 4, name: 'Buyer & Seller' },
-      { number: 5, name: 'Summary' }
+      { number: 3, name: 'Buyer & Seller' },
+      { number: 4, name: 'Summary' }
     ];
   };
 
@@ -937,14 +822,14 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
 
       {/* Step Content */}
       <div className="p-4 md:p-6 lg:p-8">
-        {/* Which party's details are being captured on this step */}
-        {(currentStep === 5 || (currentStep >= 8 && currentStep <= 17 && currentStep !== 12)) && (
+        {/* Which party's entity details are being captured on this step */}
+        {(currentStep >= 8 && currentStep <= 17 && currentStep !== 12) && (
           <div className={`max-w-3xl mx-auto mb-4 rounded-lg px-4 py-2 text-sm font-semibold border ${
-            currentStep >= 13
+            currentStep >= 14
               ? 'bg-primary/5 border-primary/20 text-primary'
               : 'bg-secondary/15 border-secondary/40 text-primary'
           }`}>
-            Capturing the {currentStep >= 13 ? 'SELLER' : 'BUYER'}'s details
+            Capturing the {currentStep >= 14 ? 'SELLER' : 'BUYER'}'s details
           </div>
         )}
         {renderStep()}
