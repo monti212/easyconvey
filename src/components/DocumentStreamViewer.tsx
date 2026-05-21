@@ -170,7 +170,10 @@ const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
           {/* Paper */}
           <div className="bg-white rounded-lg shadow-2xl shadow-black/50 mx-auto" style={{ minHeight: '60vh' }}>
             {/* Document header — matches PDF cover styling */}
-            <div className="mx-12 pt-12 pb-6" style={{ borderBottom: '2px solid #1a1a2e' }}>
+            <div className="mx-12 pt-12 pb-6 relative" style={{ borderBottom: '2px solid #1a1a2e' }}>
+              <p className="absolute top-3 right-0 text-[8px] uppercase tracking-wider text-gray-400">
+                Prepared by {firmName}{lawyerName ? ` | ${lawyerName}` : ''}
+              </p>
               <div className="text-center">
                 <p className="text-[7px] uppercase tracking-[0.4em] text-[#4a3f8a] font-bold mb-1">
                   {firmName}
@@ -233,7 +236,6 @@ const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
             {!isStreaming && content && (
               <div className="border-t border-gray-200 mx-12 py-6 mb-8">
                 <div className="flex justify-between text-[9px] text-gray-400 uppercase tracking-wider">
-                  <span>Prepared by {firmName} | {lawyerName}</span>
                   <span>Ref: {caseNumber}</span>
                   <span>{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                 </div>

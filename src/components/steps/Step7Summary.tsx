@@ -670,15 +670,15 @@ const Step7Summary: React.FC<Step7Props> = ({
   li { margin-bottom: 4px; }
   hr { border: none; border-top: 0.5px solid #ddd; margin: 16px 0; }
   strong { color: #1a1a2e; }
-  .footer { text-align: center; border-top: 0.5px solid #ddd; padding-top: 12px; margin-top: 40px; font-size: 8pt; color: #999; text-transform: uppercase; letter-spacing: 2px; }
+  .prepared-by { text-align: right; font-size: 7pt; color: #999; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
 </style></head><body>
+<div class="prepared-by">Prepared by ${firmName} | ${lawyerName}</div>
 <div class="header">
   <div class="firm">${firmName}</div>
   <div class="republic">Republic of Botswana &middot; Property Conveyancing</div>
   <div class="ref">Ref: ${transactionReferenceId} &middot; ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
 </div>
 <p>${htmlContent}</p>
-<div class="footer">Prepared by ${firmName} | ${lawyerName}</div>
 </body></html>`);
       printWindow.document.close();
       printWindow.print();

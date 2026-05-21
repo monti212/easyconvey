@@ -6,6 +6,7 @@ import {
   HeadingLevel,
   AlignmentType,
   BorderStyle,
+  Header,
   Table,
   TableRow,
   TableCell,
@@ -95,16 +96,6 @@ export async function downloadAsWord(
     }
   }
 
-  // Footer
-  children.push(
-    new Paragraph({
-      border: { top: { color: 'CCCCCC', style: BorderStyle.SINGLE, size: 6 } },
-      spacing: { before: 400 },
-      alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: `Prepared by ${firmName}  ·  ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, color: '999999', size: 16 })],
-    }),
-  );
-
   const doc = new Document({
     numbering: {
       config: [{ reference: 'default-numbering', levels: [{ level: 0, format: 'decimal', text: '%1.', alignment: AlignmentType.LEFT }] }],
@@ -112,6 +103,17 @@ export async function downloadAsWord(
     sections: [{
       properties: {
         page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } },
+      },
+      // "Prepared by" sits in the top-right corner of every page
+      headers: {
+        default: new Header({
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.RIGHT,
+              children: [new TextRun({ text: `Prepared by ${firmName}`, color: '999999', size: 14 })],
+            }),
+          ],
+        }),
       },
       children,
     }],
