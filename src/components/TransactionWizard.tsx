@@ -243,7 +243,11 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     setTransactionData(prev => ({ ...prev, documentFilePaths: filePaths, documentDataUrls: dataUrls }));
   };
 
-  const persistToSupabase = async (data: typeof transactionData, stepOverride?: number) => {
+  const persistToSupabase = async (
+    data: typeof transactionData,
+    stepOverride?: number,
+    statusOverride?: 'initiated' | 'in_progress' | 'completed' | 'cancelled',
+  ) => {
     try {
       // Derive client name from entity type
       const clientName = data.hasAgent ? data.agentName
@@ -280,13 +284,14 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         });
         supabaseCaseId.current = created.id;
       } else {
-        // Update existing case — progress status to in_progress once past step 1
+        // Update existing case — progress status to in_progress once past step 1.
+        // statusOverride wins (used to mark the case completed on final submit).
         await casesService.updateCase(supabaseCaseId.current, {
           case_type: caseType,
           client_name: clientName || 'Client',
           client_email: data.agentEmail || undefined,
           client_phone: data.agentContact || undefined,
-          status: step > 1 ? 'in_progress' : undefined,
+          status: statusOverride ?? (step > 1 ? 'in_progress' : undefined),
           priority: data.isFirstTimeBuyer ? 'high' : 'medium',
           documents: docPayload,
         });
@@ -299,9 +304,9 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   const persistCompletion = async () => {
     if (!supabaseCaseId.current) return;
     try {
-      await casesService.updateCaseStatus(supabaseCaseId.current, 'completed');
-      // Also persist final wizard data
-      await persistToSupabase(transactionData, 7);
+      // Persist final wizard data AND mark the case completed in one write,
+      // so the status can't be downgraded back to in_progress.
+      await persistToSupabase(transactionData, 7, 'completed');
     } catch (err) {
       console.error('Failed to mark case as completed in Supabase:', err);
     }
