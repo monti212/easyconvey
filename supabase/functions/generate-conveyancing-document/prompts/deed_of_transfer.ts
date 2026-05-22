@@ -62,7 +62,8 @@ NUMBERS AND DATES:
 - Dates use ordinal day form: "16th day of October 1994" (not "16 October 1994").
 
 FORMATTING:
-- The cover page (top): document title, "by", seller name, "in favour of", buyer name, "in respect of", lot description — each centred on its own line. Then a right-aligned "Prepared by me" line, a blank gap, then a right-aligned "Conveyancer" line.
+- The document OPENS at the top-right with a right-aligned "Prepared by me" line, a blank gap, then a right-aligned "Conveyancer" line. Everything else follows beneath that block.
+- Below the Prepared-by block, centred each on its own line: document title "DEED OF TRANSFER", "by", seller name, "in favour of", buyer name, "in respect of", lot description, then "DEED OF TRANSFER NO. ___".
 - CATCHWORDS: registry deeds carry a "catchword" at the foot of each section that previews the opening of the next section. Emit these as RIGHT-ALIGNED lines using the exact form "[[R]] …/" followed by the opening words of the section that follows. Place a catchword immediately before: condition 6, the WHEREFORE clause, the THUS DONE AND EXECUTED clause, and (where the deed uses a WHEREAS recital) the WHEREAS section. Examples: "[[R]] …/6. Connection of services", "[[R]] …/WHEREFORE", "[[R]] …/WHEREAS". The "…/" must use the ellipsis character.
 - The body uses paragraph prose for the "appeared before me" / "AND the said Appearer declared" / "WHEREFORE the Appearer" sections, and tabular prose for the property description block (CERTAIN/SITUATE/etc.).
 - Signature block at the end uses dotted/underscored signature lines (use "______________________________" for the lines).
@@ -75,6 +76,14 @@ ${transactionBlock}
 ═══════════════════════════════════════
 REQUIRED DOCUMENT STRUCTURE — REPRODUCE THIS LAYOUT EXACTLY (substitute real values for the sample placeholders, never copy the placeholder words themselves)
 ═══════════════════════════════════════
+
+[[R]] Prepared by me
+
+
+
+[[R]] Conveyancer
+
+
 
 [[C]] DEED OF TRANSFER
 
@@ -89,12 +98,6 @@ REQUIRED DOCUMENT STRUCTURE — REPRODUCE THIS LAYOUT EXACTLY (substitute real v
 [[C]] in respect of
 
 [[C]] **LOT [PLOT NUMBER] [LOCATION IN CAPS]**
-
-[[R]] Prepared by me
-
-
-
-[[R]] Conveyancer
 
 [[C]] DEED OF TRANSFER NO. ___________
 
@@ -198,7 +201,7 @@ CRITICAL REMINDERS — RE-READ BEFORE OUTPUTTING:
 - NEVER output bracketed placeholders ([NAME], [DATE], [NUMBER]) in the final document. Use the real value or "OUTSTANDING — [description]".
 - NEVER copy filenames or any part of filenames as data. Filenames listed in the prompt are inventory only.
 - For every field, follow the DATA RESOLUTION ORDER: party block → OCR-extracted block → attached image extraction → "OUTSTANDING" (last resort). Do NOT write "OUTSTANDING" while real data exists in the OCR-extracted block or document images.
-- The cover page format is fixed: document title, "by", seller, "in favour of", buyer, "in respect of", lot. Then a right-aligned "Prepared by me" / "Conveyancer".
+- The page opens top-right with "Prepared by me" / "Conveyancer" (right-aligned). Beneath it, centred: document title, "by", seller, "in favour of", buyer, "in respect of", lot, deed number.
 - The 6 numbered conditions are STANDARD for Fixed Period State Grant residential properties — include them verbatim with sub-clauses a–e on condition 1.
 - Use ordinal dates ("16th day of October 1994") and figures-and-words for all amounts.
 - For company buyers, ALWAYS append the Section 25 Companies Act endorsement.
