@@ -499,29 +499,6 @@ const Step3SellingPrice: React.FC<Step3Props> = ({
         Please specify the {transactionType === 'buying' ? 'buying' : 'selling'} price for the property and we'll calculate associated costs.
       </p>
 
-      {/* Important Notice — additional requirements before transfer can complete */}
-      <div className="mb-6 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-xl p-4 shadow-sm">
-        <div className="flex items-start">
-          <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
-          <div className="ml-3">
-            <h3 className="text-sm font-semibold text-amber-800">Important Notice</h3>
-            <p className="text-sm text-amber-700 mt-1">
-              The following are also required before the transfer can be completed:
-            </p>
-            <ul className="mt-1.5 list-disc pl-5 space-y-0.5 text-sm text-amber-700">
-              <li>Tax clearance from the relevant authorities</li>
-              <li>Rates clearance certificate from the local municipality</li>
-              <li>Letter of Compliance — where applicable</li>
-              <li>Land Board Consent — where applicable (tribal land only)</li>
-              <li>Bond Cancellation — where applicable (existing mortgage only)</li>
-            </ul>
-            <p className="mt-1.5 text-xs text-amber-600">
-              Requirements marked "where applicable" depend on the specific transaction and location.
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* First Time Buyer Notification */}
       {isAutoExempt && (
         <div className="mb-6 bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-4 shadow-sm">

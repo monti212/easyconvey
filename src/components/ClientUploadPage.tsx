@@ -239,6 +239,29 @@ export default function ClientUploadPage({
         </div>
       </div>
 
+      {/* Important notice — further requirements before transfer */}
+      <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Important Notice</p>
+            <p className="text-sm text-amber-700 mt-0.5">
+              The following are also required before the transfer can be completed:
+            </p>
+            <ul className="mt-1.5 list-disc pl-5 space-y-0.5 text-sm text-amber-700">
+              <li>Tax clearance from the relevant authorities</li>
+              <li>Rates clearance certificate from the local municipality</li>
+              <li>Letter of Compliance — where applicable</li>
+              <li>Land Board Consent — where applicable (tribal land only)</li>
+              <li>Bond Cancellation — where applicable (existing mortgage only)</li>
+            </ul>
+            <p className="mt-1.5 text-xs text-amber-600">
+              You can upload any of these here too if you already have them.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Details */}
       <div className="bg-white rounded-2xl shadow-soft border border-border p-5 md:p-6 mb-5">
         <h2 className="text-lg font-semibold text-primary mb-1">{possessive} Details</h2>

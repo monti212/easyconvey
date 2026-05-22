@@ -64,6 +64,9 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   const { orgUser, organization } = useAuth();
   const supabaseCaseId = useRef<string | null>(initialCaseId || null);
   const [currentStep, setCurrentStep] = useState(1);
+  // Pop-up shown once, when the conveyancer leaves the Agent Information step
+  const [showClearanceNotice, setShowClearanceNotice] = useState(false);
+  const clearanceShownRef = useRef(false);
   const [transactionData, setTransactionData] = useState(() => ({
     transactionType: initialTransactionType?.transactionType || '',
     transactionCategory: initialTransactionType?.transactionCategory || 'normal_transfer', // normal_transfer | sectional_title | tribal_grant
@@ -327,6 +330,15 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     }
   }, [currentStep, transactionId]);
 
+  // After the conveyancer finishes Agent Information, surface the notice of
+  // further requirements (tax/rates clearance, compliance, consents) once.
+  useEffect(() => {
+    if (mode === 'conveyancer' && currentStep !== 1 && !clearanceShownRef.current) {
+      clearanceShownRef.current = true;
+      setShowClearanceNotice(true);
+    }
+  }, [currentStep, mode]);
+
   // Track client step progress via activity log (skip initial mount)
   const stepStartTimeRef = useRef<number>(Date.now());
   const isFirstStepRender = useRef(true);
@@ -539,6 +551,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             transactionData={transactionData}
             transactionId={transactionId}
             supabaseCaseId={supabaseCaseId.current}
+            onUpdate={updateTransactionData}
             onPrevious={previousStep}
             mode={mode}
             clientToken={clientToken}
@@ -728,6 +741,42 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
 
   return (
     <div className="overflow-hidden rounded-lg bg-white shadow-soft">
+      {/* Important-requirements notice — shown once after Agent Information */}
+      {showClearanceNotice && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-5 md:p-7">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="flex-shrink-0 h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-primary">Important Notice</h3>
+                <p className="text-sm text-gray-600 mt-0.5">
+                  The following are also required before the transfer can be completed:
+                </p>
+              </div>
+            </div>
+            <ul className="list-disc pl-6 space-y-1.5 text-sm text-gray-700 mb-4">
+              <li>Tax clearance from the relevant authorities</li>
+              <li>Rates clearance certificate from the local municipality</li>
+              <li>Letter of Compliance — where applicable</li>
+              <li>Land Board Consent — where applicable (tribal land only)</li>
+              <li>Bond Cancellation — where applicable (existing mortgage only)</li>
+            </ul>
+            <p className="text-xs text-gray-500 mb-5">
+              Requirements marked "where applicable" depend on the specific transaction and location.
+              These can be uploaded on the Summary step as they are obtained.
+            </p>
+            <button
+              onClick={() => setShowClearanceNotice(false)}
+              className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-dark transition-colors"
+            >
+              I Understand
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Shared Transaction Header */}
       {transactionData.isSharedTransaction && (
         <div className="bg-gradient-to-r from-green-50 to-green-100 border-b border-green-200 px-4 py-3">

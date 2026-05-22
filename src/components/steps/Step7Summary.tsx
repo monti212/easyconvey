@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { ArrowLeft, CheckCircle, Clipboard, Download, FileText, Users, Clock, Banknote, UserCircle, Building, Lock, Shield, ExternalLink, Share2, Loader2, Sparkles, Eye, Printer, StopCircle, PlayCircle, FolderDown, Send, Building2, FileDown, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clipboard, Download, FileText, Users, Clock, Banknote, UserCircle, Building, Lock, Shield, ExternalLink, Share2, Loader2, Sparkles, Eye, Printer, StopCircle, PlayCircle, FolderDown, Send, Building2, FileDown, AlertTriangle, Plus } from 'lucide-react';
+import * as storageService from '../../services/storage.service';
 import { downloadAsWord } from '../../lib/downloadAsWord';
 import { useTransactions } from '../../App';
 import { pdf } from '@react-pdf/renderer';
@@ -53,6 +54,7 @@ interface Step7Props {
   lawyerName?: string;
   lawFirms?: { id: string; name: string }[];
   onSendToLawFirm?: (firmId: string, firmName: string) => void;
+  onUpdate?: (data: any) => void;
 }
 
 type DocumentType = 'deed_of_sale' | 'deed_of_transfer' | 'transfer_duty' | 'power_of_attorney' | 'declaration_of_purchase' | 'affidavit' | 'bond_registration' | 'missing_information';
@@ -94,6 +96,7 @@ const Step7Summary: React.FC<Step7Props> = ({
   lawyerName = 'Conveyancer',
   lawFirms,
   onSendToLawFirm,
+  onUpdate,
 }) => {
   const [copied, setCopied] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
@@ -144,6 +147,34 @@ const Step7Summary: React.FC<Step7Props> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [clearanceUploading, setClearanceUploading] = useState(false);
+
+  // Upload clearance / compliance documents (tax & rates clearance, Letter of
+  // Compliance, Land Board Consent, Bond Cancellation) as they are obtained.
+  const handleClearanceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !onUpdate) return;
+    setClearanceUploading(true);
+    const seg = supabaseCaseId || transactionReferenceId;
+    for (const file of Array.from(files)) {
+      try {
+        const { path } = await storageService.uploadFile(file, seg, seg, 'clearance');
+        onUpdate({ documentFilePaths: [{ path, bucket: 'documents', name: file.name, type: 'clearance' }] });
+      } catch {
+        try {
+          const dataUrl = await new Promise<string>((res, rej) => {
+            const r = new FileReader();
+            r.onload = () => res(r.result as string);
+            r.onerror = () => rej(new Error('read failed'));
+            r.readAsDataURL(file);
+          });
+          onUpdate({ documentDataUrls: [{ dataUrl, name: file.name, docType: 'clearance' }] });
+        } catch { /* ignore */ }
+      }
+    }
+    setClearanceUploading(false);
+    e.target.value = '';
+  };
   const [caseRecord, setCaseRecord] = useState<Case | null>(null);
 
   // Derive display names for buyer and seller based on current party's role and case record
@@ -1168,6 +1199,53 @@ const Step7Summary: React.FC<Step7Props> = ({
           </div>
         </div>
       </div>
+
+      {/* Clearance & Compliance Documents — upload pocket */}
+      {mode === 'conveyancer' && (() => {
+        const cat = ((transactionData as any).transactionCategory || '').toLowerCase();
+        const needed = ['Tax Clearance Certificate', 'Rates Clearance Certificate', 'Letter of Compliance (where applicable)'];
+        if (cat.includes('tribal')) needed.push('Land Board Consent');
+        needed.push('Bond Cancellation (where there is an existing mortgage)');
+        const uploaded = [
+          ...((transactionData.documentFilePaths || []).filter((d: any) => d.type === 'clearance')),
+          ...((transactionData.documentDataUrls || []).filter((d: any) => d.docType === 'clearance')),
+        ];
+        return (
+          <div className="bg-white border border-[#D1D5DB] rounded-2xl p-5 md:p-6 mb-6 md:mb-8 shadow-[0px_4px_8px_rgba(0,0,0,0.05)]">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="font-serif text-lg font-bold text-[#0B1F3A]">Clearance &amp; Compliance Documents</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Upload these as they are obtained — what's required depends on the transaction.</p>
+              </div>
+              <label className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium flex-shrink-0 ${clearanceUploading ? 'bg-gray-200 text-gray-400 cursor-wait' : 'bg-[#0B1F3A] text-white hover:bg-[#0B1F3A]/90 cursor-pointer'}`}>
+                {clearanceUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {clearanceUploading ? 'Uploading' : 'Upload'}
+                <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={handleClearanceUpload} disabled={clearanceUploading} />
+              </label>
+            </div>
+            <ul className="space-y-1 text-sm text-gray-600">
+              {needed.map((d, i) => (
+                <li key={i} className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#C8A14F] flex-shrink-0" />{d}
+                </li>
+              ))}
+            </ul>
+            {uploaded.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <p className="text-xs font-medium text-gray-500 mb-1.5">Uploaded ({uploaded.length})</p>
+                <ul className="space-y-1">
+                  {uploaded.map((f: any, i: number) => (
+                    <li key={i} className="flex items-center gap-2 text-sm text-gray-700">
+                      <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                      <span className="truncate">{f.name}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Conveyancer Dashboard Link Section — conveyancer mode only */}
       {mode === 'conveyancer' && <div className="bg-white border border-[#D1D5DB] rounded-2xl overflow-hidden mb-6 md:mb-8 shadow-[0px_6px_12px_rgba(0,0,0,0.08)]">
