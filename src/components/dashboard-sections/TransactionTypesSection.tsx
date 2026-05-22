@@ -28,6 +28,8 @@ interface TransactionTypesProps {
   onViewTransaction: (transactionId: string, transactionData: any) => void;
   /** Opens the transaction wizard for an existing case (steps 1-6). */
   onStartTransaction?: (caseId: string, typeData?: any) => void;
+  /** Opens the buyer/seller detail-entry page (first step) for a case awaiting documents. */
+  onEnterDetails?: (caseId: string) => void;
 }
 
 const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
@@ -36,6 +38,7 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
   cases,
   onViewTransaction,
   onStartTransaction,
+  onEnterDetails,
 }) => {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [typeSearchTerm, setTypeSearchTerm] = useState('');
@@ -283,7 +286,7 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
             <p className={`text-xs mt-2 font-medium ${bothSubmitted ? 'text-green-700' : 'text-gray-500'}`}>
               {bothSubmitted
                 ? 'Both parties have submitted — ready to select on Step 6.'
-                : 'Client submissions are still pending — you can still begin the transaction.'}
+                : 'Client submissions are still pending — click Start Transaction to enter their details and documents yourself.'}
             </p>
           </div>
         )}
@@ -300,8 +303,16 @@ const TransactionTypesSection: React.FC<TransactionTypesProps> = ({
             </button>
             {isInitiated && (
               <button
-                onClick={() => onStartTransaction?.(c.id, deriveTypeData(c))}
-                title="Start the transaction process"
+                onClick={() =>
+                  bothSubmitted
+                    ? onStartTransaction?.(c.id, deriveTypeData(c))
+                    : onEnterDetails?.(c.id)
+                }
+                title={
+                  bothSubmitted
+                    ? 'Start the transaction process'
+                    : 'Enter the buyer and seller details and documents'
+                }
                 className="inline-flex items-center px-4 py-2 rounded-lg transition-colors text-sm font-medium bg-green-600 text-white hover:bg-green-700"
               >
                 <ArrowRight className="h-4 w-4 mr-2" />

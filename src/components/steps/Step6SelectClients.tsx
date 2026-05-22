@@ -84,6 +84,10 @@ const Step6SelectClients: React.FC<Step6SelectClientsProps> = ({
     const sellerUrls = (seller?.data?.documentDataUrls || []).map((d: any) => ({ ...d, party: 'seller' }));
 
     onSetDocuments([...buyerPaths, ...sellerPaths], [...buyerUrls, ...sellerUrls]);
+    // Personal details (gender / nationality / marital status) come from the
+    // party's submission — surface the buyer's, falling back to the seller's,
+    // so the transaction summary shows real data.
+    const personalSource = buyer?.data || seller?.data || {};
     onUpdate({
       selectedParties: { buyer: buyer || null, seller: seller || null },
       uploadedDocuments: [
@@ -92,6 +96,9 @@ const Step6SelectClients: React.FC<Step6SelectClientsProps> = ({
       ],
       ...(buyer ? { extractedBuyerName: buyer.name } : {}),
       ...(seller ? { extractedSellerName: seller.name } : {}),
+      ...(personalSource.gender ? { gender: personalSource.gender } : {}),
+      ...(personalSource.nationality ? { nationality: personalSource.nationality } : {}),
+      ...(personalSource.maritalStatus ? { maritalStatus: personalSource.maritalStatus } : {}),
     });
   };
 

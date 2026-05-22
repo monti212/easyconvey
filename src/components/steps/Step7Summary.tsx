@@ -41,6 +41,7 @@ interface Step7Props {
     isFirstTimeBuyer?: boolean; // Added for first time buyer status
     documentFilePaths?: { path: string; bucket: string; name: string; type: string; party?: 'buyer' | 'seller' }[];
     documentDataUrls?: { dataUrl: string; name: string; docType: string; party?: 'buyer' | 'seller' }[];
+    selectedParties?: { buyer: any; seller: any } | null;
   };
   transactionId: string | null;
   supabaseCaseId?: string | null;
@@ -1100,25 +1101,57 @@ const Step7Summary: React.FC<Step7Props> = ({
               </div>
             )}
             
-            <div className="flex">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#0B1F3A]/5 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
-                <UserCircle className="h-4 w-4 md:h-5 md:w-5 text-[#0B1F3A]" />
-              </div>
-              <div>
-                <dt className="text-xs md:text-sm font-medium text-gray-500">Personal Information</dt>
-                <div className="mt-1 space-y-1">
-                  <div className="text-sm text-gray-900">
-                    <span className="font-medium">Gender:</span> <span className="capitalize">{transactionData.gender}</span>
+            {(() => {
+              // Personal details are captured per party on their submission page.
+              // Show the selected buyer and seller; fall back to the wizard's
+              // top-level fields when no parties have been selected yet.
+              const buyerD = transactionData.selectedParties?.buyer?.data;
+              const sellerD = transactionData.selectedParties?.seller?.data;
+              const rows: { label: string; data: any }[] = [];
+              if (buyerD) rows.push({ label: 'Buyer', data: buyerD });
+              if (sellerD) rows.push({ label: 'Seller', data: sellerD });
+              if (rows.length === 0) {
+                rows.push({
+                  label: '',
+                  data: {
+                    gender: transactionData.gender,
+                    nationality: transactionData.nationality,
+                    maritalStatus: transactionData.maritalStatus,
+                  },
+                });
+              }
+              const show = (v?: string) => (v && String(v).trim()) ? String(v) : 'Not specified';
+              return (
+                <div className="flex">
+                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#0B1F3A]/5 flex-shrink-0 flex items-center justify-center mr-2 md:mr-3">
+                    <UserCircle className="h-4 w-4 md:h-5 md:w-5 text-[#0B1F3A]" />
                   </div>
-                  <div className="text-sm text-gray-900">
-                    <span className="font-medium">Nationality:</span> {transactionData.nationality}
-                  </div>
-                  <div className="text-sm text-gray-900">
-                    <span className="font-medium">Marital Status:</span> {getMaritalStatusDisplay(transactionData.maritalStatus)}
+                  <div>
+                    <dt className="text-xs md:text-sm font-medium text-gray-500">Personal Information</dt>
+                    <div className="mt-1 space-y-2">
+                      {rows.map((row, i) => (
+                        <div key={i} className="space-y-0.5">
+                          {row.label && (
+                            <p className="text-xs font-semibold text-[#0B1F3A] uppercase tracking-wide">{row.label}</p>
+                          )}
+                          <div className="text-sm text-gray-900">
+                            <span className="font-medium">Gender:</span>{' '}
+                            <span className="capitalize">{show(row.data.gender)}</span>
+                          </div>
+                          <div className="text-sm text-gray-900">
+                            <span className="font-medium">Nationality:</span> {show(row.data.nationality)}
+                          </div>
+                          <div className="text-sm text-gray-900">
+                            <span className="font-medium">Marital Status:</span>{' '}
+                            {row.data.maritalStatus ? getMaritalStatusDisplay(row.data.maritalStatus) : 'Not specified'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()}
             
             {transactionData.hasBond !== undefined && (
               <div className="flex">
