@@ -62,51 +62,33 @@ const MARITAL_OPTIONS = [
   { value: 'widowed', label: 'Widowed' },
 ];
 
-// Documents expected from each party — depends on role, transaction type,
-// nationality and marital status.
-const requiredDocsFor = (
-  role: 'buyer' | 'seller',
-  caseType?: string,
-  nationality?: string,
-  maritalStatus?: string,
-): string[] => {
-  const ct = (caseType || '').toLowerCase();
-  const docs: string[] = ['Proof of residential address (utility bill or affidavit)'];
+// Documents required from a party — determined by nationality and marital
+// status, per the firm's required-documents schedule.
+const requiredDocsFor = (nationality?: string, maritalStatus?: string): string[] => {
+  const docs: string[] = ['Proof of Address'];
 
   // Identity — by nationality
   if (nationality === 'Botswana') {
-    docs.push('Certified copy of Omang (National ID)');
+    docs.push('ID Document');
   } else if (nationality) {
-    docs.push('Certified passport copy');
-    docs.push('Residence / immigration permit');
-  } else {
-    docs.push('Omang (ID) or passport copy');
-  }
-
-  // Role-specific
-  if (role === 'buyer') {
-    docs.push('Proof of funds or a recent bank statement');
-    if (ct.includes('bond')) docs.push('Bank bond approval letter');
-  } else {
-    docs.push('Original Title Deed of the property');
-    docs.push('Latest rates & service-charge statement');
+    docs.push('Passport Copy');
+    docs.push('Residence Permit');
   }
 
   // Marital status
-  if (maritalStatus === 'married_in' || maritalStatus === 'married_out') {
-    docs.push('Marriage certificate');
-    docs.push(nationality === 'Botswana' ? "Spouse's Omang (ID) copy" : "Spouse's passport / ID copy");
-    docs.push('Spouse consent form');
-    if (maritalStatus === 'married_out') docs.push('Antenuptial contract');
+  if (maritalStatus === 'married_in') {
+    docs.push('Marriage Certificate');
+    docs.push(nationality === 'Botswana' ? 'Spouse ID Document' : 'Spouse Passport Copy or Identity Document Copy');
+    docs.push('Spouse Consent Form');
+  } else if (maritalStatus === 'married_out') {
+    docs.push('Marriage Certificate');
+    docs.push('Antenuptial Contract');
   } else if (maritalStatus === 'divorced') {
-    docs.push('Divorce decree / court order');
+    docs.push('Divorce Decree');
   } else if (maritalStatus === 'widowed') {
-    docs.push("Death certificate of the deceased spouse");
+    docs.push('Death Certificate of Spouse');
   }
 
-  docs.push('Signed Agreement of Sale / Offer to Purchase');
-  if (ct.includes('sectional')) docs.push('Sectional title plan / scheme rules');
-  if (ct.includes('tribal')) docs.push('Land Board consent for the tribal grant');
   return docs;
 };
 
@@ -125,7 +107,7 @@ const formatSize = (bytes: number) => {
 };
 
 export default function ClientUploadPage({
-  token, role, caseId, orgId, caseNumber, caseType, forConveyancer, onSubmitParty, onSubmitted,
+  token, role, caseId, orgId, caseNumber, forConveyancer, onSubmitParty, onSubmitted,
 }: ClientUploadPageProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -142,7 +124,7 @@ export default function ClientUploadPage({
   const isBuyer = role === 'buyer';
   const Role = isBuyer ? 'Buyer' : 'Seller';
   const possessive = forConveyancer ? `${Role}'s` : 'Your';
-  const checklist = requiredDocsFor(role, caseType, nationality, maritalStatus);
+  const checklist = requiredDocsFor(nationality, maritalStatus);
   const doneFiles = files.filter(f => f.status === 'done');
   const uploadingCount = files.filter(f => f.status === 'uploading').length;
 
