@@ -163,10 +163,9 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         // generated_documents table may not exist yet
       }
 
-      // Extract wizard data stored by the conveyancer during the transaction wizard
-      const wd = Array.isArray(caseRecord?.documents) && caseRecord.documents.length > 0
-        ? caseRecord.documents[caseRecord.documents.length - 1]?.wizardData
-        : null;
+      // Wizard data captured by the conveyancer during the transaction wizard.
+      // getCase() extracts the latest snapshot from `documents` into `wizardData`.
+      const wd = caseRecord?.wizardData || null;
       if (wd) setWizardData(wd);
 
       // Build transaction display data

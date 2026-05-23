@@ -27,10 +27,17 @@ export async function getCase(id: string): Promise<Case> {
     .single();
   if (error) throw error;
   const c = data as Case;
+  // The transaction wizard persists its full state as objects inside `documents`.
+  // Pull out the latest wizard snapshot BEFORE sanitizing `documents` to strings,
+  // so the conveyancer dashboard can read the selected parties, extracted
+  // identity/property details and pricing captured during the wizard.
+  const rawDocs = Array.isArray(c.documents) ? c.documents : [];
+  const wizardEntry = [...rawDocs]
+    .reverse()
+    .find((d: any) => d && typeof d === 'object' && d.wizardData);
+  c.wizardData = wizardEntry?.wizardData ?? null;
   // Sanitize documents — may contain wizard state objects instead of string arrays
-  c.documents = Array.isArray(c.documents)
-    ? c.documents.filter((d: any) => typeof d === 'string')
-    : [];
+  c.documents = rawDocs.filter((d: any) => typeof d === 'string');
   return c;
 }
 

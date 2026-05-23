@@ -60,6 +60,8 @@ export interface Case {
   status: 'initiated' | 'in_progress' | 'completed' | 'cancelled';
   priority: 'low' | 'medium' | 'high';
   documents: any[];
+  /** Latest transaction-wizard snapshot, extracted from `documents` by getCase(). */
+  wizardData?: any;
   notes?: string;
   buyer_data?: any;
   seller_data?: any;
