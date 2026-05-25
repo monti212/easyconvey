@@ -62,9 +62,13 @@ const MARITAL_OPTIONS = [
   { value: 'widowed', label: 'Widowed' },
 ];
 
-// Documents required from a party — determined by nationality and marital
+// Documents required from a party — determined by role, nationality and marital
 // status, per the firm's required-documents schedule.
-const requiredDocsFor = (nationality?: string, maritalStatus?: string): string[] => {
+const requiredDocsFor = (
+  role: 'buyer' | 'seller',
+  nationality?: string,
+  maritalStatus?: string,
+): string[] => {
   const docs: string[] = ['Proof of Address'];
 
   // Identity — by nationality
@@ -87,6 +91,12 @@ const requiredDocsFor = (nationality?: string, maritalStatus?: string): string[]
     docs.push('Divorce Decree');
   } else if (maritalStatus === 'widowed') {
     docs.push('Death Certificate of Spouse');
+  }
+
+  // Seller must always supply the property's Title Deed — required regardless of
+  // marital status, nationality or any other circumstance.
+  if (role === 'seller') {
+    docs.push('Title Deed');
   }
 
   return docs;
@@ -124,7 +134,7 @@ export default function ClientUploadPage({
   const isBuyer = role === 'buyer';
   const Role = isBuyer ? 'Buyer' : 'Seller';
   const possessive = forConveyancer ? `${Role}'s` : 'Your';
-  const checklist = requiredDocsFor(nationality, maritalStatus);
+  const checklist = requiredDocsFor(role, nationality, maritalStatus);
   const doneFiles = files.filter(f => f.status === 'done');
   const uploadingCount = files.filter(f => f.status === 'uploading').length;
 
