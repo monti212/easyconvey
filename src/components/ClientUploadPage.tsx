@@ -102,6 +102,29 @@ const requiredDocsFor = (
   return docs;
 };
 
+// Clearance & compliance documents from the Important Notice — filtered to the
+// items each party can supply for THIS type of transaction. Optional uploads:
+// the party can attach them now if they already have them.
+const clearanceDocsFor = (role: 'buyer' | 'seller', caseType?: string): string[] => {
+  const docs: string[] = [];
+  const ct = (caseType || '').toLowerCase();
+  const isTribal = ct.includes('tribal');
+
+  if (role === 'seller') {
+    docs.push('Tax Clearance Certificate');
+    // Rates clearance is municipal — not applicable to tribal land.
+    if (!isTribal) docs.push('Rates Clearance Certificate');
+    docs.push('Letter of Compliance (where applicable)');
+    if (isTribal) docs.push('Land Board Consent');
+    docs.push('Bond Cancellation (if existing mortgage)');
+  } else if (isTribal) {
+    // The buyer of tribal land also needs Land Board consent for the acquisition.
+    docs.push('Land Board Consent');
+  }
+
+  return docs;
+};
+
 const readDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -117,7 +140,7 @@ const formatSize = (bytes: number) => {
 };
 
 export default function ClientUploadPage({
-  token, role, caseId, orgId, caseNumber, forConveyancer, onSubmitParty, onSubmitted,
+  token, role, caseId, orgId, caseNumber, caseType, forConveyancer, onSubmitParty, onSubmitted,
 }: ClientUploadPageProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -135,6 +158,7 @@ export default function ClientUploadPage({
   const Role = isBuyer ? 'Buyer' : 'Seller';
   const possessive = forConveyancer ? `${Role}'s` : 'Your';
   const checklist = requiredDocsFor(role, nationality, maritalStatus);
+  const clearanceList = clearanceDocsFor(role, caseType);
   const doneFiles = files.filter(f => f.status === 'done');
   const uploadingCount = files.filter(f => f.status === 'uploading').length;
 
@@ -375,6 +399,28 @@ export default function ClientUploadPage({
             ))}
           </ul>
         </div>
+
+        {clearanceList.length > 0 && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <p className="text-sm font-semibold text-amber-800">
+                Clearance & Compliance — relevant to this transaction
+              </p>
+            </div>
+            <ul className="space-y-1.5">
+              {clearanceList.map((doc, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-amber-900">
+                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                  <span>{doc}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-amber-700">
+              Upload any of these here if you already have them — they speed up the transfer.
+            </p>
+          </div>
+        )}
 
         <div
           onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
