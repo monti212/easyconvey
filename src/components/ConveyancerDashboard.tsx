@@ -396,6 +396,18 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         console.warn('PDF rendering module failed to load:', importErr);
       }
 
+      // Visibility in the browser console so the conveyancer can confirm the AI
+      // is actually receiving document images for each side. If buyer/seller
+      // counts are 0 here, the documents never reached the AI — check uploads.
+      console.info('[AI doc generation] Sending to edge function:', {
+        documentType: typeToGenerate,
+        buyerImageCount: partyImages.filter((i: any) => i.party === 'buyer').length,
+        sellerImageCount: partyImages.filter((i: any) => i.party === 'seller').length,
+        untaggedImageCount: partyImages.filter((i: any) => !i.party).length,
+        buyerPdfPathsInStorage: partyFilePaths.filter((p: any) => p.party === 'buyer' && (p.path || '').toLowerCase().endsWith('.pdf')).length,
+        sellerPdfPathsInStorage: partyFilePaths.filter((p: any) => p.party === 'seller' && (p.path || '').toLowerCase().endsWith('.pdf')).length,
+      });
+
       const response = await fetch(`${supabaseUrl}/functions/v1/generate-conveyancing-document`, {
         method: 'POST',
         headers: {

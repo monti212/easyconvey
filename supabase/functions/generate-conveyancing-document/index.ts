@@ -321,17 +321,28 @@ PDF DOCUMENT INVENTORY (these PDF filenames are listed ONLY so you know which do
 ${pdfDocsByParty.map((d, i) => `  ${i + 1}. type=${d.type || "unspecified"} — belongs to ${d.party ? d.party.toUpperCase() : "UNTAGGED"}`).join("\n")}` : ""}
 ${imageUrls.length > 0 ? `
 ═══════════════════════════════════════
-ATTACHED DOCUMENT IMAGES (${imageUrls.length} document(s)):
+ATTACHED DOCUMENT IMAGES (${imageUrls.length} document image(s) — ${imageUrls.filter(i => i.party === 'buyer').length} for BUYER, ${imageUrls.filter(i => i.party === 'seller').length} for SELLER, ${imageUrls.filter(i => !i.party).length} untagged):
 ═══════════════════════════════════════
 PARTY-TAG ROUTING TABLE (which side each image belongs to — this is a routing hint, NOT a data field; do not reassign documents to the wrong party, and do not copy these tag words or any filenames into the output):
 ${imageUrls.map((img, i) => `  Image ${i + 1}${img.type ? ` — type: ${img.type}` : ""} — belongs to ${img.party ? img.party.toUpperCase() : "UNTAGGED"}`).join("\n")}
 
-CRITICAL: The attached images are scans/photos of actual legal documents (IDs, title deeds, passports, marriage certificates, etc.).
+CRITICAL: The attached images are scans/photos of actual legal documents (Botswana Omang ID cards, title deeds, passports, marriage certificates, antenuptial contracts, etc.).
 EXTRACT VALUES FROM THE IMAGES THEMSELVES — read the names, ID numbers, dates, addresses, etc. that are visible inside the document scans. Do NOT use filenames or party-tag words as values.
 The images are passed to you in the SAME ORDER as the routing table above. When you extract data from "Image N", apply that data ONLY to the party labelled in the routing table — never to the other party.
+
+THE OUTSTANDING RULE — READ THIS CAREFULLY:
+"OUTSTANDING — [field]" is permitted ONLY when NO image was attached for the party that field belongs to AND the value is not in the structured form data or OCR-extracted block. If at least one image is attached for that party, you MUST look at the images and pull the value from them before writing OUTSTANDING. Specifically:
+- Seller DOB / ID number / full name → look at the SELLER-tagged images (Omang, passport). Botswana Omang cards show date of birth clearly. Marriage certificates also show DOB.
+- Buyer DOB / ID number / full name → look at the BUYER-tagged images (Omang, passport).
+- Plot number, property address, extent, title deed reference, administrative district, registered owner → look at any title deed image (typically SELLER-tagged).
+- Marriage date / place / regime / spouse details → look at marriage certificate images.
+- Antenuptial regime details → look at the ANC contract images.
+- Power-of-attorney date and place → look at any POA image. If no POA image is attached at all, OUTSTANDING is acceptable.
+If a field is missing in ALL of the sources above, only THEN write "OUTSTANDING — [field description]". Writing OUTSTANDING while the value is visible in an attached image is a hard failure.
+
 You MUST carefully analyze each image and extract ALL relevant information including but not limited to:
 - Full legal names of all parties (buyer, seller, spouse, witnesses)
-- ID numbers, passport numbers, date of birth
+- ID numbers, passport numbers, date of birth (read directly from Omang / passport)
 - Physical and postal addresses
 - Property description: lot number, plot number, location, extent/size, district
 - Title deed reference numbers
@@ -343,7 +354,11 @@ You MUST carefully analyze each image and extract ALL relevant information inclu
 - Any other legally relevant details visible in the documents
 
 Use the extracted information to populate the generated document with REAL data instead of placeholders.
-Where information from uploaded documents conflicts with form data, prefer the document-extracted data as it is from the primary source.` : ""}`;
+Where information from uploaded documents conflicts with form data, prefer the document-extracted data as it is from the primary source.` : `
+═══════════════════════════════════════
+NO DOCUMENT IMAGES ATTACHED
+═══════════════════════════════════════
+No party-tagged document images were attached to this request. For fields that depend on document extraction (ID number, date of birth, plot number, title deed number, property description, marriage details), use the structured form data or OCR-extracted block above. If those are empty too, "OUTSTANDING — [field]" is permitted as a last resort.`}`;
 
     // ─── Get document type specific instructions and prompts ─────────
     const config = getDocumentConfig(documentType, transactionBlock);
@@ -391,6 +406,10 @@ Markdown cannot express alignment, so use these line-start markers:
       model,
       documentType,
       imageCount: imageUrls.length,
+      buyerImages: imageUrls.filter((i) => i.party === "buyer").length,
+      sellerImages: imageUrls.filter((i) => i.party === "seller").length,
+      untaggedImages: imageUrls.filter((i) => !i.party).length,
+      pdfInventoryCount: pdfDocsByParty.length,
       stream: !!wantStream,
     });
 
