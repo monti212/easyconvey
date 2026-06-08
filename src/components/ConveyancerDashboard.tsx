@@ -357,6 +357,45 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
       const partyImages = [...(bd.documentDataUrls || []), ...(sd.documentDataUrls || [])]
         .map((d: any) => ({ dataUrl: d.dataUrl, name: d.name, docType: d.docType, party: d.party }));
 
+      // For PDFs already in storage from submissions made BEFORE we started
+      // rendering pages at upload time (and to be safe for any PDF the page
+      // images never came through with), download and render them now so the
+      // AI vision model can OCR them. Image files in storage are downloaded
+      // and base64-encoded by the edge function itself.
+      try {
+        const { renderPdfToImages } = await import('../lib/pdfToImages');
+        const pdfPaths = partyFilePaths.filter((fp: any) =>
+          (fp?.path || '').toLowerCase().endsWith('.pdf') ||
+          (fp?.name || '').toLowerCase().endsWith('.pdf')
+        );
+        // Skip PDFs whose page-images already arrived via documentDataUrls
+        const alreadyRendered = new Set(
+          partyImages
+            .map((img: any) => (img.name || '').replace(/\s*\(page \d+\)$/, ''))
+            .filter((n: string) => !!n)
+        );
+        for (const fp of pdfPaths) {
+          if (alreadyRendered.has(fp.name)) continue;
+          try {
+            const url = await storageService.getSignedUrl(fp.path, fp.bucket || 'documents');
+            const blob = await (await fetch(url)).blob();
+            const pages = await renderPdfToImages(blob);
+            pages.forEach((dataUrl, idx) => {
+              partyImages.push({
+                dataUrl,
+                name: pages.length > 1 ? `${fp.name} (page ${idx + 1})` : fp.name,
+                docType: fp.type || 'client_document',
+                party: fp.party,
+              });
+            });
+          } catch (pdfErr) {
+            console.warn('Could not render PDF for AI extraction:', fp.name, pdfErr);
+          }
+        }
+      } catch (importErr) {
+        console.warn('PDF rendering module failed to load:', importErr);
+      }
+
       const response = await fetch(`${supabaseUrl}/functions/v1/generate-conveyancing-document`, {
         method: 'POST',
         headers: {

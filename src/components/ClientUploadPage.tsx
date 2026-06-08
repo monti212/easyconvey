@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import * as storageService from '../services/storage.service';
 import * as casesService from '../services/cases.service';
+import { renderPdfToImages, isPdf } from '../lib/pdfToImages';
 
 interface ClientUploadPageProps {
   token?: string;
@@ -26,6 +27,10 @@ interface UploadedFile {
   path?: string;
   bucket?: string;
   dataUrl?: string;
+  // JPEG data URLs — one per PDF page. The AI vision model can't read PDFs
+  // directly, so we render scanned documents (Omang, title deed, marriage
+  // certificate, etc.) page-by-page in the browser and ship the images.
+  pageImages?: string[];
 }
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -176,13 +181,19 @@ export default function ClientUploadPage({
     }
     const id = crypto.randomUUID();
     setFiles(prev => [...prev, { id, name: file.name, size: file.size, status: 'uploading' }]);
+
+    // For PDFs, render every page to a JPEG so the AI can OCR the document
+    // (Omang scans, title deeds, marriage certificates are usually PDFs).
+    // Best-effort — failure here doesn't block the upload.
+    const pageImages = isPdf(file) ? await renderPdfToImages(file) : undefined;
+
     try {
       const { path } = await storageService.uploadFile(file, orgId, caseId, `${role}_documents`);
-      setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'done', path, bucket: 'documents' } : f)));
+      setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'done', path, bucket: 'documents', pageImages } : f)));
     } catch {
       try {
         const dataUrl = await readDataUrl(file);
-        setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'done', dataUrl } : f)));
+        setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'done', dataUrl, pageImages } : f)));
       } catch {
         setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'error' } : f)));
       }
@@ -219,9 +230,29 @@ export default function ClientUploadPage({
         documentFilePaths: doneFiles
           .filter(f => f.path)
           .map(f => ({ path: f.path, bucket: f.bucket || 'documents', name: f.name, type: 'client_document', party: role })),
-        documentDataUrls: doneFiles
-          .filter(f => !f.path && f.dataUrl)
-          .map(f => ({ dataUrl: f.dataUrl, name: f.name, docType: 'client_document', party: role })),
+        // documentDataUrls is what the AI vision model actually sees. Include:
+        //  • the raw data-URL fallback (when storage upload failed and the file
+        //    was kept inline as an image), plus
+        //  • the page-image renders for every PDF — one image per PDF page —
+        //    so scanned Omangs, title deeds and marriage certificates are
+        //    readable. Each page is tagged with the source filename + page no.
+        documentDataUrls: doneFiles.flatMap(f => {
+          const out: { dataUrl: string; name: string; docType: string; party: 'buyer' | 'seller' }[] = [];
+          if (!f.path && f.dataUrl) {
+            out.push({ dataUrl: f.dataUrl, name: f.name, docType: 'client_document', party: role });
+          }
+          if (f.pageImages && f.pageImages.length > 0) {
+            f.pageImages.forEach((dataUrl, idx) => {
+              out.push({
+                dataUrl,
+                name: f.pageImages!.length > 1 ? `${f.name} (page ${idx + 1})` : f.name,
+                docType: 'client_document',
+                party: role,
+              });
+            });
+          }
+          return out;
+        }),
         uploadedDocuments: doneFiles.map(f => f.name),
         submittedAt: new Date().toISOString(),
       };
