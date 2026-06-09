@@ -149,8 +149,6 @@ export default function ClientUploadPage({
 }: ClientUploadPageProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
-  const [idNumber, setIdNumber] = useState('');
   const [gender, setGender] = useState('');
   const [nationality, setNationality] = useState('');
   const [maritalStatus, setMaritalStatus] = useState('');
@@ -171,10 +169,6 @@ export default function ClientUploadPage({
 
   const firstNameError = touched && !firstName.trim() ? 'First name is required' : '';
   const lastNameError = touched && !lastName.trim() ? 'Surname is required' : '';
-  const dobError = touched && !dateOfBirth ? 'Date of birth is required' : '';
-  const idNumberError = touched && !idNumber.trim()
-    ? (nationality === 'Botswana' ? 'Omang (ID) number is required' : 'Passport / ID number is required')
-    : '';
   const genderError = touched && !gender ? 'Please select a gender' : '';
   const nationalityError = touched && !nationality ? 'Please select a nationality' : '';
   const maritalError = touched && !maritalStatus ? 'Please select a marital status' : '';
@@ -216,33 +210,17 @@ export default function ClientUploadPage({
   const handleSubmit = async () => {
     setTouched(true);
     setSubmitError(null);
-    if (!firstName.trim() || !lastName.trim() || !dateOfBirth || !idNumber.trim()
-      || !gender || !nationality || !maritalStatus
+    if (!firstName.trim() || !lastName.trim() || !gender || !nationality || !maritalStatus
       || doneFiles.length === 0 || uploadingCount > 0) return;
 
     setIsSubmitting(true);
     try {
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-      // dateOfBirth comes from a <input type="date"> as YYYY-MM-DD — format it
-      // to a readable form for the AI prompt and deed body (e.g. "16 October 1994").
-      const formatDateLong = (iso: string): string => {
-        const d = new Date(iso);
-        if (Number.isNaN(d.getTime())) return iso;
-        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-      };
       const partyData = {
         role,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         fullName,
-        // Sent under several common keys so every downstream reader (edge
-        // function resolvers, dashboard summary, AI prompts) can find them.
-        dateOfBirth: formatDateLong(dateOfBirth),
-        dateOfBirthIso: dateOfBirth,
-        idNumber: idNumber.trim(),
-        idPassportNumber: idNumber.trim(),
-        [isBuyer ? 'extractedBuyerDateOfBirth' : 'extractedSellerDateOfBirth']: formatDateLong(dateOfBirth),
-        [isBuyer ? 'extractedBuyerIdNumber' : 'extractedSellerIdNumber']: idNumber.trim(),
         gender,
         nationality,
         maritalStatus,
@@ -374,37 +352,6 @@ export default function ClientUploadPage({
             <input type="text" value={lastName} onChange={e => setLastName(e.target.value)}
               placeholder="e.g. Molefe" className={fieldClass(lastNameError)} />
             {lastNameError && <p className="mt-1 text-xs text-error">{lastNameError}</p>}
-          </div>
-        </div>
-
-        {/* Date of birth + ID/Passport number — these populate the deed directly
-            so the AI doesn't have to OCR them out of the Omang. */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Date of Birth <span className="text-error">*</span>
-            </label>
-            <input
-              type="date"
-              value={dateOfBirth}
-              max={new Date().toISOString().split('T')[0]}
-              onChange={e => setDateOfBirth(e.target.value)}
-              className={fieldClass(dobError)}
-            />
-            {dobError && <p className="mt-1 text-xs text-error">{dobError}</p>}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {nationality === 'Botswana' ? 'Omang (ID) Number' : 'Passport / ID Number'} <span className="text-error">*</span>
-            </label>
-            <input
-              type="text"
-              value={idNumber}
-              onChange={e => setIdNumber(e.target.value)}
-              placeholder={nationality === 'Botswana' ? 'e.g. 123456789' : 'e.g. BW1234567'}
-              className={fieldClass(idNumberError)}
-            />
-            {idNumberError && <p className="mt-1 text-xs text-error">{idNumberError}</p>}
           </div>
         </div>
 
