@@ -362,6 +362,9 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
       // images never came through with), download and render them now so the
       // AI vision model can OCR them. Image files in storage are downloaded
       // and base64-encoded by the edge function itself.
+      //
+      // Done in PARALLEL — 5 PDFs sequentially is what used to make this take
+      // 15–30s before the AI even started.
       try {
         const { renderPdfToImages } = await import('../lib/pdfToImages');
         const pdfPaths = partyFilePaths.filter((fp: any) =>
@@ -374,23 +377,29 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
             .map((img: any) => (img.name || '').replace(/\s*\(page \d+\)$/, ''))
             .filter((n: string) => !!n)
         );
-        for (const fp of pdfPaths) {
-          if (alreadyRendered.has(fp.name)) continue;
-          try {
-            const url = await storageService.getSignedUrl(fp.path, fp.bucket || 'documents');
-            const blob = await (await fetch(url)).blob();
-            const pages = await renderPdfToImages(blob);
-            pages.forEach((dataUrl, idx) => {
-              partyImages.push({
-                dataUrl,
-                name: pages.length > 1 ? `${fp.name} (page ${idx + 1})` : fp.name,
-                docType: fp.type || 'client_document',
-                party: fp.party,
-              });
+        const toRender = pdfPaths.filter((fp: any) => !alreadyRendered.has(fp.name));
+        const renderResults = await Promise.all(
+          toRender.map(async (fp: any) => {
+            try {
+              const url = await storageService.getSignedUrl(fp.path, fp.bucket || 'documents');
+              const blob = await (await fetch(url)).blob();
+              const pages = await renderPdfToImages(blob);
+              return { fp, pages };
+            } catch (pdfErr) {
+              console.warn('Could not render PDF for AI extraction:', fp.name, pdfErr);
+              return { fp, pages: [] };
+            }
+          })
+        );
+        for (const { fp, pages } of renderResults) {
+          pages.forEach((dataUrl, idx) => {
+            partyImages.push({
+              dataUrl,
+              name: pages.length > 1 ? `${fp.name} (page ${idx + 1})` : fp.name,
+              docType: fp.type || 'client_document',
+              party: fp.party,
             });
-          } catch (pdfErr) {
-            console.warn('Could not render PDF for AI extraction:', fp.name, pdfErr);
-          }
+          });
         }
       } catch (importErr) {
         console.warn('PDF rendering module failed to load:', importErr);

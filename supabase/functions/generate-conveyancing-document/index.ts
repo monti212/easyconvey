@@ -140,41 +140,53 @@ serve(async (req: Request) => {
     if (supabaseUrl && supabaseServiceKey && documentPaths && documentPaths.length > 0) {
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-      for (const docPath of documentPaths) {
-        const path: string = docPath.path || docPath;
-        const bucket: string = docPath.bucket || "documents";
-        const party: 'buyer' | 'seller' | undefined = docPath.party;
-        const type: string | undefined = docPath.type;
-        const name: string | undefined = docPath.name;
+      // Download every stored document in PARALLEL. The previous serial loop
+      // could spend 10+s on a case with a handful of attachments.
+      const downloads = await Promise.all(
+        documentPaths.map(async (docPath: any) => {
+          const path: string = docPath.path || docPath;
+          const bucket: string = docPath.bucket || "documents";
+          const party: 'buyer' | 'seller' | undefined = docPath.party;
+          const type: string | undefined = docPath.type;
+          const name: string | undefined = docPath.name;
 
-        try {
-          if (isImageFile(path)) {
-            // Download image and convert to base64 data URL
-            const { data, error } = await supabase.storage
-              .from(bucket)
-              .download(path);
+          if (!isImageFile(path)) {
+            const filename = path.split("/").pop() || path;
+            return { kind: "pdf" as const, filename, party, type };
+          }
 
-            if (error || !data) continue;
-
+          try {
+            const { data, error } = await supabase.storage.from(bucket).download(path);
+            if (error || !data) return null;
             const arrayBuffer = await data.arrayBuffer();
             const bytes = new Uint8Array(arrayBuffer);
             let binary = "";
-            for (let i = 0; i < bytes.length; i++) {
-              binary += String.fromCharCode(bytes[i]);
-            }
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
             const base64 = btoa(binary);
             const ext = path.toLowerCase().split(".").pop() || "jpeg";
-            const mimeType = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : ext === "webp" ? "image/webp" : "image/jpeg";
-            imageUrls.push({ url: `data:${mimeType};base64,${base64}`, party, type, name });
+            const mimeType =
+              ext === "png" ? "image/png" :
+              ext === "gif" ? "image/gif" :
+              ext === "webp" ? "image/webp" : "image/jpeg";
             log("INFO", "Image converted to base64", { path, size: bytes.length, party });
-          } else {
-            // Track PDF/other docs by name
-            const filename = path.split("/").pop() || path;
-            pdfDocNames.push(filename);
-            pdfDocsByParty.push({ name: filename, party, type });
+            return {
+              kind: "img" as const,
+              url: `data:${mimeType};base64,${base64}`,
+              party, type, name,
+            };
+          } catch (dlErr) {
+            log("WARN", "Failed to download image", { path, error: (dlErr as Error).message });
+            return null;
           }
-        } catch (dlErr) {
-          log("WARN", "Failed to download image", { path, error: (dlErr as Error).message });
+        })
+      );
+      for (const r of downloads) {
+        if (!r) continue;
+        if (r.kind === "img") {
+          imageUrls.push({ url: r.url, party: r.party, type: r.type, name: r.name });
+        } else {
+          pdfDocNames.push(r.filename);
+          pdfDocsByParty.push({ name: r.filename, party: r.party, type: r.type });
         }
       }
     }
