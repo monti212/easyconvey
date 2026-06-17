@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
 // ─── Markdown Parser ─────────────────────────────────────────────────────────
 
 interface ParsedBlock {
-  type: 'h1' | 'h2' | 'h3' | 'h4' | 'paragraph' | 'list-item' | 'hr' | 'blank' | 'page-break' | 'br';
+  type: 'h1' | 'h2' | 'h3' | 'h4' | 'paragraph' | 'list-item' | 'hr' | 'blank' | 'page-break' | 'br' | 'catchword';
   text: string;
   ordered?: boolean;
   index?: number;
@@ -405,6 +405,15 @@ function parseMarkdownToBlocks(markdown: string): ParsedBlock[] {
     if (trimmed === '[[BR]]') {
       flushParagraph();
       blocks.push({ type: 'br', text: '' });
+      i++;
+      continue;
+    }
+
+    // Catchword [[CATCHWORD]]
+    const catchwordMatch = trimmed.match(/^\[\[CATCHWORD\]\]\s*(.*)/);
+    if (catchwordMatch) {
+      flushParagraph();
+      blocks.push({ type: 'catchword', text: catchwordMatch[1] });
       i++;
       continue;
     }
@@ -536,6 +545,12 @@ export default function DeedOfSalePDF(props: DeedOfSaleProps) {
           return <View key={idx} break />;
         case 'br':
           return <Text key={idx}>{"\n"}</Text>;
+        case 'catchword':
+          return (
+            <Text key={idx} style={{ position: 'absolute', bottom: 106, right: 106, textAlign: 'right', ...styles.paragraph }}>
+              {renderInlineText(block.text)}
+            </Text>
+          );
         default:
           return null;
       }

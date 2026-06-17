@@ -65,7 +65,7 @@ NUMBERS AND DATES:
 FORMATTING:
 - The document OPENS at the top-right with a right-aligned "Prepared by me" line, a blank gap, then a right-aligned "Conveyancer" line. Everything else follows beneath that block.
 - Below the Prepared-by block, centred each on its own line: document title "DEED OF TRANSFER", "by", seller name, "in favour of", buyer name, "in respect of", lot description, then "DEED OF TRANSFER NO.".
-- CATCHWORDS: registry deeds carry a "catchword" at the foot of each page that previews the opening of the next page. Emit these as RIGHT-ALIGNED lines using the exact form "[[R]] .... / [NEXT WORD]" immediately followed by a "[[PAGE_BREAK]]" marker. Follow the manual page breaks provided in the structure template exactly!
+- CATCHWORDS: registry deeds carry a "catchword" at the foot of each page that previews the opening of the next page. Emit these using the exact form "[[CATCHWORD]] .... / [NEXT WORD]" immediately followed by a "[[PAGE_BREAK]]" marker. Follow the manual page breaks provided in the structure template exactly!
 - The body uses paragraph prose for the "appeared before me" / "AND the said Appearer declared" / "WHEREFORE the Appearer" sections, and tabular prose for the property description block (CERTAIN/SITUATE/etc.).
 - Signature block at the end uses dotted/underscored signature lines (use "______________________________" for the lines).
 - Use Markdown bold (**…**) ONLY for party names, plot/lot numbers, deed numbers, and key amounts.
@@ -112,7 +112,7 @@ AND the said Appearer declared that his Principal had truly and legally sold and
 
 [Closing pronoun line — for individual: "her Heirs, executors, administrators or assigns" or "his Heirs, executors, administrators or assigns"; for company: "its successors-in-title or assigns"], the following property, that is to say:
 
-[[R]] .... / CERTAIN
+[[CATCHWORD]] .... / CERTAIN
 [[PAGE_BREAK]]
 
     **CERTAIN:**                   piece of land being [PLOT ADDRESS], [PLACE];
@@ -150,12 +150,12 @@ AND FURTHER SUBJECT TO the following conditions:
 
 5. The Government or any lawfully established public authority authorised thereto by the Government shall at all times have the power of constructing on or through any part of the property pipe lines, aqueducts, drains or telephone or telegraph lines required for public purposes. No compensation shall be payable by the Government or other authority aforesaid in the exercise of any of its rights under this paragraph except in respect of the value of any damage to improvements actually sustained by reason of the exercise of these rights.
 
-[[R]] .... / 6. Connection
+[[CATCHWORD]] .... / 6. Connection
 [[PAGE_BREAK]]
 
 6. Connection of services to individual plots shall be the responsibility of the Purchaser.
 
-[[R]] .... / WHEREFORE
+[[CATCHWORD]] .... / WHEREFORE
 [[PAGE_BREAK]]
 
 WHEREFORE the Appearer, renouncing all the right, title and interest which his Principal heretofore had to the premises did in consequence also acknowledge him to be entirely dispossessed of and disentitled to the same and that by virtue of these presents, the said
@@ -170,7 +170,7 @@ AND, finally, acknowledging that the property was sold on the [ordinal] day of [
 
 In witness whereof I, the said Registrar, together with the Appearer q.q. have subscribed to these presents, and have caused the Seal of Office to be affixed hereto.
 
-[[R]] .... / THUS
+[[CATCHWORD]] .... / THUS
 [[PAGE_BREAK]]
 
 THUS DONE AND EXECUTED at the Office of the Registrar of Deeds for Botswana at **[PLACE OF EXECUTION]** on this [ordinal] day of [Month] in the Year of Our Lord **[YEAR IN WORDS]**.
@@ -186,7 +186,7 @@ kept at
 
 on the                             day of                                        20
 
-[[R]] .... / ENDORSEMENTS
+[[CATCHWORD]] .... / ENDORSEMENTS
 [[PAGE_BREAK]]
 [[C]] **ENDORSEMENTS**
 

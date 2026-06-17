@@ -710,6 +710,7 @@ const Step7Summary: React.FC<Step7Props> = ({
         .replace(/^\d+[.)] (.*$)/gm, '<li>$1</li>')
         .replace(/^---$/gm, '<hr>')
         .replace(/^\[\[PAGE_BREAK\]\]$/gm, '</p><div class="page-break"></div><p>')
+        .replace(/^\[\[CATCHWORD\]\](.*)$/gm, '</p><p style="text-align: right; margin-top: 100px;">$1</p><p>')
         .replace(/^\[\[BR\]\]$/gm, '<br><br>')
         .replace(/\n\n/g, '</p><p>')
         .replace(/\n/g, '<br>');

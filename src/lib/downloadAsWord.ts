@@ -14,6 +14,10 @@ import {
   LevelFormat,
   TabStopType,
   PageBreak,
+  HorizontalPositionAlign,
+  VerticalPositionAlign,
+  HorizontalPositionRelativeFrom,
+  VerticalPositionRelativeFrom,
 } from 'docx';
 
 function parseMarkdownLine(line: string): TextRun[] {
@@ -64,6 +68,23 @@ export async function downloadAsWord(
       children.push(new Paragraph({ text: trimmed.slice(2), heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER, spacing: { before: 240, after: 160 } }));
     } else if (trimmed === '[[PAGE_BREAK]]') {
       children.push(new Paragraph({ children: [new PageBreak()] }));
+    } else if (trimmed.startsWith('[[CATCHWORD]]')) {
+      const text = trimmed.replace(/^\[\[CATCHWORD\]\]\s*/, '');
+      children.push(new Paragraph({
+        children: parseMarkdownLine(text),
+        frame: {
+          position: { x: 0, y: 0 },
+          anchor: {
+            horizontal: HorizontalPositionAlign.RIGHT,
+            horizontalRelative: HorizontalPositionRelativeFrom.MARGIN,
+            vertical: VerticalPositionAlign.BOTTOM,
+            verticalRelative: VerticalPositionRelativeFrom.MARGIN,
+          },
+          width: 4000,
+          height: 300,
+        },
+        alignment: AlignmentType.RIGHT,
+      }));
     } else if (trimmed === '[[BR]]') {
       children.push(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 240 } }));
     } else if (trimmed.startsWith('---')) {
