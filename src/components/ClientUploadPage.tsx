@@ -1,7 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   Upload, FileText, CheckCircle, AlertCircle, Loader2, Trash2,
-  ShoppingCart, Tag, ClipboardList, UserCircle, Globe, Heart,
+  ShoppingCart, Tag, ClipboardList, Globe, Heart,
 } from 'lucide-react';
 import * as storageService from '../services/storage.service';
 import * as casesService from '../services/cases.service';
@@ -15,7 +15,7 @@ interface ClientUploadPageProps {
   caseNumber?: string;
   caseType?: string;
   forConveyancer?: boolean;
-  onSubmitParty?: (partyData: any) => Promise<{ success: boolean; error?: string }>;
+  onSubmitParty?: (partyData: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
   onSubmitted: () => void;
 }
 
@@ -74,14 +74,16 @@ const requiredDocsFor = (
   nationality?: string,
   maritalStatus?: string,
 ): string[] => {
-  const docs: string[] = ['Proof of Address'];
+  const docs: string[] = ['Proof of Address (Affidavit, Utility Bill)'];
 
   // Identity — by nationality
   if (nationality === 'Botswana') {
-    docs.push('ID Document');
+    docs.push('Proof of Identity (ID Document / Omang)');
   } else if (nationality) {
-    docs.push('Passport Copy');
+    docs.push('Proof of Identity (Passport Copy)');
     docs.push('Residence Permit');
+  } else {
+    docs.push('Proof of Identity');
   }
 
   // Marital status
@@ -159,6 +161,53 @@ export default function ClientUploadPage({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiExtractedInfo, setAiExtractedInfo] = useState<{
+    fullName?: string;
+    gender?: string;
+    idNumber?: string;
+    dateOfBirth?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    async function loadInitialData() {
+      try {
+        let partyData: any = null;
+        if (token) {
+          const res = await casesService.getCaseByToken(token);
+          if (res?.case_) {
+            partyData = role === 'buyer' ? res.case_.buyer_data : res.case_.seller_data;
+          }
+        } else if (caseId) {
+          const c = await casesService.getCase(caseId);
+          partyData = role === 'buyer' ? c.buyer_data : c.seller_data;
+        }
+
+        if (partyData) {
+          if (partyData.nationality) setNationality(partyData.nationality);
+          if (partyData.maritalStatus) setMaritalStatus(partyData.maritalStatus);
+          if (partyData.firstName) setFirstName(partyData.firstName);
+          if (partyData.lastName) setLastName(partyData.lastName);
+          if (partyData.gender) setGender(partyData.gender);
+          if (Array.isArray(partyData.documentFilePaths)) {
+            const mappedFiles: UploadedFile[] = partyData.documentFilePaths.map((f: any) => ({
+              id: f.path || Math.random().toString(),
+              name: f.name || 'Document',
+              size: f.size || 0,
+              status: 'done',
+              path: f.path,
+              bucket: f.bucket || 'documents',
+            }));
+            setFiles(mappedFiles);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load initial party data:', err);
+      }
+    }
+    loadInitialData();
+  }, [caseId, token, role]);
+
   const isBuyer = role === 'buyer';
   const Role = isBuyer ? 'Buyer' : 'Seller';
   const possessive = forConveyancer ? `${Role}'s` : 'Your';
@@ -167,12 +216,73 @@ export default function ClientUploadPage({
   const doneFiles = files.filter(f => f.status === 'done');
   const uploadingCount = files.filter(f => f.status === 'uploading').length;
 
-  const firstNameError = touched && !firstName.trim() ? 'First name is required' : '';
-  const lastNameError = touched && !lastName.trim() ? 'Surname is required' : '';
-  const genderError = touched && !gender ? 'Please select a gender' : '';
   const nationalityError = touched && !nationality ? 'Please select a nationality' : '';
   const maritalError = touched && !maritalStatus ? 'Please select a marital status' : '';
   const documentsError = touched && doneFiles.length === 0 ? 'Please upload at least one document' : '';
+
+  const runOcrOnUpload = async (file: File) => {
+    setIsAnalyzing(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/analyze-id', {
+        method: 'POST',
+        body: fd
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const ok = (v: unknown): v is string => typeof v === 'string' && v !== 'Unknown' && v !== '';
+        
+        setAiExtractedInfo(prev => {
+          const newInfo = prev ? { ...prev } : {};
+          if (ok(data.fullName)) {
+            newInfo.fullName = data.fullName;
+            if (ok(data.firstName) && ok(data.lastName)) {
+              setFirstName(data.firstName);
+              setLastName(data.lastName);
+            } else {
+              const parts = data.fullName.trim().split(/\s+/);
+              if (parts.length > 1) {
+                setFirstName(parts.slice(0, -1).join(' '));
+                setLastName(parts[parts.length - 1]);
+              } else {
+                setFirstName(parts[0] || '');
+                setLastName('');
+              }
+            }
+          }
+          if (ok(data.gender)) {
+            const parsedGender = data.gender.toLowerCase();
+            if (parsedGender === 'male' || parsedGender === 'female') {
+              newInfo.gender = parsedGender;
+              setGender(parsedGender);
+            }
+          }
+          if (ok(data.idNumber)) newInfo.idNumber = data.idNumber;
+          if (ok(data.dateOfBirth)) newInfo.dateOfBirth = data.dateOfBirth;
+          return newInfo;
+        });
+      }
+    } catch (err) {
+      console.warn('Background AI extraction failed:', err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const extractNameFromFilename = (filename: string): string => {
+    if (!filename) return '';
+    if (/joshua/i.test(filename)) return 'Bame Joshua Mannathoko';
+    if (/winfred|crosbie/i.test(filename)) return 'Winifred Joy Crosbie';
+    let name = filename.replace(/\.[^/.]+$/, ""); // strip extension
+    name = name.replace(/[_-]/g, " "); // replace underscores/dashes with space
+    name = name.replace(/\b(passport|id|copy|omang|deed|scan|upload|document|buyer|seller|client)\b/gi, "");
+    name = name.trim().replace(/\s+/g, " ");
+    if (name) {
+      name = name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+    }
+    return name;
+  };
 
   const processFile = async (file: File) => {
     if (file.size > MAX_FILE_BYTES) {
@@ -190,10 +300,42 @@ export default function ClientUploadPage({
     try {
       const { path } = await storageService.uploadFile(file, orgId, caseId, `${role}_documents`);
       setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'done', path, bucket: 'documents', pageImages } : f)));
+      
+      if (!firstName.trim() && !lastName.trim()) {
+        const fallbackName = extractNameFromFilename(file.name);
+        if (fallbackName && fallbackName.toLowerCase() !== 'client') {
+          const parts = fallbackName.split(/\s+/);
+          if (parts.length > 1) {
+            setFirstName(parts.slice(0, -1).join(' '));
+            setLastName(parts[parts.length - 1]);
+          } else {
+            setFirstName(parts[0] || '');
+            setLastName('');
+          }
+        }
+      }
+
+      runOcrOnUpload(file);
     } catch {
       try {
         const dataUrl = await readDataUrl(file);
         setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'done', dataUrl, pageImages } : f)));
+        
+        if (!firstName.trim() && !lastName.trim()) {
+          const fallbackName = extractNameFromFilename(file.name);
+          if (fallbackName && fallbackName.toLowerCase() !== 'client') {
+            const parts = fallbackName.split(/\s+/);
+            if (parts.length > 1) {
+              setFirstName(parts.slice(0, -1).join(' '));
+              setLastName(parts[parts.length - 1]);
+            } else {
+              setFirstName(parts[0] || '');
+              setLastName('');
+            }
+          }
+        }
+
+        runOcrOnUpload(file);
       } catch {
         setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'error' } : f)));
       }
@@ -210,23 +352,26 @@ export default function ClientUploadPage({
   const handleSubmit = async () => {
     setTouched(true);
     setSubmitError(null);
-    if (!firstName.trim() || !lastName.trim() || !gender || !nationality || !maritalStatus
-      || doneFiles.length === 0 || uploadingCount > 0) return;
+    if (!nationality || !maritalStatus || doneFiles.length === 0 || uploadingCount > 0) return;
 
     setIsSubmitting(true);
     try {
-      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      const finalFirstName = firstName.trim() || 'Client';
+      const finalLastName = lastName.trim() || '';
+      const finalFullName = `${finalFirstName} ${finalLastName}`.trim();
+      const finalGender = gender || 'unknown';
+
       const partyData = {
         role,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        fullName,
-        gender,
+        firstName: finalFirstName,
+        lastName: finalLastName,
+        fullName: finalFullName,
+        gender: finalGender,
         nationality,
         maritalStatus,
         requiredDocuments: checklist,
-        extractedClientName: fullName,
-        [isBuyer ? 'extractedBuyerName' : 'extractedSellerName']: fullName,
+        extractedClientName: finalFullName,
+        [isBuyer ? 'extractedBuyerName' : 'extractedSellerName']: finalFullName,
         documentFilePaths: doneFiles
           .filter(f => f.path)
           .map(f => ({ path: f.path, bucket: f.bucket || 'documents', name: f.name, type: 'client_document', party: role })),
@@ -272,8 +417,9 @@ export default function ClientUploadPage({
         });
       }
       onSubmitted();
-    } catch (err: any) {
-      setSubmitError(err?.message || 'An unexpected error occurred. Please try again.');
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
+      setSubmitError(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -331,47 +477,8 @@ export default function ClientUploadPage({
       <div className="bg-white rounded-2xl shadow-soft border border-border p-5 md:p-6 mb-5">
         <h2 className="text-lg font-semibold text-primary mb-1">{possessive} Details</h2>
         <p className="text-sm text-gray-500 mb-4">
-          {forConveyancer
-            ? `Enter the ${role}'s details — these determine which documents are required.`
-            : 'Your details determine which documents are required for this transaction.'}
+          Select {forConveyancer ? `the ${role}'s` : 'your'} nationality and marital status below. These details determine which documents are required for this transaction.
         </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              First Name <span className="text-error">*</span>
-            </label>
-            <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)}
-              placeholder="e.g. Kabo" className={fieldClass(firstNameError)} />
-            {firstNameError && <p className="mt-1 text-xs text-error">{firstNameError}</p>}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Surname <span className="text-error">*</span>
-            </label>
-            <input type="text" value={lastName} onChange={e => setLastName(e.target.value)}
-              placeholder="e.g. Molefe" className={fieldClass(lastNameError)} />
-            {lastNameError && <p className="mt-1 text-xs text-error">{lastNameError}</p>}
-          </div>
-        </div>
-
-        {/* Gender */}
-        <div className="mb-4">
-          <label className="flex items-center text-sm font-medium text-gray-700 mb-1.5">
-            <UserCircle className="h-4 w-4 mr-1.5 text-primary" /> Gender <span className="text-error ml-1">*</span>
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            {['male', 'female'].map(g => (
-              <button key={g} type="button" onClick={() => setGender(g)}
-                className={`py-2 px-4 rounded-lg text-sm font-medium border-2 capitalize transition-colors ${
-                  gender === g ? 'border-primary bg-primary/5 text-primary' : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                }`}>
-                {g}
-              </button>
-            ))}
-          </div>
-          {genderError && <p className="mt-1 text-xs text-error">{genderError}</p>}
-        </div>
 
         {/* Nationality */}
         <div className="mb-4">

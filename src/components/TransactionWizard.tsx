@@ -439,8 +439,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   };
 
   const previousStep = () => {
+    console.log('previousStep triggered inside TransactionWizard. currentStep:', currentStep);
     // If on document upload page (step 6) after coming from selling price
     if (currentStep === 6) {
+      console.log('Transitioning step from 6 to 4 (Selling Price)');
       setCurrentStep(4); // Go back to selling price
       window.scrollTo(0, 0);
       return;
@@ -887,7 +889,14 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       {/* Actions */}
       <div className="bg-background border-t border-border px-4 py-3 md:px-6 md:py-4 flex justify-between">
         <button 
-          onClick={() => setCurrentStep(1)}
+          onClick={() => {
+            console.log('Save and exit clicked. Triggering onComplete callback');
+            if (onComplete) {
+              onComplete();
+            } else {
+              setCurrentStep(1);
+            }
+          }}
           className="text-sm text-primary hover:text-primary-dark transition-colors"
         >
           Save and exit

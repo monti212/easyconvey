@@ -1,76 +1,67 @@
 import type { DocumentConfig } from "./deed_of_sale.ts";
 
-export function getAffidavitConfig(transactionBlock: string): DocumentConfig {
+export function getAffidavitConfig(transactionBlock: string, documentType?: string): DocumentConfig {
+  const partyTarget = documentType === 'affidavit_seller' ? 'the SELLER' : documentType === 'affidavit_purchaser' ? 'the PURCHASER' : 'the appropriate party (buyer or seller)';
   return {
-    instructions: `You are an expert Botswana property conveyancing attorney generating a sworn Affidavit supporting a property transaction.
+    instructions: `You are an expert Botswana property conveyancing attorney generating an Affidavit of Birth for a property transaction.
 
 CRITICAL INSTRUCTIONS:
-- Generate a COMPLETE, legally binding Affidavit
-- Use proper legal language and sworn statement format
-- Format using Markdown: use # for title, ## for sections, **bold** for defined terms
-- The affidavit must comply with Botswana law
-- Use actual party details provided — do NOT use placeholder names
-- Include all material facts relevant to the property transaction
-- Reference applicable legislation where relevant
+- Generate a COMPLETE Affidavit of Birth exactly matching the format below.
+- Do NOT use markdown section headings (no ### headers). The document flows as continuous prose.
+- Use actual party details provided — do NOT use placeholder names.
+- DATA RESOLUTION ORDER (apply IN ORDER for every field — do not skip steps):
+  1. Use the explicit value from the BUYER/SELLER information block if it is non-empty AND not the literal string "To be confirmed".
+  2. Otherwise, use the matching value from the "DOCUMENT OCR EXTRACTED DATA" block.
+  3. Otherwise, extract the value directly from any attached document images.
+  4. ONLY if all three sources fail, write "OUTSTANDING — [field description]". Never use a bracket placeholder like [NAME].
 
-DOCUMENT EXTRACTION (HIGHEST PRIORITY):
-- If document images are attached, extract ALL relevant information (names, ID numbers, property descriptions, addresses)
-- Uploaded documents are the PRIMARY source of truth — use extracted data over form placeholders
-- Never leave a field as "Not specified" if the information is visible in an attached document`,
+ENTITY AND MARITAL STATUS HANDLING:
+- Determine the Deponent. You MUST generate this affidavit for **${partyTarget}**. Extract the birth details for ${partyTarget}.
+- Extract the Deponent's Date of Birth and Place of Birth. If Place of Birth is missing, write "OUTSTANDING — place of birth".
+- For Marital Status (Point 3):
+  - If "single", write "BACHELOR" or "SPINSTER".
+  - If "married_in", write "Married in community of property".
+  - If "married_out", write "Married out of community of property".
+  - If "divorced", write "DIVORCED".
+  - If "widowed", write "WIDOW/WIDOWER".
+- Pronoun handling in the attestation clause: use "HE" or "SHE" depending on the Deponent's gender (if known) or "HE/SHE".`,
 
-    prompt: `Generate a complete Affidavit for the following Botswana property transaction:
+    prompt: `Generate a complete Affidavit of Birth for the following Botswana property transaction:
 ${transactionBlock}
 
 ═══════════════════════════════════════
-REQUIRED DOCUMENT STRUCTURE:
+REQUIRED DOCUMENT FORMAT — FOLLOW THIS EXACT STRUCTURE AND ALIGNMENT:
 ═══════════════════════════════════════
 
-# AFFIDAVIT
+[[C]] **AFFIDAVIT OF BIRTH**
+[[BR]]
+[[BR]]
 
-## HEADING
-- In the matter of the property transfer between [Buyer] and [Seller]
-- Reference to transaction number
+I, the undersigned,
+[[BR]]
 
-## 1. DEPONENT INFORMATION
-- Full name, ID number, address, occupation
-- Statement of capacity (buyer, seller, or conveyancer)
+[[C]] **[DEPONENT FULL NAME IN CAPS]**
+[[BR]]
 
-## 2. OATH / AFFIRMATION
-- Formal sworn statement preamble
+hereby make oath and say
+1    I was born at **[PLACE OF BIRTH]** on the [DOB e.g. 15 JULY 1983];
+2    I have always regarded the above date as my birthday; and
+4    I am a [MARITAL STATUS per rules, e.g. BACHELOR].
+[[BR]]
+[[BR]]
+[[BR]]
 
-## 3. FACTUAL DECLARATIONS
-- Identity and personal details of deponent
-- Nature of the transaction
-- Property description and details
-- Purchase price and payment arrangements
-- Marital status declarations (community of property implications)
-- Citizenship and residency status
-- First-time buyer status (if applicable)
-- Source of funds declaration
-- No pending litigation affecting the property
-- No undisclosed defects or encumbrances
-- Compliance with Financial Intelligence Act (anti-money laundering)
-- Tax compliance status
-- That all information provided is true and correct
+[[R]] ..................................
+[[R]] **[DEPONENT FULL NAME IN CAPS]**
+[[BR]]
+[[BR]]
 
-## 4. PROPERTY SPECIFIC DECLARATIONS
-- Confirmation of property inspection
-- Awareness of property condition
-- Any servitudes or restrictions
-- Municipal compliance status
+THUS SIGNED AND SWORN TO BEFORE ME AT **[PLACE OF EXECUTION OR GABORONE]** ON THIS _________ DAY OF _____________ 20[YEAR] BY THE DEPONENT WHO ACKNOWLEDGED THAT [HE/SHE] KNOWS AND UNDERSTANDS THE CONTENTS OF THIS AFFIDAVIT.
+[[BR]]
+[[BR]]
+[[BR]]
 
-## 5. DECLARATION OF TRUTH
-- Statement that contents are true and correct
-- Acknowledgment of penalties for false declaration
-- That deponent understands the contents
-
-## 6. EXECUTION
-- Deponent signature
-- Date and place
-- Commissioner of Oaths attestation
-- Commissioner's stamp and designation
-- Full name and address of Commissioner
-
-Generate the COMPLETE text with proper legal language. Use actual transaction details provided.`,
+[[R]] ..................................
+[[R]] **COMMISSIONER OF OATHS**`,
   };
 }

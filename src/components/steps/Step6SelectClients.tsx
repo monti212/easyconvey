@@ -17,14 +17,23 @@ interface Step6SelectClientsProps {
   onPrevious: () => void;
 }
 
-type Extracted = { fullName?: string; idNumber?: string; dateOfBirth?: string };
+type Extracted = {
+  fullName?: string; idNumber?: string; dateOfBirth?: string;
+  ownerName?: string; titleDeedNumber?: string; propertyAddress?: string; plotNumber?: string;
+};
 
 const partyKey = (p: SubmittedParty) => `${p.caseId}:${p.role}`;
 
 const partyDocList = (p: SubmittedParty | null) => {
   if (!p?.data) return [] as { name: string; doc: any }[];
   const paths = (p.data.documentFilePaths || []).map((d: any) => ({ name: d.name || 'Document', doc: d }));
-  const urls = (p.data.documentDataUrls || []).map((d: any) => ({ name: d.name || 'Document', doc: d }));
+  const urls = (p.data.documentDataUrls || [])
+    .filter((d: any) => {
+      const isPageImage = d.name && d.name.includes(' (page ');
+      const isDuplicate = (p.data.documentFilePaths || []).some((f: any) => f.name === d.name);
+      return !isPageImage && !isDuplicate;
+    })
+    .map((d: any) => ({ name: d.name || 'Document', doc: d }));
   return [...paths, ...urls];
 };
 
@@ -149,15 +158,38 @@ const Step6SelectClients: React.FC<Step6SelectClientsProps> = ({
           const res = await fetch('/api/analyze-deed', { method: 'POST', body: fd });
           if (res.ok) {
             const d = await res.json();
-            if (ok(d.ownerName)) deed.extractedOwnerName = d.ownerName;
+            if (ok(d.ownerName)) { deed.extractedOwnerName = d.ownerName; found.ownerName = d.ownerName; }
             if (ok(d.ownerIdNumber)) deed.extractedOwnerIdNumber = d.ownerIdNumber;
-            if (ok(d.plotNumber)) deed.extractedPlotNumber = d.plotNumber;
-            if (ok(d.propertyAddress)) deed.extractedPropertyAddress = d.propertyAddress;
+            if (ok(d.plotNumber)) { deed.extractedPlotNumber = d.plotNumber; found.plotNumber = d.plotNumber; }
+            if (ok(d.propertyAddress)) { deed.extractedPropertyAddress = d.propertyAddress; found.propertyAddress = d.propertyAddress; }
             if (ok(d.propertyDescription)) deed.extractedPropertyDescription = d.propertyDescription;
-            if (ok(d.titleDeedNumber)) deed.extractedTitleDeedNumber = d.titleDeedNumber;
+            if (ok(d.titleDeedNumber)) { deed.extractedTitleDeedNumber = d.titleDeedNumber; found.titleDeedNumber = d.titleDeedNumber; }
             if (ok(d.administrativeDistrict)) deed.extractedAdministrativeDistrict = d.administrativeDistrict;
             if (ok(d.extent)) deed.extractedExtent = d.extent;
             if (ok(d.purchasePrice)) deed.extractedPurchasePrice = d.purchasePrice;
+            if (ok(d.nameOfAppearer)) deed.extractedNameOfAppearer = d.nameOfAppearer;
+            if (ok(d.placeOfExecution)) deed.extractedPlaceOfExecution = d.placeOfExecution;
+            if (ok(d.monthAndYearOfPoa)) deed.extractedMonthAndYearOfPoa = d.monthAndYearOfPoa;
+            if (ok(d.situate)) deed.extractedSituate = d.situate;
+            if (ok(d.unitsOfMeasurement)) deed.extractedUnitsOfMeasurement = d.unitsOfMeasurement;
+            if (ok(d.dslNumber)) deed.extractedDslNumber = d.dslNumber;
+            if (ok(d.nameOfSurveyor)) deed.extractedNameOfSurveyor = d.nameOfSurveyor;
+            if (ok(d.dateOfSurvey)) deed.extractedDateOfSurvey = d.dateOfSurvey;
+            if (ok(d.dateOfApproval)) deed.extractedDateOfApproval = d.dateOfApproval;
+            if (ok(d.nameOfPreviousDeed)) deed.extractedNameOfPreviousDeed = d.nameOfPreviousDeed;
+            if (ok(d.previousDeedNumber)) deed.extractedPreviousDeedNumber = d.previousDeedNumber;
+            if (ok(d.previousDeedDateOfRegistration)) deed.extractedPreviousDeedDateOfRegistration = d.previousDeedDateOfRegistration;
+            if (ok(d.currentDeedDateOfRegistration)) deed.extractedCurrentDeedDateOfRegistration = d.currentDeedDateOfRegistration;
+            if (ok(d.crmNumber)) deed.extractedCrmNumber = d.crmNumber;
+            if (ok(d.dateOfCrm)) deed.extractedDateOfCrm = d.dateOfCrm;
+            if (ok(d.dfpsgNumber)) deed.extractedDfpsgNumber = d.dfpsgNumber;
+            if (ok(d.dfpsgDateOfRegistration)) deed.extractedDfpsgDateOfRegistration = d.dfpsgDateOfRegistration;
+            if (ok(d.dfpsgOwnerName)) deed.extractedDfpsgOwnerName = d.dfpsgOwnerName;
+            if (ok(d.dateOfSale)) deed.extractedDateOfSale = d.dateOfSale;
+            if (ok(d.purchaserPlaceOfBirth)) deed.extractedPurchaserPlaceOfBirth = d.purchaserPlaceOfBirth;
+            if (ok(d.sellerPlaceOfBirth)) deed.extractedSellerPlaceOfBirth = d.sellerPlaceOfBirth;
+            if (ok(d.sellerStatus)) deed.extractedSellerStatus = d.sellerStatus;
+            if (ok(d.purchaserStatus)) deed.extractedPurchaserStatus = d.purchaserStatus;
           }
         } catch { /* non-blocking */ }
       }
@@ -332,11 +364,14 @@ const Step6SelectClients: React.FC<Step6SelectClientsProps> = ({
             <p className="text-xs text-gray-500 flex items-center gap-1.5">
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading the submitted documents...
             </p>
-          ) : ex && (ex.fullName || ex.idNumber || ex.dateOfBirth) ? (
+          ) : ex && (ex.fullName || ex.idNumber || ex.dateOfBirth || ex.ownerName || ex.titleDeedNumber) ? (
             <div className="text-xs text-gray-700 space-y-0.5">
               {ex.fullName && <p><span className="text-gray-400">Name:</span> {ex.fullName}</p>}
               {ex.idNumber && <p><span className="text-gray-400">ID / Passport:</span> {ex.idNumber}</p>}
               {ex.dateOfBirth && <p><span className="text-gray-400">Date of birth:</span> {ex.dateOfBirth}</p>}
+              {ex.ownerName && <p><span className="text-gray-400">Deed Owner:</span> {ex.ownerName}</p>}
+              {ex.titleDeedNumber && <p><span className="text-gray-400">Deed Number:</span> {ex.titleDeedNumber}</p>}
+              {ex.propertyAddress && <p><span className="text-gray-400">Address:</span> {ex.propertyAddress}</p>}
             </div>
           ) : (
             <p className="text-xs text-gray-500">
@@ -422,7 +457,10 @@ const Step6SelectClients: React.FC<Step6SelectClientsProps> = ({
 
       <div className="mt-8 md:mt-12 flex justify-between">
         <button
-          onClick={onPrevious}
+          onClick={() => {
+            console.log('Back button clicked inside Step6SelectClients');
+            onPrevious();
+          }}
           className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 border-2 border-gray-300 rounded-lg text-sm md:text-base font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors"
         >
           <ArrowLeft className="mr-1 md:mr-2 h-4 w-4" /> Back

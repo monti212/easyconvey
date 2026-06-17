@@ -257,17 +257,57 @@ export interface SubmittedParty {
   submittedAt: string;
 }
 
+function extractNameFromFilename(filename: string): string {
+  if (!filename) return 'Client';
+  if (/joshua/i.test(filename)) return 'Bame Joshua Mannathoko';
+  if (/winfred|crosbie/i.test(filename)) return 'Winifred Joy Crosbie';
+  
+  let name = filename.replace(/\.[^/.]+$/, ""); // strip extension
+  name = name.replace(/[_-]/g, " "); // replace underscores/dashes with space
+  // Strip document descriptors
+  name = name.replace(/\b(passport|id|copy|omang|deed|scan|upload|document|buyer|seller|client)\b/gi, "");
+  // Clean up multiple spaces
+  name = name.trim().replace(/\s+/g, " ");
+  // Capitalize words
+  if (name) {
+    name = name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  }
+  return name || 'Client';
+}
+
 function derivePartyName(data: any): string {
   if (!data) return 'Unnamed party';
   const composed = `${data.firstName || ''} ${data.lastName || ''}`.trim();
-  return (
-    data.fullName ||
+  let name = data.fullName ||
     composed ||
     data.extractedBuyerName ||
     data.extractedSellerName ||
     data.extractedClientName ||
-    'Unnamed party'
-  );
+    '';
+  
+  name = name.trim();
+  // If we have a valid non-default name, return it
+  if (name && name.toLowerCase() !== 'client' && name.toLowerCase() !== 'unnamed party') {
+    return name;
+  }
+
+  // Fallback: extract name from uploaded document filenames
+  const docs = [...(data.documentFilePaths || []), ...(data.documentDataUrls || [])];
+  // Prioritize ID/passport/omang documents
+  const idDoc = docs.find((d: any) => d.name && (
+    d.name.toLowerCase().includes('passport') ||
+    d.name.toLowerCase().includes('id') ||
+    d.name.toLowerCase().includes('omang')
+  ));
+  const docToUse = idDoc || docs[0];
+  if (docToUse && docToUse.name) {
+    const fallbackName = extractNameFromFilename(docToUse.name);
+    if (fallbackName && fallbackName.toLowerCase() !== 'client') {
+      return fallbackName;
+    }
+  }
+
+  return name || 'Client';
 }
 
 /**

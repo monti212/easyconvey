@@ -44,6 +44,7 @@ MARITAL STATUS HANDLING (CRITICAL — apply for the SELLER and where applicable 
 - "married_out" / Married Out of Community of Property → same as above but "Married out of community of property to …" plus "Antenuptial Contract dated …"
 - "divorced" → write "(Divorced)" after the date of birth
 - "widowed" → write "(Widow/Widower of the late [DECEASED SPOUSE NAME])" after the date of birth
+- "Not specified" or missing → Do NOT write OUTSTANDING. Simply omit the marital status line entirely.
 
 BUYER ENTITY HANDLING:
 - Individual: include full name, date of birth, marital status (same rules as seller). Closing line: "his/her Heirs, executors, administrators or assigns".
@@ -63,8 +64,8 @@ NUMBERS AND DATES:
 
 FORMATTING:
 - The document OPENS at the top-right with a right-aligned "Prepared by me" line, a blank gap, then a right-aligned "Conveyancer" line. Everything else follows beneath that block.
-- Below the Prepared-by block, centred each on its own line: document title "DEED OF TRANSFER", "by", seller name, "in favour of", buyer name, "in respect of", lot description, then "DEED OF TRANSFER NO. ___".
-- CATCHWORDS: registry deeds carry a "catchword" at the foot of each section that previews the opening of the next section. Emit these as RIGHT-ALIGNED lines using the exact form "[[R]] …/" followed by the opening words of the section that follows. Place a catchword immediately before: condition 6, the WHEREFORE clause, the THUS DONE AND EXECUTED clause, and (where the deed uses a WHEREAS recital) the WHEREAS section. Examples: "[[R]] …/6. Connection of services", "[[R]] …/WHEREFORE", "[[R]] …/WHEREAS". The "…/" must use the ellipsis character.
+- Below the Prepared-by block, centred each on its own line: document title "DEED OF TRANSFER", "by", seller name, "in favour of", buyer name, "in respect of", lot description, then "DEED OF TRANSFER NO.".
+- CATCHWORDS: registry deeds carry a "catchword" at the foot of each page that previews the opening of the next page. Emit these as RIGHT-ALIGNED lines using the exact form "[[R]] .... / [NEXT WORD]" immediately followed by a "[[PAGE_BREAK]]" marker. Follow the manual page breaks provided in the structure template exactly!
 - The body uses paragraph prose for the "appeared before me" / "AND the said Appearer declared" / "WHEREFORE the Appearer" sections, and tabular prose for the property description block (CERTAIN/SITUATE/etc.).
 - Signature block at the end uses dotted/underscored signature lines (use "______________________________" for the lines).
 - Use Markdown bold (**…**) ONLY for party names, plot/lot numbers, deed numbers, and key amounts.
@@ -78,49 +79,41 @@ REQUIRED DOCUMENT STRUCTURE — REPRODUCE THIS LAYOUT EXACTLY (substitute real v
 ═══════════════════════════════════════
 
 [[R]] Prepared by me
-
-
-
 [[R]] Conveyancer
+[[BR]]
+[[BR]]
+[[BR]]
+[[BR]]
+[[BR]]
+[[BR]]
+[[BR]]
+[[BR]]
 
-
-
-[[C]] DEED OF TRANSFER
-
-[[C]] by
-
-[[C]] **[SELLER FULL NAME IN CAPS]**
-
-[[C]] in favour of
-
-[[C]] **[BUYER FULL NAME IN CAPS]**
-
-[[C]] in respect of
-
-[[C]] **LOT [PLOT NUMBER] [LOCATION IN CAPS]**
-
-[[C]] DEED OF TRANSFER NO. ___________
+[[C]] **DEED OF TRANSFER NO.**
 
 [[C]] **Be it hereby made known:**
 THAT **[CONVEYANCER FULL NAME IN CAPS]** appeared before me, the Registrar of Deeds for Botswana at **[PLACE]**, he the said Appearer, being duly authorised thereto by a Power of Attorney granted to him by
 
-**[SELLER FULL NAME IN CAPS]**
-(Born on the [ordinal] day of [Month] [Year])
-[Apply marital status block here per MARITAL STATUS HANDLING — e.g.:
-"Married in community of property to
-**[SPOUSE FULL NAME IN CAPS]**
-(Born [SPOUSE MAIDEN NAME] on the [ordinal] day of [Month] [Year])
-Which marriage is governed by the Laws of Botswana"]
+[[C]] **[SELLER FULL NAME IN CAPS]**
+[[C]] (Born on the [ordinal] day of [Month] [Year])
+[[C]] [Apply marital status block here per MARITAL STATUS HANDLING — e.g.:
+[[C]] "Married in community of property to
+[[C]] **[SPOUSE FULL NAME IN CAPS]**
+[[C]] (Born [SPOUSE MAIDEN NAME] on the [ordinal] day of [Month] [Year])
+[[C]] Which marriage is governed by the Laws of Botswana"]
 
-which Power of Attorney is dated the [ordinal] day of [Month] [Year] and was signed at [PLACE];
+which Power of Attorney is dated the **[DATE THIS DOCUMENT IS GENERATED]** and was signed at **[PLACE OF EXECUTION (e.g. GABORONE or FRANCISTOWN)]**;
 
 AND the said Appearer declared that his Principal had truly and legally sold and that he, the Appearer in his capacity aforesaid, did by these presents, cede and transfer in full and free property to and on behalf of
 
-**[BUYER FULL NAME IN CAPS]**
-(Born on the [ordinal] day of [Month] [Year])
-[Apply marital status block — e.g. "(Spinster)" or "(Bachelor)" or "Married in community of property to …"]
+[[C]] **[BUYER FULL NAME IN CAPS]**
+[[C]] (Born on the [ordinal] day of [Month] [Year])
+[[C]] [Apply marital status block — e.g. "(Spinster)" or "(Bachelor)" or "Married in community of property to …"]
 
 [Closing pronoun line — for individual: "her Heirs, executors, administrators or assigns" or "his Heirs, executors, administrators or assigns"; for company: "its successors-in-title or assigns"], the following property, that is to say:
+
+[[R]] .... / CERTAIN
+[[PAGE_BREAK]]
 
     **CERTAIN:**                   piece of land being [PLOT ADDRESS], [PLACE];
 
@@ -147,7 +140,7 @@ AND FURTHER SUBJECT TO the following conditions:
 
    d) The purchaser of the property shall be allowed [PERIOD] years before the expiry of transfer to indicate his intention in writing to renew and negotiations should be concluded not later than [PERIOD] years before the expiry of the Deed of Transfer;
 
-   e) Where the purchaser elects not to renew the Deed, the Deed of Transfer shall terminate on the date of expiry and rights and title therein shall revert to the state together with developments;
+   e) Where the purchaser elects not to renew the Deed, the Deed of Transfer shall terminate together with developments;
 
 2. The property shall only be used for the following purpose - residential and may not be used for any other purpose except with the written permission of the Government.
 
@@ -157,49 +150,53 @@ AND FURTHER SUBJECT TO the following conditions:
 
 5. The Government or any lawfully established public authority authorised thereto by the Government shall at all times have the power of constructing on or through any part of the property pipe lines, aqueducts, drains or telephone or telegraph lines required for public purposes. No compensation shall be payable by the Government or other authority aforesaid in the exercise of any of its rights under this paragraph except in respect of the value of any damage to improvements actually sustained by reason of the exercise of these rights.
 
-[[R]] …/6. Connection of services
+[[R]] .... / 6. Connection
+[[PAGE_BREAK]]
 
 6. Connection of services to individual plots shall be the responsibility of the Purchaser.
 
-[[R]] …/WHEREFORE
+[[R]] .... / WHEREFORE
+[[PAGE_BREAK]]
 
 WHEREFORE the Appearer, renouncing all the right, title and interest which his Principal heretofore had to the premises did in consequence also acknowledge him to be entirely dispossessed of and disentitled to the same and that by virtue of these presents, the said
 
-**[BUYER FULL NAME IN CAPS]**
-(Born on the [ordinal] day of [Month] [Year])
-[Apply marital status block — e.g. "(Spinster)"]
+[[C]] **[BUYER FULL NAME IN CAPS]**
+[[C]] (Born on the [ordinal] day of [Month] [Year])
+[[C]] [Apply marital status block]
 
-[Closing pronoun line — "her Heirs, executors, administrators or assigns" / "his Heirs, executors, administrators or assigns" / "its successors-in-title or assigns"], now is and henceforth shall be entitled thereto, conformably to local custom; the State, however, reserving its rights.
+[Closing pronoun line], now is and henceforth shall be entitled thereto, conformably to local custom; the State, however, reserving its rights.
 
-AND, finally, acknowledging that the property was sold on the [ordinal] day of [Month] [Year] for the sum of **P[SALE PRICE FIGURES] ([SALE PRICE IN WORDS])** [if valuation differs: but valued at **P[VALUATION FIGURES] ([VALUATION IN WORDS])** for transfer duty purposes].
+AND, finally, acknowledging that the property was sold on the [ordinal] day of [Month] [Year] for the sum of **P[SALE PRICE FIGURES] ([SALE PRICE IN WORDS])**.
 
-In witness whereof I; the said Registrar, together with the Appearer q.q. have subscribed to these presents, and have caused the Seal of Office to be affixed hereto.
+In witness whereof I, the said Registrar, together with the Appearer q.q. have subscribed to these presents, and have caused the Seal of Office to be affixed hereto.
 
-[[R]] …/THUS DONE AND EXECUTED
+[[R]] .... / THUS
+[[PAGE_BREAK]]
 
-THUS DONE AND EXECUTED at the Office of the Registrar of Deeds for Botswana at **GABORONE** on this [ordinal] day of [Month] in the Year of Our Lord **[YEAR IN WORDS] (20[YEAR])**.
+THUS DONE AND EXECUTED at the Office of the Registrar of Deeds for Botswana at **[PLACE OF EXECUTION]** on this [ordinal] day of [Month] in the Year of Our Lord **[YEAR IN WORDS]**.
 
 In my presence
 
             ______________________________                                              ______________________________
 
-           Registrar of Deeds Botswana                                             q.q. his Principal
+           Registrar of Deeds Botswana                                             [[R]] q.q. his Principal
 
 Registered in the Register of
 kept at
-on the above date.
 
-[If buyer is a Company (Pty Ltd), append immediately after the registration line:]
+on the                             day of                                        20
 
-ENDORSEMENTS
+[[R]] .... / ENDORSEMENTS
+[[PAGE_BREAK]]
+[[C]] **ENDORSEMENTS**
 
-**[COMPANY NAME] (Proprietary) Limited** is authorised to acquire immovable property in terms of Section 25 of the Companies Act.
-
-═══════════════════════════════════════
 CRITICAL REMINDERS — RE-READ BEFORE OUTPUTTING:
 ═══════════════════════════════════════
 - NEVER output bracketed placeholders ([NAME], [DATE], [NUMBER]) in the final document. Use the real value or "OUTSTANDING — [description]".
 - NEVER copy filenames or any part of filenames as data. Filenames listed in the prompt are inventory only.
+- PLACE OF EXECUTION: Use the Place of Execution from the transaction block. If missing, default to "GABORONE". Do NOT write OUTSTANDING.
+- DEED DATE: For the "THUS DONE AND EXECUTED" block, use the GENERATION DATE from the transaction block. Do NOT write OUTSTANDING.
+- MARITAL STATUS: If marital status is "Not specified", do NOT write OUTSTANDING, just omit the marital status line.
 - For every field, follow the DATA RESOLUTION ORDER: party block → OCR-extracted block → attached image extraction → "OUTSTANDING" (last resort). Do NOT write "OUTSTANDING" while real data exists in the OCR-extracted block or document images.
 - The page opens top-right with "Prepared by me" / "Conveyancer" (right-aligned). Beneath it, centred: document title, "by", seller, "in favour of", buyer, "in respect of", lot, deed number.
 - The 6 numbered conditions are STANDARD for Fixed Period State Grant residential properties — include them verbatim with sub-clauses a–e on condition 1.

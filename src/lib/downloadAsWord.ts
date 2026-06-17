@@ -11,6 +11,9 @@ import {
   TableRow,
   TableCell,
   WidthType,
+  LevelFormat,
+  TabStopType,
+  PageBreak,
 } from 'docx';
 
 function parseMarkdownLine(line: string): TextRun[] {
@@ -47,32 +50,6 @@ export async function downloadAsWord(
   const lines = content.split('\n');
   const children: Paragraph[] = [];
 
-  // Cover header
-  children.push(
-    new Paragraph({
-      text: firmName.toUpperCase(),
-      heading: HeadingLevel.HEADING_1,
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 100 },
-    }),
-    new Paragraph({
-      text: 'Republic of Botswana · Property Conveyancing',
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 100 },
-      children: [new TextRun({ text: 'Republic of Botswana · Property Conveyancing', color: '666666', size: 18 })],
-    }),
-  );
-
-  if (caseNumber) {
-    children.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 300 },
-        children: [new TextRun({ text: `Ref: ${caseNumber}  ·  ${buyerName} ↔ ${sellerName}`, color: '999999', size: 16 })],
-      }),
-    );
-  }
-
   // Parse markdown content
   for (const line of lines) {
     const trimmed = line.trim();
@@ -85,6 +62,10 @@ export async function downloadAsWord(
       children.push(new Paragraph({ text: trimmed.slice(3), heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER, spacing: { before: 240, after: 120 } }));
     } else if (trimmed.startsWith('# ')) {
       children.push(new Paragraph({ text: trimmed.slice(2), heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER, spacing: { before: 240, after: 160 } }));
+    } else if (trimmed === '[[PAGE_BREAK]]') {
+      children.push(new Paragraph({ children: [new PageBreak()] }));
+    } else if (trimmed === '[[BR]]') {
+      children.push(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 240 } }));
     } else if (trimmed.startsWith('---')) {
       children.push(new Paragraph({
         border: { bottom: { color: 'CCCCCC', style: BorderStyle.SINGLE, size: 6 } },
@@ -118,8 +99,23 @@ export async function downloadAsWord(
           spacing: { after: 80 },
         }));
       } else if (trimmed.startsWith('**')) {
-        // Line opening with a bold label (CERTAIN:, SITUATE: …) — left-aligned
-        children.push(new Paragraph({ children: parseMarkdownLine(trimmed), spacing: { after: 80 }, alignment: AlignmentType.LEFT }));
+        // Line opening with a bold label (CERTAIN:, SITUATE: …) — use hanging indent and tab stop
+        const colonMatch = trimmed.match(/^(\*\*.*?\*\*:?)\s+(.*)/);
+        if (colonMatch) {
+          children.push(new Paragraph({
+            children: [
+              ...parseMarkdownLine(colonMatch[1]),
+              new TextRun({ text: '\t' }),
+              ...parseMarkdownLine(colonMatch[2]),
+            ],
+            tabStops: [{ type: TabStopType.LEFT, position: 2880 }], // 2880 TWIPs = 2 inches
+            indent: { left: 2880, hanging: 2880 },
+            spacing: { after: 80 },
+            alignment: AlignmentType.LEFT,
+          }));
+        } else {
+          children.push(new Paragraph({ children: parseMarkdownLine(trimmed), spacing: { after: 80 }, alignment: AlignmentType.LEFT }));
+        }
       } else {
         children.push(new Paragraph({ children: parseMarkdownLine(trimmed), spacing: { after: 80 }, alignment: AlignmentType.JUSTIFIED }));
       }
@@ -128,23 +124,13 @@ export async function downloadAsWord(
 
   const doc = new Document({
     numbering: {
-      config: [{ reference: 'default-numbering', levels: [{ level: 0, format: 'decimal', text: '%1.', alignment: AlignmentType.LEFT }] }],
+      config: [{ reference: 'default-numbering', levels: [{ level: 0, format: LevelFormat.DECIMAL, text: '%1.', alignment: AlignmentType.LEFT }] }],
     },
     sections: [{
       properties: {
-        page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } },
+        page: { margin: { top: 2126, bottom: 2126, left: 2126, right: 2126 } },
       },
-      // "Prepared by" sits in the top-right corner of every page
-      headers: {
-        default: new Header({
-          children: [
-            new Paragraph({
-              alignment: AlignmentType.RIGHT,
-              children: [new TextRun({ text: `Prepared by ${firmName}`, color: '999999', size: 14 })],
-            }),
-          ],
-        }),
-      },
+      // No default headers; the AI emits '[[R]] Prepared by me' as part of the document body
       children,
     }],
   });

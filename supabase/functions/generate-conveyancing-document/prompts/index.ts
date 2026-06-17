@@ -4,7 +4,8 @@ export { getTransferDutyConfig } from "./transfer_duty.ts";
 export { getPowerOfAttorneyConfig } from "./power_of_attorney.ts";
 export { getAffidavitConfig } from "./affidavit.ts";
 export { getBondRegistrationConfig } from "./bond_registration.ts";
-export { getDeclarationOfPurchaseConfig } from "./declaration_of_purchase.ts";
+export { getDeclarationOfPurchaserConfig } from "./declaration_of_purchaser.ts";
+export { getDeclarationOfSellerConfig } from "./declaration_of_seller.ts";
 export { getMissingInformationConfig } from "./missing_information.ts";
 export { getDeedOfTransferConfig } from "./deed_of_transfer.ts";
 
@@ -14,19 +15,23 @@ import { getTransferDutyConfig } from "./transfer_duty.ts";
 import { getPowerOfAttorneyConfig } from "./power_of_attorney.ts";
 import { getAffidavitConfig } from "./affidavit.ts";
 import { getBondRegistrationConfig } from "./bond_registration.ts";
-import { getDeclarationOfPurchaseConfig } from "./declaration_of_purchase.ts";
+import { getDeclarationOfPurchaserConfig } from "./declaration_of_purchaser.ts";
+import { getDeclarationOfSellerConfig } from "./declaration_of_seller.ts";
 import { getMissingInformationConfig } from "./missing_information.ts";
 import { getDeedOfTransferConfig } from "./deed_of_transfer.ts";
 import { BOTSWANA_CONVEYANCING_RULES } from "./business_rules.ts";
 
-const configFactories: Record<string, (transactionBlock: string) => DocumentConfig> = {
+const configFactories: Record<string, (transactionBlock: string, documentType?: string) => DocumentConfig> = {
   deed_of_sale: getDeedOfSaleConfig,
   deed_of_transfer: getDeedOfTransferConfig,
   transfer_duty: getTransferDutyConfig,
   power_of_attorney: getPowerOfAttorneyConfig,
   affidavit: getAffidavitConfig,
+  affidavit_purchaser: getAffidavitConfig,
+  affidavit_seller: getAffidavitConfig,
   bond_registration: getBondRegistrationConfig,
-  declaration_of_purchase: getDeclarationOfPurchaseConfig,
+  declaration_purchaser: getDeclarationOfPurchaserConfig,
+  declaration_seller: getDeclarationOfSellerConfig,
   missing_information: getMissingInformationConfig,
 };
 
@@ -37,7 +42,7 @@ const configFactories: Record<string, (transactionBlock: string) => DocumentConf
  */
 export function getDocumentConfig(documentType: string, transactionBlock: string): DocumentConfig {
   const factory = configFactories[documentType] || configFactories.deed_of_sale;
-  const config = factory(transactionBlock);
+  const config = factory(transactionBlock, documentType);
   return {
     ...config,
     instructions: `${config.instructions}\n\n${BOTSWANA_CONVEYANCING_RULES}`,

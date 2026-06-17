@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, Upload, CheckCircle, AlertCircle, Share2, FileText, Eye, X, AlertTriangle, FileType, Sparkles, ShoppingCart, Tag } from 'lucide-react';
 import * as storageService from '../../services/storage.service';
 import { convertToPdf } from '../../lib/convertToPdf';
+import { renderPdfToImages, isPdf } from '../../lib/pdfToImages';
 
 interface Step6Props {
   requiredDocuments: string[];
@@ -162,12 +163,24 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
           newQuality[file.name] = 'good';
         }
 
+        // Render images once if the file is a PDF (for OCR vision)
+        let pageImages: string[] = [];
+        if (isPdf(originalFile)) {
+          pageImages = await renderPdfToImages(originalFile);
+        } else if (isImage) {
+          const dataUrl = await fileToDataUrl(originalFile);
+          pageImages = [dataUrl];
+        }
+
         // ID OCR — every bulk-uploaded file is sent through analyze-id; the API
         // returns "Unknown" for non-ID documents (which we ignore). Successful
         // hits are routed to the active party's bucket and shown per-file.
         try {
           const idForm = new FormData();
           idForm.append('file', originalFile);
+          if (pageImages.length > 0) {
+            idForm.append('images', JSON.stringify(pageImages));
+          }
           const idRes = await fetch('/api/analyze-id', { method: 'POST', body: idForm });
           if (idRes.ok) {
             const idData = await idRes.json();
@@ -190,6 +203,9 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
           try {
             const deedForm = new FormData();
             deedForm.append('file', originalFile);
+            if (pageImages.length > 0) {
+              deedForm.append('images', JSON.stringify(pageImages));
+            }
             const deedRes = await fetch('/api/analyze-deed', { method: 'POST', body: deedForm });
             if (deedRes.ok) {
               const deedData = await deedRes.json();
@@ -204,6 +220,29 @@ const Step6DocumentUpload: React.FC<Step6Props> = ({
                 if (def(deedData.administrativeDistrict)) deedPayload.extractedAdministrativeDistrict = deedData.administrativeDistrict;
                 if (def(deedData.extent)) deedPayload.extractedExtent = deedData.extent;
                 if (def(deedData.purchasePrice)) deedPayload.extractedPurchasePrice = deedData.purchasePrice;
+                if (def(deedData.nameOfAppearer)) deedPayload.extractedNameOfAppearer = deedData.nameOfAppearer;
+                if (def(deedData.placeOfExecution)) deedPayload.extractedPlaceOfExecution = deedData.placeOfExecution;
+                if (def(deedData.monthAndYearOfPoa)) deedPayload.extractedMonthAndYearOfPoa = deedData.monthAndYearOfPoa;
+                if (def(deedData.situate)) deedPayload.extractedSituate = deedData.situate;
+                if (def(deedData.unitsOfMeasurement)) deedPayload.extractedUnitsOfMeasurement = deedData.unitsOfMeasurement;
+                if (def(deedData.dslNumber)) deedPayload.extractedDslNumber = deedData.dslNumber;
+                if (def(deedData.nameOfSurveyor)) deedPayload.extractedNameOfSurveyor = deedData.nameOfSurveyor;
+                if (def(deedData.dateOfSurvey)) deedPayload.extractedDateOfSurvey = deedData.dateOfSurvey;
+                if (def(deedData.dateOfApproval)) deedPayload.extractedDateOfApproval = deedData.dateOfApproval;
+                if (def(deedData.nameOfPreviousDeed)) deedPayload.extractedNameOfPreviousDeed = deedData.nameOfPreviousDeed;
+                if (def(deedData.previousDeedNumber)) deedPayload.extractedPreviousDeedNumber = deedData.previousDeedNumber;
+                if (def(deedData.previousDeedDateOfRegistration)) deedPayload.extractedPreviousDeedDateOfRegistration = deedData.previousDeedDateOfRegistration;
+                if (def(deedData.currentDeedDateOfRegistration)) deedPayload.extractedCurrentDeedDateOfRegistration = deedData.currentDeedDateOfRegistration;
+                if (def(deedData.crmNumber)) deedPayload.extractedCrmNumber = deedData.crmNumber;
+                if (def(deedData.dateOfCrm)) deedPayload.extractedDateOfCrm = deedData.dateOfCrm;
+                if (def(deedData.dfpsgNumber)) deedPayload.extractedDfpsgNumber = deedData.dfpsgNumber;
+                if (def(deedData.dfpsgDateOfRegistration)) deedPayload.extractedDfpsgDateOfRegistration = deedData.dfpsgDateOfRegistration;
+                if (def(deedData.dfpsgOwnerName)) deedPayload.extractedDfpsgOwnerName = deedData.dfpsgOwnerName;
+                if (def(deedData.dateOfSale)) deedPayload.extractedDateOfSale = deedData.dateOfSale;
+                if (def(deedData.purchaserPlaceOfBirth)) deedPayload.extractedPurchaserPlaceOfBirth = deedData.purchaserPlaceOfBirth;
+                if (def(deedData.sellerPlaceOfBirth)) deedPayload.extractedSellerPlaceOfBirth = deedData.sellerPlaceOfBirth;
+                if (def(deedData.sellerStatus)) deedPayload.extractedSellerStatus = deedData.sellerStatus;
+                if (def(deedData.purchaserStatus)) deedPayload.extractedPurchaserStatus = deedData.purchaserStatus;
                 (onUpdate as (d: Record<string, unknown>) => void)(deedPayload);
               }
             }

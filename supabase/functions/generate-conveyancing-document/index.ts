@@ -90,6 +90,29 @@ serve(async (req: Request) => {
       extractedSellerName,
       extractedSellerIdNumber,
       extractedSellerDateOfBirth,
+      extractedNameOfAppearer,
+      extractedPlaceOfExecution,
+      extractedMonthAndYearOfPoa,
+      extractedSituate,
+      extractedUnitsOfMeasurement,
+      extractedDslNumber,
+      extractedNameOfSurveyor,
+      extractedDateOfSurvey,
+      extractedDateOfApproval,
+      extractedNameOfPreviousDeed,
+      extractedPreviousDeedNumber,
+      extractedPreviousDeedDateOfRegistration,
+      extractedCurrentDeedDateOfRegistration,
+      extractedCrmNumber,
+      extractedDateOfCrm,
+      extractedDfpsgNumber,
+      extractedDfpsgDateOfRegistration,
+      extractedDfpsgOwnerName,
+      extractedDateOfSale,
+      extractedPurchaserPlaceOfBirth,
+      extractedSellerPlaceOfBirth,
+      extractedSellerStatus,
+      extractedPurchaserStatus,
     } = await req.json();
 
     // ─── Fetch document URLs from Supabase Storage ───────────────────
@@ -249,6 +272,7 @@ serve(async (req: Request) => {
     // ─── Transaction details block (shared across all document types) ──
     const transactionBlock = `
 TRANSACTION REFERENCE: ${transactionId}
+GENERATION DATE: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
 TRANSACTION CATEGORY: ${transactionCategory ? transactionCategory.replace(/_/g, ' ').toUpperCase() : 'NORMAL TRANSFER'}${includeBondRegistration ? ' + BOND REGISTRATION' : ''}
 
 ═══════════════════════════════════════
@@ -278,6 +302,29 @@ ${extractedBuyerDateOfBirth ? `BUYER Date of Birth (party-tagged from ID documen
 ${extractedSellerName ? `SELLER Full Name (party-tagged from ID document): ${extractedSellerName}` : ''}
 ${extractedSellerIdNumber ? `SELLER ID / Passport Number (party-tagged from ID document): ${extractedSellerIdNumber}` : ''}
 ${extractedSellerDateOfBirth ? `SELLER Date of Birth (party-tagged from ID document): ${extractedSellerDateOfBirth}` : ''}
+${extractedNameOfAppearer ? `Name of Appearer (Conveyancer): ${extractedNameOfAppearer}` : ''}
+${extractedPlaceOfExecution ? `Place of Execution: ${extractedPlaceOfExecution}` : ''}
+${extractedMonthAndYearOfPoa ? `Month and Year of Power of Attorney: ${extractedMonthAndYearOfPoa}` : ''}
+${extractedSituate ? `Property Situate: ${extractedSituate}` : ''}
+${extractedUnitsOfMeasurement ? `Units of Measurement: ${extractedUnitsOfMeasurement}` : ''}
+${extractedDslNumber ? `DSL / Diagram Number: ${extractedDslNumber}` : ''}
+${extractedNameOfSurveyor ? `Name of Surveyor: ${extractedNameOfSurveyor}` : ''}
+${extractedDateOfSurvey ? `Date of Survey: ${extractedDateOfSurvey}` : ''}
+${extractedDateOfApproval ? `Date of Approval: ${extractedDateOfApproval}` : ''}
+${extractedNameOfPreviousDeed ? `Previous Deed Name/Type: ${extractedNameOfPreviousDeed}` : ''}
+${extractedPreviousDeedNumber ? `Previous Deed Number: ${extractedPreviousDeedNumber}` : ''}
+${extractedPreviousDeedDateOfRegistration ? `Previous Deed Date of Registration: ${extractedPreviousDeedDateOfRegistration}` : ''}
+${extractedCurrentDeedDateOfRegistration ? `Current Deed Date of Registration: ${extractedCurrentDeedDateOfRegistration}` : ''}
+${extractedCrmNumber ? `CRM Number: ${extractedCrmNumber}` : ''}
+${extractedDateOfCrm ? `Date of CRM: ${extractedDateOfCrm}` : ''}
+${extractedDfpsgNumber ? `DFPSG Number: ${extractedDfpsgNumber}` : ''}
+${extractedDfpsgDateOfRegistration ? `DFPSG Date of Registration: ${extractedDfpsgDateOfRegistration}` : ''}
+${extractedDfpsgOwnerName ? `DFPSG Owner Name: ${extractedDfpsgOwnerName}` : ''}
+${extractedDateOfSale ? `Date of Sale (from Deed): ${extractedDateOfSale}` : ''}
+${extractedPurchaserPlaceOfBirth ? `Purchaser Place of Birth: ${extractedPurchaserPlaceOfBirth}` : ''}
+${extractedSellerPlaceOfBirth ? `Seller Place of Birth: ${extractedSellerPlaceOfBirth}` : ''}
+${extractedSellerStatus ? `Seller Marital Status (from Deed): ${extractedSellerStatus}` : ''}
+${extractedPurchaserStatus ? `Purchaser Marital Status (from Deed): ${extractedPurchaserStatus}` : ''}
 ` : ''}
 ═══════════════════════════════════════
 BUYER (PURCHASER) INFORMATION:
@@ -383,10 +430,51 @@ ${"═".repeat(39)}
 PAGE ALIGNMENT MARKERS — APPLY TO THIS DOCUMENT
 ${"═".repeat(39)}
 Markdown cannot express alignment, so use these line-start markers:
-- "[[C]] " at the very start of a line CENTRES that line. Use it for deed cover lines such as "by", "in favour of", "in respect of", the party-name lines, the lot/property line, and the deed-number line.
-- "[[R]] " at the very start of a line RIGHT-ALIGNS it. Use it for the "Prepared by me" block and the conveyancer name/"Conveyancer" line on a deed cover.
-- Do NOT mark ordinary body paragraphs, numbered/lettered clauses (1, 1.1, 2, a, etc.) or the CERTAIN/SITUATE/MEASURING property block — the renderer automatically justifies body prose, left-indents numbered clauses, and left-aligns bold-labelled lines.
-- A marker must be the FIRST characters on the line, followed by exactly one space, then the text. Never put a marker on a "#" heading line — headings are centred automatically.`;
+1. "[[C]] " at the very start of a line CENTRES that line. Use it for deed cover lines such as "by", "in favour of", "in respect of", the party-name lines, the lot/property line, and the deed-number line.
+2. "[[R]] " at the very start of a line RIGHT-ALIGNS it. Use it for the "Prepared by me" block and the conveyancer name/"Conveyancer" line on a deed cover.
+3. Do NOT mark ordinary body paragraphs, numbered/lettered clauses (1, 1.1, 2, a, etc.) or the CERTAIN/SITUATE/MEASURING property block — the renderer automatically justifies body prose, left-indents numbered clauses, and left-aligns bold-labelled lines.
+4. When listing Party Names, Dates of Birth, and Marital Status as standalone blocks (e.g. in Declarations), they MUST be centered:
+   [[C]] KOKELETSO MARIRI
+   [[C]] (Born on the 15 JULY 1983)
+   [[C]] (BACHELOR)
+5. Catchphrases at the bottom of pages MUST be right-aligned using [[R]]:
+   [[R]] ... / CERTAIN
+   [[R]] .... / ENDORSEMENTS
+   [[R]] ..... / SIGNED
+6. Execution blocks (signatures) should be formatted cleanly. E.g.:
+   In my presence
+   [[R]] ......................................
+   [[R]] q.q. his Principal
+   ......................................
+   Registrar of Deeds Botswana
+7. "AS WITNESSES" blocks should have left-aligned witnesses and a right-aligned principal signature line:
+   **AS WITNESSES**
+   1 ......................................
+   2 ......................................
+   [[R]] ......................................
+   [[R]] KENNETH OBRIEN MPHO MAPOKA
+8. "AFFIDAVIT OF BIRTH" MUST have the heading and party block centered, and a specific layout for signatures:
+   [[C]] AFFIDAVIT OF BIRTH
+   I, the undersigned,
+   [[C]] KENNETH OBRIEN MPHO MAPOKA
+   hereby make oath and say
+   1 I was born at FRANCISTOWN on the 4 AUGUST 1985;
+   ...
+   [[R]] ......................................
+   [[R]] KENNETH OBRIEN MPHO MAPOKA
+   THUS SIGNED AND SWORN TO BEFORE ME AT GABORONE ON THIS ________ DAY OF ________ 2024 BY THE DEPONENT WHO ACKNOWLEDGED THAT HE KNOWS AND UNDERSTANDS THE CONTENTS OF THIS AFFIDAVIT.
+   [[R]] ......................................
+   [[R]] COMMISSIONER OF OATHS
+
+BOTSWANA CONVEYANCING BUSINESS RULES:
+• Transfer Duty: Citizens 0% on first P1,500,000 then 5%; Non-citizens 10% up to P2M then 15%
+• First-Time Buyer Exemption: Citizens only, Section 20(1)(f) Transfer Duty Act
+• Rates Clearance required before transfer
+• Land Board Consent may be needed where applicable (tribal land only)
+• Bond Cancellation may be needed where applicable (only if existing bond)
+• All transfers comply with Financial Intelligence Act
+
+WORDING RULE: Use "may be needed where applicable" for conditional documents. Never "will be needed".`;
     config.instructions = config.instructions + globalFormatting;
 
     const instructions = knowledgeBaseContent

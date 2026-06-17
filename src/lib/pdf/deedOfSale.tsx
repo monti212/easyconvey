@@ -162,9 +162,9 @@ const styles = StyleSheet.create({
 
   // ─── Content Pages ──────────────────────────────
   page: {
-    paddingTop: 60,
-    paddingBottom: 70,
-    paddingHorizontal: 55,
+    paddingTop: 106,
+    paddingBottom: 106,
+    paddingHorizontal: 106,
     fontSize: 10,
     fontFamily: 'Helvetica',
     lineHeight: 1.6,
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
 // ─── Markdown Parser ─────────────────────────────────────────────────────────
 
 interface ParsedBlock {
-  type: 'h1' | 'h2' | 'h3' | 'h4' | 'paragraph' | 'list-item' | 'hr' | 'blank';
+  type: 'h1' | 'h2' | 'h3' | 'h4' | 'paragraph' | 'list-item' | 'hr' | 'blank' | 'page-break' | 'br';
   text: string;
   ordered?: boolean;
   index?: number;
@@ -388,6 +388,23 @@ function parseMarkdownToBlocks(markdown: string): ParsedBlock[] {
     if (markerMatch) {
       flushParagraph();
       blocks.push({ type: 'paragraph', text: markerMatch[2], align: markerMatch[1] === 'C' ? 'center' : 'right' });
+      i++;
+      continue;
+    }
+
+    // Page break
+    const pbMatch = trimmed.match(/^\[\[PAGE_BREAK\]\]/);
+    if (pbMatch) {
+      flushParagraph();
+      blocks.push({ type: 'page-break', text: '' });
+      i++;
+      continue;
+    }
+
+    // Line break [[BR]]
+    if (trimmed === '[[BR]]') {
+      flushParagraph();
+      blocks.push({ type: 'br', text: '' });
       i++;
       continue;
     }
@@ -484,66 +501,6 @@ export default function DeedOfSalePDF(props: DeedOfSaleProps) {
   const priceFormatted = `P ${parseInt(propertyPrice || '0').toLocaleString()}`;
   const title = documentTitle || 'Deed of Sale & Transfer Agreement';
 
-  // ─── Cover Page ──────────────────────────────────────
-  const CoverPage = () => (
-    <Page size="A4" style={styles.coverPage}>
-      {/* Double border frame */}
-      <View style={styles.coverBorder} />
-      <View style={styles.coverInnerBorder} />
-
-      <View style={styles.coverContent}>
-        {/* Top accent line */}
-        <View style={styles.coverTopAccent} />
-
-        {/* Firm name */}
-        <Text style={styles.coverFirmName}>{firmName}</Text>
-        <Text style={styles.coverFirmTagline}>Attorneys &middot; Notaries &middot; Conveyancers</Text>
-
-        {/* Divider */}
-        <View style={styles.coverDivider} />
-
-        {/* Republic header */}
-        <Text style={styles.coverRepublic}>Republic of Botswana</Text>
-
-        {/* Document title */}
-        <Text style={styles.coverTitle}>{title}</Text>
-        <Text style={styles.coverSubtitle}>Property Conveyancing Document</Text>
-
-        {/* Details box */}
-        <View style={styles.coverDetailsBox}>
-          <View style={styles.coverDetailRow}>
-            <Text style={styles.coverDetailLabel}>Reference</Text>
-            <Text style={styles.coverDetailValue}>{transactionId}</Text>
-          </View>
-          <View style={styles.coverDetailRow}>
-            <Text style={styles.coverDetailLabel}>Purchaser</Text>
-            <Text style={styles.coverDetailValue}>{buyerName}</Text>
-          </View>
-          <View style={styles.coverDetailRow}>
-            <Text style={styles.coverDetailLabel}>Seller</Text>
-            <Text style={styles.coverDetailValue}>{sellerName}</Text>
-          </View>
-          <View style={styles.coverDetailRow}>
-            <Text style={styles.coverDetailLabel}>Purchase Price</Text>
-            <Text style={styles.coverDetailValue}>{priceFormatted}</Text>
-          </View>
-          <View style={{ ...styles.coverDetailRow, marginBottom: 0 }}>
-            <Text style={styles.coverDetailLabel}>Date</Text>
-            <Text style={styles.coverDetailValue}>{date}</Text>
-          </View>
-        </View>
-
-        {/* Bottom accent */}
-        <View style={styles.coverBottomAccent} />
-
-        {/* Prepared by */}
-        <Text style={styles.coverPreparedBy}>Prepared by</Text>
-        <Text style={styles.coverLawyerName}>{lawyerName}</Text>
-        <Text style={styles.coverDate}>{firmName} | {date}</Text>
-      </View>
-    </Page>
-  );
-
   // ─── Render parsed markdown blocks ──────────────────
   const renderBlocks = (blocks: ParsedBlock[]) => {
     return blocks.map((block, idx) => {
@@ -575,6 +532,10 @@ export default function DeedOfSalePDF(props: DeedOfSaleProps) {
           );
         case 'hr':
           return <View key={idx} style={styles.hr} />;
+        case 'page-break':
+          return <View key={idx} break />;
+        case 'br':
+          return <Text key={idx}>{"\n"}</Text>;
         default:
           return null;
       }
@@ -587,7 +548,6 @@ export default function DeedOfSalePDF(props: DeedOfSaleProps) {
 
     return (
       <Document>
-        <CoverPage />
         <Page size="A4" style={styles.page} wrap>
           {/* Running header */}
           <View style={styles.pageHeader} fixed>

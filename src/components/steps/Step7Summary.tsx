@@ -58,17 +58,15 @@ interface Step7Props {
   onUpdate?: (data: any) => void;
 }
 
-type DocumentType = 'deed_of_sale' | 'deed_of_transfer' | 'transfer_duty' | 'power_of_attorney' | 'declaration_of_purchase' | 'affidavit' | 'bond_registration' | 'missing_information';
+type DocumentType = 'deed_of_transfer' | 'power_of_attorney' | 'declaration_purchaser' | 'declaration_seller' | 'affidavit_birth';
 
 const DOC_TYPES: { id: DocumentType; label: string; short: string }[] = [
-  { id: 'missing_information', label: 'Missing Information Checklist', short: 'Readiness Check' },
-  { id: 'deed_of_sale', label: 'Deed of Sale & Transfer', short: 'Deed of Sale' },
-  { id: 'deed_of_transfer', label: 'Deed of Transfer (Registry)', short: 'Deed of Transfer' },
-  { id: 'transfer_duty', label: 'Transfer Duty Declaration', short: 'Transfer Duty' },
-  { id: 'power_of_attorney', label: 'Power of Attorney to Transfer', short: 'POA & Seller Dec.' },
-  { id: 'declaration_of_purchase', label: 'Declaration of Purchaser', short: 'Purchaser Dec.' },
-  { id: 'affidavit', label: 'Affidavit', short: 'Affidavit' },
-  { id: 'bond_registration', label: 'Bond Registration', short: 'Bond Reg.' },
+  { id: 'deed_of_transfer', label: 'DEED OF TRANSFER', short: 'Deed of Transfer' },
+  { id: 'power_of_attorney', label: 'POWER OF ATTORNEY TO GIVE TRANSFER', short: 'POA to Transfer' },
+  { id: 'declaration_purchaser', label: 'DECLARATION OF PURCHASER', short: 'Declaration of Purchaser' },
+  { id: 'declaration_seller', label: 'DECLARATION OF SELLER', short: 'Declaration of Seller' },
+  { id: 'affidavit_purchaser', label: 'AFFIDAVIT OF BIRTH (PURCHASER)', short: 'Affidavit (Purchaser)' },
+  { id: 'affidavit_seller', label: 'AFFIDAVIT OF BIRTH (SELLER)', short: 'Affidavit (Seller)' },
 ];
 
 // Build a human-readable, filesystem-safe download name like
@@ -434,6 +432,29 @@ const Step7Summary: React.FC<Step7Props> = ({
           extractedExtent: (transactionData as any).extractedExtent || '',
           extractedClientName: (transactionData as any).extractedClientName || '',
           extractedIdNumber: (transactionData as any).extractedIdNumber || '',
+          extractedNameOfAppearer: (transactionData as any).extractedNameOfAppearer || '',
+          extractedPlaceOfExecution: (transactionData as any).extractedPlaceOfExecution || '',
+          extractedMonthAndYearOfPoa: (transactionData as any).extractedMonthAndYearOfPoa || '',
+          extractedSituate: (transactionData as any).extractedSituate || '',
+          extractedUnitsOfMeasurement: (transactionData as any).extractedUnitsOfMeasurement || '',
+          extractedDslNumber: (transactionData as any).extractedDslNumber || '',
+          extractedNameOfSurveyor: (transactionData as any).extractedNameOfSurveyor || '',
+          extractedDateOfSurvey: (transactionData as any).extractedDateOfSurvey || '',
+          extractedDateOfApproval: (transactionData as any).extractedDateOfApproval || '',
+          extractedNameOfPreviousDeed: (transactionData as any).extractedNameOfPreviousDeed || '',
+          extractedPreviousDeedNumber: (transactionData as any).extractedPreviousDeedNumber || '',
+          extractedPreviousDeedDateOfRegistration: (transactionData as any).extractedPreviousDeedDateOfRegistration || '',
+          extractedCurrentDeedDateOfRegistration: (transactionData as any).extractedCurrentDeedDateOfRegistration || '',
+          extractedCrmNumber: (transactionData as any).extractedCrmNumber || '',
+          extractedDateOfCrm: (transactionData as any).extractedDateOfCrm || '',
+          extractedDfpsgNumber: (transactionData as any).extractedDfpsgNumber || '',
+          extractedDfpsgDateOfRegistration: (transactionData as any).extractedDfpsgDateOfRegistration || '',
+          extractedDfpsgOwnerName: (transactionData as any).extractedDfpsgOwnerName || '',
+          extractedDateOfSale: (transactionData as any).extractedDateOfSale || '',
+          extractedPurchaserPlaceOfBirth: (transactionData as any).extractedPurchaserPlaceOfBirth || '',
+          extractedSellerPlaceOfBirth: (transactionData as any).extractedSellerPlaceOfBirth || '',
+          extractedSellerStatus: (transactionData as any).extractedSellerStatus || '',
+          extractedPurchaserStatus: (transactionData as any).extractedPurchaserStatus || '',
           // Party-tagged ID OCR (set in Step 6 by the BUYER/SELLER toggle)
           extractedBuyerName: (transactionData as any).extractedBuyerName || '',
           extractedBuyerIdNumber: (transactionData as any).extractedBuyerIdNumber || '',
@@ -641,7 +662,8 @@ const Step7Summary: React.FC<Step7Props> = ({
           lawyerName={lawyerName}
         />
       ).toBlob();
-    } catch {
+    } catch (err) {
+      console.error('PDF generation failed:', err);
       blob = new Blob([content], { type: 'text/plain' });
     }
     const url = URL.createObjectURL(blob);
@@ -687,16 +709,14 @@ const Step7Summary: React.FC<Step7Props> = ({
         .replace(/^[-*+] (.*$)/gm, '<li>$1</li>')
         .replace(/^\d+[.)] (.*$)/gm, '<li>$1</li>')
         .replace(/^---$/gm, '<hr>')
+        .replace(/^\[\[PAGE_BREAK\]\]$/gm, '</p><div class="page-break"></div><p>')
+        .replace(/^\[\[BR\]\]$/gm, '<br><br>')
         .replace(/\n\n/g, '</p><p>')
         .replace(/\n/g, '<br>');
       printWindow.document.write(`<html><head><title>${docTitle} - ${transactionReferenceId}</title>
 <style>
-  @page { margin: 2cm; }
+  @page { margin: 37.5mm; }
   body { font-family: 'Times New Roman', Georgia, serif; font-size: 11pt; line-height: 1.7; color: #333; max-width: 700px; margin: 0 auto; }
-  .header { text-align: center; border-bottom: 2px solid #1a1a2e; padding-bottom: 16px; margin-bottom: 24px; }
-  .header .firm { font-size: 8pt; letter-spacing: 4px; text-transform: uppercase; color: #4a3f8a; font-weight: bold; margin-bottom: 4px; }
-  .header .republic { font-size: 9pt; letter-spacing: 3px; text-transform: uppercase; color: #999; margin-bottom: 8px; }
-  .header .ref { font-size: 8pt; color: #999; }
   h1 { font-size: 14pt; text-align: center; text-transform: uppercase; letter-spacing: 3px; color: #1a1a2e; margin: 20px 0; }
   h2 { font-size: 12pt; text-transform: uppercase; letter-spacing: 1.5px; color: #1a1a2e; border-bottom: 0.5px solid #ddd; padding-bottom: 4px; margin-top: 24px; }
   h3 { font-size: 11pt; color: #333; margin-top: 16px; }
@@ -709,14 +729,8 @@ const Step7Summary: React.FC<Step7Props> = ({
   ol, ul { padding-left: 1.8em; }
   hr { border: none; border-top: 0.5px solid #ddd; margin: 16px 0; }
   strong { color: #1a1a2e; }
-  .prepared-by { text-align: right; font-size: 7pt; color: #999; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .page-break { page-break-before: always; }
 </style></head><body>
-<div class="prepared-by">Prepared by ${firmName} | ${lawyerName}</div>
-<div class="header">
-  <div class="firm">${firmName}</div>
-  <div class="republic">Republic of Botswana &middot; Property Conveyancing</div>
-  <div class="ref">Ref: ${transactionReferenceId} &middot; ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-</div>
 <p>${htmlContent}</p>
 </body></html>`);
       printWindow.document.close();

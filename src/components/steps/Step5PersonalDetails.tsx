@@ -27,18 +27,18 @@ const Step5PersonalDetails: React.FC<Step5Props> = ({
 }) => {
   // Define the documents required based on nationality and marital status
   useEffect(() => {
-    const baseDocuments = ['Proof of Address (Utility Bill or Affidavit)'];
+    const baseDocuments = ['Proof of Address (Affidavit, Utility Bill)'];
     let additionalDocuments: string[] = [];
 
     if (nationality === 'Botswana') {
-      baseDocuments.push('ID Document');
+      baseDocuments.push('Proof of Identity (ID Document / Omang)');
       if (maritalStatus === 'married_in') {
         additionalDocuments.push('Form B - The Married Persons Property Act');
       } else if (maritalStatus === 'married_out') {
         additionalDocuments.push('Form A - Married Persons Property Act');
       }
     } else if (nationality !== 'Select nationality' && nationality) {
-      additionalDocuments.push('Passport Copy');
+      additionalDocuments.push('Proof of Identity (Passport Copy)');
       additionalDocuments.push('Residence Permit');
     }
 
