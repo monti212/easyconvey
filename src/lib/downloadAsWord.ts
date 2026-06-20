@@ -72,18 +72,8 @@ export async function downloadAsWord(
       const text = trimmed.replace(/^\[\[CATCHWORD\]\]\s*/, '');
       children.push(new Paragraph({
         children: parseMarkdownLine(text),
-        frame: {
-          position: { x: 0, y: 0 },
-          anchor: {
-            horizontal: HorizontalPositionAlign.RIGHT,
-            horizontalRelative: HorizontalPositionRelativeFrom.MARGIN,
-            vertical: VerticalPositionAlign.BOTTOM,
-            verticalRelative: VerticalPositionRelativeFrom.MARGIN,
-          },
-          width: 4000,
-          height: 300,
-        },
         alignment: AlignmentType.RIGHT,
+        spacing: { before: 240, after: 120 }
       }));
     } else if (trimmed === '[[BR]]') {
       children.push(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 240 } }));

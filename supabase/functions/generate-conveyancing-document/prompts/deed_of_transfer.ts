@@ -64,7 +64,6 @@ NUMBERS AND DATES:
 
 FORMATTING:
 - The document OPENS at the top-right with a right-aligned "Prepared by me" line, a blank gap, then a right-aligned "Conveyancer" line. Everything else follows beneath that block.
-- Below the Prepared-by block, centred each on its own line: document title "DEED OF TRANSFER", "by", seller name, "in favour of", buyer name, "in respect of", lot description, then "DEED OF TRANSFER NO.".
 - CATCHWORDS: registry deeds carry a "catchword" at the foot of each page that previews the opening of the next page. Emit these using the exact form "[[CATCHWORD]] .... / [NEXT WORD]" immediately followed by a "[[PAGE_BREAK]]" marker. Follow the manual page breaks provided in the structure template exactly!
 - The body uses paragraph prose for the "appeared before me" / "AND the said Appearer declared" / "WHEREFORE the Appearer" sections, and tabular prose for the property description block (CERTAIN/SITUATE/etc.).
 - Signature block at the end uses dotted/underscored signature lines (use "______________________________" for the lines).
@@ -175,7 +174,7 @@ In my presence
 
             ______________________________                                              ______________________________
 
-           Registrar of Deeds Botswana                                             [[R]] q.q. his Principal
+Registrar of Deeds Botswana                                                           q.q. his Principal
 
 Registered in the Register of
 kept at
