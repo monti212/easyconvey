@@ -108,7 +108,7 @@ AND the said Appearer declared that his Principal had truly and legally sold and
 
 [[C]] **[BUYER FULL NAME IN CAPS]**
 [[C]] (Born on the [ordinal] day of [Month] [Year])
-[[C]] [Apply marital status block — e.g. "(Spinster)" or "(Bachelor)" or "Married in community of property to …"]
+[[C]] [Apply marital status block — e.g. "(Spinster)" for a single woman, "(Bachelor)" for a single man, or "Married in community of property to …"]
 
 [Closing pronoun line — for individual: "her Heirs, executors, administrators or assigns" or "his Heirs, executors, administrators or assigns"; for company: "its successors-in-title or assigns"], the following property, that is to say:
 

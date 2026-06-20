@@ -19,11 +19,11 @@ ENTITY AND MARITAL STATUS HANDLING:
 - Determine the Deponent. You MUST generate this affidavit for **${partyTarget}**. Extract the birth details for ${partyTarget}.
 - Extract the Deponent's Date of Birth and Place of Birth. If Place of Birth is missing, write "OUTSTANDING — place of birth".
 - For Marital Status (Point 3):
-  - If "single", write "BACHELOR" or "SPINSTER".
+  - If "single", you MUST write "BACHELOR" (for men) or "SPINSTER" (for women). Never write "Single".
   - If "married_in", write "Married in community of property".
   - If "married_out", write "Married out of community of property".
-  - If "divorced", write "DIVORCED".
-  - If "widowed", write "WIDOW/WIDOWER".
+  - If "divorced", write "DIVORCEE".
+  - If "widowed", write "WIDOW" (for women) or "WIDOWER" (for men).
 - Pronoun handling in the attestation clause: use "HE" or "SHE" depending on the Deponent's gender (if known) or "HE/SHE".`,
 
     prompt: `Generate a complete Affidavit of Birth for the following Botswana property transaction:
@@ -46,7 +46,7 @@ I, the undersigned,
 hereby make oath and say
 1    I was born at **[PLACE OF BIRTH]** on the [DOB e.g. 15 JULY 1983];
 2    I have always regarded the above date as my birthday; and
-4    I am a [MARITAL STATUS per rules, e.g. BACHELOR].
+4    I am a [MARITAL STATUS per rules, e.g. BACHELOR / SPINSTER].
 [[BR]]
 [[BR]]
 [[BR]]

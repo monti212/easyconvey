@@ -38,11 +38,11 @@ REQUIRED DOCUMENTS BY PARTY STATUS:
 
 For Botswana Citizens (Individual):
 • Always Required: National ID Document (Omang), Proof of Address
-• Single/Unmarried: No additional documents
+• Single/Unmarried: No additional documents. IMPORTANT DOCUMENT WORDING: You MUST use the word "Bachelor" (for men) or "Spinster" (for women). Never write "Single" or "Unmarried" in the document body.
 • Married in Community of Property: + Marriage Certificate, Spouse ID Document, Spouse Consent Form, Form B (Married Persons Property Act)
 • Married Out of Community of Property: + Marriage Certificate, Antenuptial Contract, Form A (Married Persons Property Act)
-• Divorced: + Divorce Decree / Court Order
-• Widowed: + Death Certificate of Spouse
+• Divorced: + Divorce Decree / Court Order. IMPORTANT DOCUMENT WORDING: You MUST use the word "Divorcee".
+• Widowed: + Death Certificate of Spouse. IMPORTANT DOCUMENT WORDING: You MUST use the word "Widow" (for women) or "Widower" (for men).
 
 For Non-Citizens (Individual):
 • Always Required: Passport Copy, Residence Permit, Proof of Address
