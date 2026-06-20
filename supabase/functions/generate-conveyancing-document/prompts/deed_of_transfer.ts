@@ -79,6 +79,8 @@ REQUIRED DOCUMENT STRUCTURE — REPRODUCE THIS LAYOUT EXACTLY (substitute real v
 ═══════════════════════════════════════
 
 [[R]] Prepared by me
+[[BR]]
+[[BR]]
 [[R]] Conveyancer
 [[BR]]
 [[BR]]
@@ -126,37 +128,34 @@ AND the said Appearer declared that his Principal had truly and legally sold and
 
     **WHICH PROPERTY:**      was held under **Certificate of Registered State Title No. [NUMBER]** dated [ordinal] day of [Month] [Year] and subsequent Deeds the last of which being **Deed of Transfer No. [NUMBER]** dated [ordinal] day of [Month] [Year] made in favour of **[SELLER FULL NAME IN CAPS]**;
 
-    **SUBJECT TO:**                the conditions contained in **Certificate of Rights to Minerals No. [NUMBER]** dated [ordinal] day of [Month] [Year];
+    **SUBJECT TO:**                the conditions contained in **Certificate of Rights to Minerals No. [NUMBER]** dated [ordinal] day of [Month] [Year] and further subject to the following reservations and conditions namely:-
 
-    **AND SUBJECT TO:**       all such conditions as the aforesaid Deed will more fully point out;
+1. a) This Deed of Transfer shall vest ownership of the property in the purchaser for a period of [PERIOD — typically 99 years] from the date of Registration of **Deed of Fixed Period State Grant No. [NUMBER]** dated [ordinal] day of [Month] [Year] made in favour of **[ORIGINAL GRANTEE NAME]** and the Purchaser shall have the right to cede, assign, transfer, lease, sell, mortgage or otherwise deal with the property during the period of ownership.
 
-AND FURTHER SUBJECT TO the following conditions:
+   b) Upon expiry of the Deed of Transfer, the purchaser shall be allowed to renew his title deed for another [PERIOD] years.
 
-1. a) This Deed of Transfer shall vest ownership of the property in the purchaser for a period of [PERIOD — typically 99 years] from the date of Registration of **Deed of Fixed Period State Grant No. [NUMBER]** dated [ordinal] day of [Month] [Year] made in favour of [ORIGINAL GRANTEE NAME] and the Purchaser shall have the right to cede, assign, transfer, lease, sell, mortgage or otherwise deal with the property during the period of ownership;
+   c) The state shall notify the purchaser of the Deed of Transfer of the pending expiry of title deed at least five (5) years prior to its lapse.
 
-   b) Upon expiry of the Deed of Transfer, the purchaser shall be allowed to renew his title for another [PERIOD];
+   d) The Purchaser of Deed of Transfer shall be allowed five (5) years before the expiry of the deed to indicate his intention in writing to renew and negotiations should be concluded not later than two (2) years before the expiry of the Deed.
 
-   c) The State shall notify the purchaser of the property of the impending expiry of the property at least five (5) years prior to its lapse;
+   e) Where the Purchaser elects not to renew the grant, the Deed of Transfer shall terminate on the date of expiry and rights and deed therein shall revert to the State together with developments.
 
-   d) The purchaser of the property shall be allowed [PERIOD] years before the expiry of transfer to indicate his intention in writing to renew and negotiations should be concluded not later than [PERIOD] years before the expiry of the Deed of Transfer;
+   f) Where the state elects not to renew the title deed, the Purchaser shall be entitled to compensation at replacement value or market value, whichever is greater.
 
-   e) Where the purchaser elects not to renew the Deed, the Deed of Transfer shall terminate together with developments;
+   g) Upon renewal, the title deed shall pay a renewal fee as may be determined by the state from time to time, which fee must be paid prior to the renewal.
 
 2. The property shall only be used for the following purpose - residential and may not be used for any other purpose except with the written permission of the Government.
 
-3. The purchaser or his successors in title or assigns shall maintain the buildings, their replacement and improvements on the property in good order and repair throughout the period of the Grant and on determination of the Grant shall surrender the said property with all buildings and erections thereon in good repair and condition.
+[[CATCHWORD]] .... / 3. The
+[[PAGE_BREAK]]
+
+3. The purchaser or his successors in title or assigns shall maintain the buildings, their replacement and improvements on the property in good order and repair throughout the period of the title deed and on determination of the deed shall surrender the said property with all buildings and erections thereon in good repair and condition.
 
 4. All mineral rights in and upon the property are reserved to the State and the Government may at any time deal with such rights in accordance with any law then in force relating to the prospecting for and mining of minerals.
 
 5. The Government or any lawfully established public authority authorised thereto by the Government shall at all times have the power of constructing on or through any part of the property pipe lines, aqueducts, drains or telephone or telegraph lines required for public purposes. No compensation shall be payable by the Government or other authority aforesaid in the exercise of any of its rights under this paragraph except in respect of the value of any damage to improvements actually sustained by reason of the exercise of these rights.
 
-[[CATCHWORD]] .... / 6. Connection
-[[PAGE_BREAK]]
-
 6. Connection of services to individual plots shall be the responsibility of the Purchaser.
-
-[[CATCHWORD]] .... / WHEREFORE
-[[PAGE_BREAK]]
 
 WHEREFORE the Appearer, renouncing all the right, title and interest which his Principal heretofore had to the premises did in consequence also acknowledge him to be entirely dispossessed of and disentitled to the same and that by virtue of these presents, the said
 
@@ -169,9 +168,6 @@ WHEREFORE the Appearer, renouncing all the right, title and interest which his P
 AND, finally, acknowledging that the property was sold on the [ordinal] day of [Month] [Year] for the sum of **P[SALE PRICE FIGURES] ([SALE PRICE IN WORDS])**.
 
 In witness whereof I, the said Registrar, together with the Appearer q.q. have subscribed to these presents, and have caused the Seal of Office to be affixed hereto.
-
-[[CATCHWORD]] .... / THUS
-[[PAGE_BREAK]]
 
 THUS DONE AND EXECUTED at the Office of the Registrar of Deeds for Botswana at **[PLACE OF EXECUTION]** on this [ordinal] day of [Month] in the Year of Our Lord **[YEAR IN WORDS]**.
 
