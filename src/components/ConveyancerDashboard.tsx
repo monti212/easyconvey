@@ -32,6 +32,7 @@ import { useAuth } from '../hooks/useAuth';
 import { pdf } from '@react-pdf/renderer';
 import DeedOfSalePDF from '../lib/pdf/deedOfSale';
 import { downloadAsWord } from '../lib/downloadAsWord';
+import { normalizeGeneratedLegalDocument } from '../lib/normalizeGeneratedLegalDocument';
 import * as casesService from '../services/cases.service';
 import * as storageService from '../services/storage.service';
 import { supabase } from '../lib/supabase';
@@ -114,6 +115,16 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
     } : undefined,
   } : null;
 
+  useEffect(() => {
+    if (!generatedDocument) return;
+    const normalizedText = normalizeGeneratedLegalDocument(generatedDocument);
+    if (normalizedText !== generatedDocument) {
+      setGeneratedDocument(normalizedText);
+      setStreamingContent(normalizedText);
+      setGeneratedDocuments(prev => ({ ...prev, [selectedDocType]: normalizedText }));
+    }
+  }, [generatedDocument, selectedDocType]);
+
   // Fetch case data from Supabase (real data) with props as fallback
   useEffect(() => {
     async function loadCaseData() {
@@ -156,7 +167,9 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
         const genDocs = await casesService.getGeneratedDocuments(transactionId);
         const map: Record<string, string> = {};
         for (const g of genDocs) {
-          if (g.status === 'completed' && g.content) map[g.document_type] = g.content;
+          if (g.status === 'completed' && g.content) {
+            map[g.document_type] = normalizeGeneratedLegalDocument(g.content);
+          }
         }
         if (Object.keys(map).length > 0) setGeneratedDocuments(map as Record<DocumentType, string>);
       } catch {
@@ -498,7 +511,7 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
               const delta = parsed.choices?.[0]?.delta?.content || '';
               if (typeof delta === 'string' && delta) {
                 fullText += delta;
-                setStreamingContent(fullText);
+                setStreamingContent(normalizeGeneratedLegalDocument(fullText));
               }
             } catch {
               // Skip non-JSON lines
@@ -506,14 +519,15 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
           }
         }
 
-        setGeneratedDocument(fullText);
-        setStreamingContent(fullText);
-        setGeneratedDocuments(prev => ({ ...prev, [typeToGenerate]: fullText }));
-        finalText = fullText;
+        const normalizedText = normalizeGeneratedLegalDocument(fullText);
+        setGeneratedDocument(normalizedText);
+        setStreamingContent(normalizedText);
+        setGeneratedDocuments(prev => ({ ...prev, [typeToGenerate]: normalizedText }));
+        finalText = normalizedText;
       } else {
         // Fallback: JSON response (non-streaming)
         const data = await response.json();
-        const text = data.document || '';
+        const text = normalizeGeneratedLegalDocument(data.document || '');
         setGeneratedDocument(text);
         setStreamingContent(text);
         setGeneratedDocuments(prev => ({ ...prev, [typeToGenerate]: text }));
@@ -981,8 +995,9 @@ const ConveyancerDashboard: React.FC<ConveyancerDashboardProps> = ({
                         setSelectedDocType(doc.id);
                         // Show previously generated doc if available
                         if (generatedDocuments[doc.id]) {
-                          setGeneratedDocument(generatedDocuments[doc.id]);
-                          setStreamingContent(generatedDocuments[doc.id]);
+                          const normalizedText = normalizeGeneratedLegalDocument(generatedDocuments[doc.id]);
+                          setGeneratedDocument(normalizedText);
+                          setStreamingContent(normalizedText);
                         } else {
                           setGeneratedDocument(null);
                           setStreamingContent('');

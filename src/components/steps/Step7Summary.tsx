@@ -6,6 +6,7 @@ import { useTransactions } from '../../App';
 import { pdf } from '@react-pdf/renderer';
 import TransactionSummaryPDF from '../../lib/pdf/transactionSummary';
 import DeedOfSalePDF from '../../lib/pdf/deedOfSale';
+import { normalizeGeneratedLegalDocument } from '../../lib/normalizeGeneratedLegalDocument';
 import DocumentStreamViewer from '../DocumentStreamViewer';
 import * as casesService from '../../services/cases.service';
 import { supabase } from '../../lib/supabase';
@@ -248,6 +249,16 @@ const Step7Summary: React.FC<Step7Props> = ({
   const [currentQueueIndex, setCurrentQueueIndex] = useState(0);
   const abortControllerRef = useRef<AbortController | null>(null);
   const stopRequestedRef = useRef(false);
+
+  useEffect(() => {
+    if (!activeDocument) return;
+    const normalizedText = normalizeGeneratedLegalDocument(activeDocument);
+    if (normalizedText !== activeDocument) {
+      setActiveDocument(normalizedText);
+      setStreamingContent(normalizedText);
+      setGeneratedDocuments(prev => ({ ...prev, [selectedDocType]: normalizedText }));
+    }
+  }, [activeDocument, selectedDocType]);
   const [isDownloadingPack, setIsDownloadingPack] = useState(false);
 
   // Load previously generated documents from DB on mount
@@ -261,7 +272,7 @@ const Step7Summary: React.FC<Step7Props> = ({
         const docs: Record<string, string> = {};
         for (const doc of saved) {
           if (doc.status === 'completed' && doc.content) {
-            docs[doc.document_type] = doc.content;
+            docs[doc.document_type] = normalizeGeneratedLegalDocument(doc.content);
           }
         }
         if (Object.keys(docs).length > 0) {
@@ -503,7 +514,7 @@ const Step7Summary: React.FC<Step7Props> = ({
                 const delta = parsed.choices?.[0]?.delta?.content || '';
                 if (typeof delta === 'string' && delta) {
                   fullText += delta;
-                  setStreamingContent(fullText);
+                  setStreamingContent(normalizeGeneratedLegalDocument(fullText));
                 }
               } catch {
                 // Skip non-JSON lines
@@ -514,10 +525,11 @@ const Step7Summary: React.FC<Step7Props> = ({
           if (signal?.aborted) {
             // Save whatever we got so far if aborted mid-stream
             if (fullText) {
-              setActiveDocument(fullText);
-              setStreamingContent(fullText);
-              setGeneratedDocuments(prev => ({ ...prev, [docType]: fullText }));
-              saveDocToDb(docType, docName, fullText, 'completed');
+              const normalizedText = normalizeGeneratedLegalDocument(fullText);
+              setActiveDocument(normalizedText);
+              setStreamingContent(normalizedText);
+              setGeneratedDocuments(prev => ({ ...prev, [docType]: normalizedText }));
+              saveDocToDb(docType, docName, normalizedText, 'completed');
             }
             throw new DOMException('Aborted', 'AbortError');
           }
@@ -525,15 +537,16 @@ const Step7Summary: React.FC<Step7Props> = ({
         }
 
         if (!signal?.aborted) {
-          setActiveDocument(fullText);
-          setStreamingContent(fullText);
-          setGeneratedDocuments(prev => ({ ...prev, [docType]: fullText }));
+          const normalizedText = normalizeGeneratedLegalDocument(fullText);
+          setActiveDocument(normalizedText);
+          setStreamingContent(normalizedText);
+          setGeneratedDocuments(prev => ({ ...prev, [docType]: normalizedText }));
           // Persist completed document to DB
-          saveDocToDb(docType, docName, fullText, 'completed');
+          saveDocToDb(docType, docName, normalizedText, 'completed');
         }
       } else {
         const data = await response.json();
-        const text = data.document || '';
+        const text = normalizeGeneratedLegalDocument(data.document || '');
         setActiveDocument(text);
         setStreamingContent(text);
         setGeneratedDocuments(prev => ({ ...prev, [docType]: text }));
@@ -1486,8 +1499,9 @@ const Step7Summary: React.FC<Step7Props> = ({
                     if (isGeneratingAll) return; // Don't switch tabs during batch generation
                     setSelectedDocType(doc.id);
                     if (generatedDocuments[doc.id]) {
-                      setActiveDocument(generatedDocuments[doc.id]);
-                      setStreamingContent(generatedDocuments[doc.id]);
+                      const normalizedText = normalizeGeneratedLegalDocument(generatedDocuments[doc.id]);
+                      setActiveDocument(normalizedText);
+                      setStreamingContent(normalizedText);
                     } else {
                       setActiveDocument(null);
                       setStreamingContent('');
@@ -1571,8 +1585,9 @@ const Step7Summary: React.FC<Step7Props> = ({
                     </button>
                     <button
                       onClick={() => {
-                        setActiveDocument(generatedDocuments[selectedDocType]);
-                        setStreamingContent(generatedDocuments[selectedDocType]);
+                        const normalizedText = normalizeGeneratedLegalDocument(generatedDocuments[selectedDocType]);
+                        setActiveDocument(normalizedText);
+                        setStreamingContent(normalizedText);
                         setShowDocViewer(true);
                       }}
                       className="px-2.5 py-1.5 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 inline-flex items-center"

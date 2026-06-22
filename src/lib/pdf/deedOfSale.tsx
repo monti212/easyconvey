@@ -1,5 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
+import { normalizeGeneratedLegalDocument } from '../normalizeGeneratedLegalDocument';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
@@ -284,6 +285,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica',
     color: '#333333',
     lineHeight: 1.7,
+    textAlign: 'justify',
   },
   hr: {
     borderBottomWidth: 0.5,
@@ -323,8 +325,39 @@ function clauseDepth(text: string): number | null {
   return null;
 }
 
+function isCatchphrase(text: string): boolean {
+  return /^[.\s]*\/\s*[A-Z][A-Z\s]+$/.test(text.trim());
+}
+
+function isNumberedClauseCatchword(text: string): boolean {
+  return /^[.\s]*\/\s*\d+[.)]?\s*/.test(text.trim());
+}
+
+function isSignatureOrRegistryLine(text: string): boolean {
+  return /^(In my presence|Registered in the Register of|kept at|on the above date\.?)/i.test(text.trim())
+    || /^[.\s]{8,}.*Registrar of Deeds Botswana/i.test(text.trim())
+    || /^Registrar of Deeds Botswana$/i.test(text.trim());
+}
+
+function normalizeGeneratedContent(markdown: string): string {
+  return normalizeGeneratedLegalDocument(markdown)
+    .replace(/\[\[PAGE_BREAK\]\][\s\n]*(?=\[\[CATCHWORD\]\])/g, '')
+    .replace(/(\[\[CATCHWORD\]\][^\n]*)(?:\n\s*)+\[\[PAGE_BREAK\]\]/g, '$1')
+    .replace(/(\[\[R\]\]\s*[.\s]*\/\s*[A-Z][A-Z\s]+)(?:\n\s*)+\[\[PAGE_BREAK\]\]/g, '$1')
+    .replace(/\[\[PAGE_BREAK\]\][\s\n]*(?:\[\[BR\]\][\s\n]*)*\[\[PAGE_BREAK\]\]/g, '[[PAGE_BREAK]]')
+    .replace(/\[\[PAGE_BREAK\]\][\s\n]+(?=\[\[PAGE_BREAK\]\])/g, '[[PAGE_BREAK]]')
+    .replace(
+      /(\*\*SUBJECT TO:\*\*[\s\S]*?)(?:\n\s*)+(and further subject to the following (?:reservations and )?conditions\s+namely:-)/gi,
+      (_match, before, after) => `${before.trimEnd()} ${after}`,
+    )
+    .replace(
+      /(\*\*SUBJECT TO:\*\*[\s\S]*?conditions contained in[\s\S]*?)(?:\n\s*)+(and further subject to the following (?:reservations and )?conditions\s+namely:-)/gi,
+      (_match, before, after) => `${before.trimEnd()} ${after}`,
+    );
+}
+
 function parseMarkdownToBlocks(markdown: string): ParsedBlock[] {
-  const lines = markdown.split('\n');
+  const lines = normalizeGeneratedContent(markdown).split('\n');
   const blocks: ParsedBlock[] = [];
   let i = 0;
   let paragraphBuffer: string[] = [];
@@ -387,7 +420,15 @@ function parseMarkdownToBlocks(markdown: string): ParsedBlock[] {
     const markerMatch = trimmed.match(/^\[\[(C|R)\]\]\s*(.*)/);
     if (markerMatch) {
       flushParagraph();
-      blocks.push({ type: 'paragraph', text: markerMatch[2], align: markerMatch[1] === 'C' ? 'center' : 'right' });
+      if (isNumberedClauseCatchword(markerMatch[2])) {
+        i++;
+        continue;
+      }
+      if (markerMatch[1] === 'R' && isCatchphrase(markerMatch[2])) {
+        blocks.push({ type: 'catchword', text: markerMatch[2] });
+      } else {
+        blocks.push({ type: 'paragraph', text: markerMatch[2], align: markerMatch[1] === 'C' ? 'center' : 'right' });
+      }
       i++;
       continue;
     }
@@ -413,6 +454,10 @@ function parseMarkdownToBlocks(markdown: string): ParsedBlock[] {
     const catchwordMatch = trimmed.match(/^\[\[CATCHWORD\]\]\s*(.*)/);
     if (catchwordMatch) {
       flushParagraph();
+      if (isNumberedClauseCatchword(catchwordMatch[1])) {
+        i++;
+        continue;
+      }
       blocks.push({ type: 'catchword', text: catchwordMatch[1] });
       i++;
       continue;
@@ -433,7 +478,11 @@ function parseMarkdownToBlocks(markdown: string): ParsedBlock[] {
   }
 
   flushParagraph();
-  return blocks;
+  return blocks.filter((block, index) => {
+    const previous = blocks[index - 1];
+    if (block.type !== 'page-break') return true;
+    return index > 0 && previous?.type !== 'page-break' && previous?.type !== 'catchword';
+  });
 }
 
 /** Render inline markdown (bold, italic) within a Text element */
@@ -526,8 +575,9 @@ export default function DeedOfSalePDF(props: DeedOfSaleProps) {
           let pStyle: any = styles.paragraph;
           if (block.align === 'center') pStyle = [styles.paragraph, { textAlign: 'center' as const }];
           else if (block.align === 'right') pStyle = [styles.paragraph, { textAlign: 'right' as const }];
-          else if (block.indent) pStyle = [styles.paragraph, { textAlign: 'left' as const, marginLeft: block.indent * 18 }];
-          else if (block.text.trimStart().startsWith('**')) pStyle = [styles.paragraph, { textAlign: 'left' as const }];
+          else if (block.indent) pStyle = [styles.paragraph, { textAlign: 'justify' as const, marginLeft: block.indent * 18 }];
+          else if (block.text.trimStart().startsWith('**')) pStyle = [styles.paragraph, { textAlign: 'justify' as const }];
+          else if (isSignatureOrRegistryLine(block.text)) pStyle = [styles.paragraph, { textAlign: 'left' as const }];
           return <Text key={idx} style={pStyle}>{renderInlineText(block.text)}</Text>;
         }
         case 'list-item':
@@ -547,9 +597,12 @@ export default function DeedOfSalePDF(props: DeedOfSaleProps) {
           return <Text key={idx}>{"\n"}</Text>;
         case 'catchword':
           return (
-            <Text key={idx} style={{ position: 'absolute', bottom: 106, right: 106, textAlign: 'right', ...styles.paragraph }}>
-              {renderInlineText(block.text)}
-            </Text>
+            <React.Fragment key={idx}>
+              <Text style={{ position: 'absolute', bottom: 106, right: 106, textAlign: 'right', ...styles.paragraph }}>
+                {renderInlineText(block.text)}
+              </Text>
+              <View break />
+            </React.Fragment>
           );
         default:
           return null;

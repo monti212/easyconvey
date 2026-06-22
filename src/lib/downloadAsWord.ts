@@ -6,19 +6,16 @@ import {
   HeadingLevel,
   AlignmentType,
   BorderStyle,
-  Header,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
   LevelFormat,
   TabStopType,
   PageBreak,
   HorizontalPositionAlign,
+  FrameAnchorType,
+  FrameWrap,
+  HeightRule,
   VerticalPositionAlign,
-  HorizontalPositionRelativeFrom,
-  VerticalPositionRelativeFrom,
 } from 'docx';
+import { normalizeGeneratedLegalDocument } from './normalizeGeneratedLegalDocument';
 
 function parseMarkdownLine(line: string): TextRun[] {
   const runs: TextRun[] = [];
@@ -42,6 +39,60 @@ function clauseDepth(text: string): number | null {
   return null;
 }
 
+const PAGE_MARGIN = 2126;
+const LABEL_TAB = 2130;
+const CATCHWORD_FRAME_WIDTH = 2600;
+const CATCHWORD_FRAME_HEIGHT = 260;
+
+function normalizeDeedContent(content: string): string {
+  return normalizeGeneratedLegalDocument(content)
+    .replace(/\[\[PAGE_BREAK\]\][\s\n]*(?=\[\[CATCHWORD\]\])/g, '')
+    .replace(/(\[\[CATCHWORD\]\][^\n]*)(?:\n\s*)+\[\[PAGE_BREAK\]\]/g, '$1')
+    .replace(/(\[\[R\]\]\s*[.\s]*\/\s*[A-Z][A-Z\s]+)(?:\n\s*)+\[\[PAGE_BREAK\]\]/g, '$1')
+    .replace(/\[\[PAGE_BREAK\]\][\s\n]*(?:\[\[BR\]\][\s\n]*)*\[\[PAGE_BREAK\]\]/g, '[[PAGE_BREAK]]')
+    .replace(/\[\[PAGE_BREAK\]\][\s\n]+(?=\[\[PAGE_BREAK\]\])/g, '[[PAGE_BREAK]]')
+    .replace(
+      /(\*\*SUBJECT TO:\*\*[\s\S]*?)(?:\n\s*)+(and further subject to the following (?:reservations and )?conditions\s+namely:-)/gi,
+      (_match, before, after) => `${before.trimEnd()} ${after}`,
+    )
+    .replace(
+      /(\*\*SUBJECT TO:\*\*[\s\S]*?conditions contained in[\s\S]*?)(?:\n\s*)+(and further subject to the following (?:reservations and )?conditions\s+namely:-)/gi,
+      (_match, before, after) => `${before.trimEnd()} ${after}`,
+    );
+}
+
+function isCatchphrase(text: string): boolean {
+  return /^[.\s]*\/\s*[A-Z][A-Z\s]+$/.test(text.trim());
+}
+
+function isNumberedClauseCatchword(text: string): boolean {
+  return /^[.\s]*\/\s*\d+[.)]?\s*/.test(text.trim());
+}
+
+function isSignatureOrRegistryLine(text: string): boolean {
+  return /^(In my presence|Registered in the Register of|kept at|on the above date\.?)/i.test(text.trim())
+    || /^[.\s]{8,}.*Registrar of Deeds Botswana/i.test(text.trim())
+    || /^Registrar of Deeds Botswana$/i.test(text.trim());
+}
+
+function createCatchwordParagraph(text: string): Paragraph {
+  return new Paragraph({
+    children: [new TextRun({ text: '\t' }), ...parseMarkdownLine(text)],
+    alignment: AlignmentType.RIGHT,
+    tabStops: [{ type: TabStopType.RIGHT, position: 9024 }],
+    frame: {
+      type: 'alignment',
+      alignment: { x: HorizontalPositionAlign.RIGHT, y: VerticalPositionAlign.BOTTOM },
+      anchor: { horizontal: FrameAnchorType.MARGIN, vertical: FrameAnchorType.MARGIN },
+      width: CATCHWORD_FRAME_WIDTH,
+      height: CATCHWORD_FRAME_HEIGHT,
+      wrap: FrameWrap.NONE,
+      rule: HeightRule.EXACT,
+    },
+    spacing: { before: 0, after: 0 },
+  });
+}
+
 export async function downloadAsWord(
   content: string,
   documentTitle: string,
@@ -51,61 +102,89 @@ export async function downloadAsWord(
   buyerName = '',
   sellerName = '',
 ) {
-  const lines = content.split('\n');
+  const lines = normalizeDeedContent(content).split('\n');
   const children: Paragraph[] = [];
+  let previousWasPageBreak = false;
+
+  const pushParagraph = (paragraph: Paragraph, options: { pageBreak?: boolean } = {}) => {
+    children.push(paragraph);
+    previousWasPageBreak = Boolean(options.pageBreak);
+  };
+
+  const pushDeedTransferHeadingGap = () => {
+    for (let i = 0; i < 5; i++) {
+      pushParagraph(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 240 } }));
+    }
+  };
 
   // Parse markdown content
   for (const line of lines) {
     const trimmed = line.trim();
 
     if (trimmed.startsWith('#### ')) {
-      children.push(new Paragraph({ text: trimmed.slice(5), heading: HeadingLevel.HEADING_4, alignment: AlignmentType.CENTER, spacing: { before: 120, after: 60 } }));
+      pushParagraph(new Paragraph({ text: trimmed.slice(5), heading: HeadingLevel.HEADING_4, alignment: AlignmentType.CENTER, spacing: { before: 120, after: 60 } }));
     } else if (trimmed.startsWith('### ')) {
-      children.push(new Paragraph({ text: trimmed.slice(4), heading: HeadingLevel.HEADING_3, alignment: AlignmentType.CENTER, spacing: { before: 160, after: 80 } }));
+      pushParagraph(new Paragraph({ text: trimmed.slice(4), heading: HeadingLevel.HEADING_3, alignment: AlignmentType.CENTER, spacing: { before: 160, after: 80 } }));
     } else if (trimmed.startsWith('## ')) {
-      children.push(new Paragraph({ text: trimmed.slice(3), heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER, spacing: { before: 240, after: 120 } }));
+      pushParagraph(new Paragraph({ text: trimmed.slice(3), heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER, spacing: { before: 240, after: 120 } }));
     } else if (trimmed.startsWith('# ')) {
-      children.push(new Paragraph({ text: trimmed.slice(2), heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER, spacing: { before: 240, after: 160 } }));
+      if (/^DEED OF TRANSFER NO\.?$/i.test(trimmed.slice(2).trim())) {
+        pushDeedTransferHeadingGap();
+      }
+      pushParagraph(new Paragraph({ text: trimmed.slice(2), heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER, spacing: { before: 240, after: 160 } }));
     } else if (trimmed === '[[PAGE_BREAK]]') {
-      children.push(new Paragraph({ children: [new PageBreak()] }));
+      if (!previousWasPageBreak && children.length > 0) {
+        pushParagraph(new Paragraph({ children: [new PageBreak()] }), { pageBreak: true });
+      }
     } else if (trimmed.startsWith('[[CATCHWORD]]')) {
       const text = trimmed.replace(/^\[\[CATCHWORD\]\]\s*/, '');
-      children.push(new Paragraph({
-        children: parseMarkdownLine(text),
-        alignment: AlignmentType.RIGHT,
-        spacing: { before: 240, after: 120 }
-      }));
+      if (isNumberedClauseCatchword(text)) continue;
+      pushParagraph(createCatchwordParagraph(text));
+      pushParagraph(new Paragraph({ children: [new PageBreak()] }), { pageBreak: true });
     } else if (trimmed === '[[BR]]') {
-      children.push(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 240 } }));
+      if (!previousWasPageBreak) {
+        pushParagraph(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 240 } }));
+      }
     } else if (trimmed.startsWith('---')) {
-      children.push(new Paragraph({
+      pushParagraph(new Paragraph({
         border: { bottom: { color: 'CCCCCC', style: BorderStyle.SINGLE, size: 6 } },
         spacing: { before: 120, after: 120 },
         alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: '' })],
       }));
     } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      children.push(new Paragraph({ bullet: { level: 0 }, children: parseMarkdownLine(trimmed.slice(2)), alignment: AlignmentType.LEFT, spacing: { after: 60 } }));
+      pushParagraph(new Paragraph({ bullet: { level: 0 }, children: parseMarkdownLine(trimmed.slice(2)), alignment: AlignmentType.JUSTIFIED, spacing: { after: 60 } }));
     } else if (/^\d+[.)]\s/.test(trimmed)) {
       const text = trimmed.replace(/^\d+[.)]\s/, '');
-      children.push(new Paragraph({ numbering: { reference: 'default-numbering', level: 0 }, children: parseMarkdownLine(text), alignment: AlignmentType.LEFT, spacing: { after: 60 } }));
+      pushParagraph(new Paragraph({ numbering: { reference: 'default-numbering', level: 0 }, children: parseMarkdownLine(text), alignment: AlignmentType.JUSTIFIED, spacing: { after: 60 } }));
     } else if (trimmed === '') {
-      children.push(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 60 } }));
+      if (!previousWasPageBreak) {
+        pushParagraph(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 60 } }));
+      }
     } else {
       const markerMatch = trimmed.match(/^\[\[(C|R)\]\]\s*(.*)/);
       const depth = clauseDepth(trimmed);
       if (markerMatch) {
-        // Explicit alignment marker from the AI
-        children.push(new Paragraph({
-          children: parseMarkdownLine(markerMatch[2]),
-          alignment: markerMatch[1] === 'C' ? AlignmentType.CENTER : AlignmentType.RIGHT,
-          spacing: { after: 80 },
-        }));
+        if (isNumberedClauseCatchword(markerMatch[2])) continue;
+        if (markerMatch[1] === 'R' && isCatchphrase(markerMatch[2])) {
+          pushParagraph(createCatchwordParagraph(markerMatch[2]));
+          pushParagraph(new Paragraph({ children: [new PageBreak()] }), { pageBreak: true });
+        } else {
+          if (markerMatch[1] === 'C' && /^DEED OF TRANSFER NO\.?$/i.test(markerMatch[2].trim())) {
+            pushDeedTransferHeadingGap();
+          }
+          // Explicit alignment marker from the AI
+          pushParagraph(new Paragraph({
+            children: parseMarkdownLine(markerMatch[2]),
+            alignment: markerMatch[1] === 'C' ? AlignmentType.CENTER : AlignmentType.RIGHT,
+            spacing: { after: 80 },
+          }));
+        }
       } else if (depth !== null) {
         // Numbered/lettered clause — left-aligned and indented by depth
-        children.push(new Paragraph({
+        pushParagraph(new Paragraph({
           children: parseMarkdownLine(trimmed),
-          alignment: AlignmentType.LEFT,
+          alignment: AlignmentType.JUSTIFIED,
           indent: { left: depth * 360 },
           spacing: { after: 80 },
         }));
@@ -113,22 +192,26 @@ export async function downloadAsWord(
         // Line opening with a bold label (CERTAIN:, SITUATE: …) — use hanging indent and tab stop
         const colonMatch = trimmed.match(/^(\*\*.*?\*\*:?)\s+(.*)/);
         if (colonMatch) {
-          children.push(new Paragraph({
+          pushParagraph(new Paragraph({
             children: [
               ...parseMarkdownLine(colonMatch[1]),
               new TextRun({ text: '\t' }),
               ...parseMarkdownLine(colonMatch[2]),
             ],
-            tabStops: [{ type: TabStopType.LEFT, position: 2880 }], // 2880 TWIPs = 2 inches
-            indent: { left: 2880, hanging: 2880 },
+            tabStops: [{ type: TabStopType.LEFT, position: LABEL_TAB }],
+            indent: { left: LABEL_TAB, hanging: LABEL_TAB },
             spacing: { after: 80 },
-            alignment: AlignmentType.LEFT,
+            alignment: AlignmentType.JUSTIFIED,
           }));
         } else {
-          children.push(new Paragraph({ children: parseMarkdownLine(trimmed), spacing: { after: 80 }, alignment: AlignmentType.LEFT }));
+          pushParagraph(new Paragraph({ children: parseMarkdownLine(trimmed), spacing: { after: 80 }, alignment: AlignmentType.LEFT }));
         }
       } else {
-        children.push(new Paragraph({ children: parseMarkdownLine(trimmed), spacing: { after: 80 }, alignment: AlignmentType.JUSTIFIED }));
+        pushParagraph(new Paragraph({
+          children: parseMarkdownLine(trimmed),
+          spacing: { after: 80 },
+          alignment: isSignatureOrRegistryLine(trimmed) ? AlignmentType.LEFT : AlignmentType.JUSTIFIED,
+        }));
       }
     }
   }
@@ -139,7 +222,7 @@ export async function downloadAsWord(
     },
     sections: [{
       properties: {
-        page: { margin: { top: 2126, bottom: 2126, left: 2126, right: 2126 } },
+        page: { margin: { top: PAGE_MARGIN, bottom: PAGE_MARGIN, left: PAGE_MARGIN, right: PAGE_MARGIN } },
       },
       // No default headers; the AI emits '[[R]] Prepared by me' as part of the document body
       children,

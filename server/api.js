@@ -213,10 +213,23 @@ The output MUST be formatted using these specific markdown structures to match t
    **AS WILL MORE FULLY APPEAR:** from General Plan D.S.L. No. 14/91 surveyed by...
    **WHICH PROPERTY:** was held under Certificate of Registered State Title No...
    **SUBJECT TO:** the conditions contained in...
-5. Catchphrases at the bottom of pages MUST be right-aligned using [[R]]:
-   [[R]] ... / CERTAIN
-   [[R]] .... / ENDORSEMENTS
-   [[R]] ..... / SIGNED
+5. Catchphrases MUST be emitted with [[CATCHWORD]] and nothing else on the line. They are anchored by the exporter at the very bottom-right corner of the page, then the next content starts on the next page:
+   [[CATCHWORD]] ..... / CERTAIN
+   [[CATCHWORD]] .... / SUBJECT
+   [[CATCHWORD]] ..... / WHEREFORE
+   [[CATCHWORD]] .... / ENDORSEMENTS
+   [[CATCHWORD]] ..... / SIGNED
+   Do not use [[R]] for catchphrases.
+   For the numbered State Grant conditions, keep the conditions in the ordinary document flow exactly as numbered clauses with the same spacing between every point. Never emit [[CATCHWORD]] ..... / 3. The, [[CATCHWORD]] ..... / 4., or any catchword/page break pointing to the next numbered paragraph. Point 3 must follow point 2 with the same spacing as point 2 follows point 1.
+10. Do not create blank pages. Use [[PAGE_BREAK]] only when a new registry section must start on a fresh page. Do not put [[PAGE_BREAK]] immediately before or after [[CATCHWORD]] because [[CATCHWORD]] already advances to the next page in Word export.
+11. Deed of Transfer property description labels must match the registry template using one hanging-indent paragraph per label:
+   **CERTAIN:** piece of land being Lot ...
+   **SITUATE:** in ...
+   **MEASURING:** ...
+   **AS WILL MORE FULLY APPEAR:** from ...
+   **WHICH PROPERTY:** was held under ...
+   **SUBJECT TO:** the conditions contained in Certificate of Rights to Minerals No. ... dated ... and further subject to the following reservations and conditions namely:-
+   The SUBJECT TO line MUST be one sentence/paragraph through "namely:-". Do not split "and further subject to the following reservations and conditions namely:-" onto a new line.
 6. Declarations of Seller/Purchaser MUST center the heading, party block, "(the 'Seller')", and the Purchase Price:
    [[C]] DECLARATION OF PURCHASER
    I, the undersigned,
@@ -226,12 +239,18 @@ The output MUST be formatted using these specific markdown structures to match t
    [[C]] (the 'Purchaser')
    do solemnly and sincerely declare that the sum of
    [[C]] P500 000,00 (Five Hundred Thousand Pula)
-7. Execution blocks (signatures) should be formatted cleanly. E.g.:
+   Declaration clauses must use dotted numbering: "1. The costs of ..." not "1 The costs of ...".
+7. Execution/signature blocks for the Deed of Transfer MUST use this simple registry layout:
+   In witness whereof I, the said Registrar, together with the Appearer q.q. have subscribed to these presents, and have caused the Seal of Office to be affixed hereto.
+   THUS DONE AND EXECUTED at the Office of the Registrar of Deeds for Botswana at Gaborone on this             day of                            in the Year of Our Lord Two Thousand and Twenty Six (2026)
    In my presence
    [[R]] ......................................
+   ..................................... Registrar of Deeds Botswana
    [[R]] q.q. his Principal
-   ......................................
-   Registrar of Deeds Botswana
+   Registered in the Register of
+   kept at
+   on the above date.
+   There must be only ONE line associated with Registrar of Deeds Botswana. Do not add a second/double line above Registrar of Deeds Botswana. Do not write "on the day of 20" or any date blanks in the Registered in the Register block; it must say exactly "on the above date."
 8. "AS WITNESSES" blocks should have left-aligned witnesses and a right-aligned principal signature line:
    **AS WITNESSES**
    1 ......................................
@@ -257,10 +276,15 @@ CRITICAL DATA RULE:
 - Use OCR EXTRACTED DATA as the HIGHEST PRIORITY source for all property and party details`;
 
   const docInstructions = {
-    deed_of_transfer: `You are an expert Botswana property conveyancing attorney generating a Deed of Transfer for the Deeds Registry. Generate a COMPLETE Deed of Transfer and Power of Attorney TO EXACTLY MATCH the visual layout of the standard templates. Ensure you use the [[C]] and [[R]] markdown tags and **LABEL:** prefixes exactly as specified in the FORMATTING RULES. Use ALL actual party details from the transaction data. Provide the full DEED OF TRANSFER, ENDORSEMENTS page, and POWER OF ATTORNEY TO GIVE TRANSFER in one comprehensive document.`,
+    deed_of_transfer: `You are an expert Botswana property conveyancing attorney generating a Deed of Transfer for the Deeds Registry. Generate a COMPLETE Deed of Transfer and Power of Attorney TO EXACTLY MATCH the visual layout of the standard templates. Ensure you use the [[C]], [[R]], [[CATCHWORD]], and **LABEL:** prefixes exactly as specified in the FORMATTING RULES. Use ALL actual party details from the transaction data. Provide the full DEED OF TRANSFER, ENDORSEMENTS page, and POWER OF ATTORNEY TO GIVE TRANSFER in one comprehensive document. Do not generate a decorative cover page or any blank pages.`,
     deed_of_sale: `You are an expert Botswana property conveyancing attorney. Generate a COMPLETE, legally binding Deed of Sale and Transfer Agreement (minimum 3000 words). Use proper legal language, numbered clauses. Include all standard Botswana Deed of Sale clauses. Use actual party details from the transaction data.`,
     transfer_duty: `You are an expert Botswana property conveyancing attorney. Generate a complete Transfer Duty Declaration under the Transfer Duty Act (Cap 53:01). Include buyer/seller details, property description, purchase price, applicable rate, and any exemption claims.`,
-    power_of_attorney: `You are an expert Botswana property conveyancing attorney. Generate a complete Power of Attorney to Transfer, authorising the conveyancer to appear before the Registrar of Deeds on behalf of the seller.`,
+    power_of_attorney: `You are an expert Botswana property conveyancing attorney. Generate a complete Power of Attorney to Transfer, authorising the conveyancer to appear before the Registrar of Deeds on behalf of the seller. The document MUST start with the top-right prepared block exactly as:
+[[R]] Prepared by me
+
+[[R]] Conveyancer
+Then center the heading:
+[[C]] POWER OF ATTORNEY TO GIVE TRANSFER`,
     declaration_of_purchase: `You are an expert Botswana property conveyancing attorney. Generate a complete Declaration of Purchaser in the Botswana Deeds Registry format, matching the exact format used for acceptance.`,
     affidavit: `You are an expert Botswana property conveyancing attorney. Generate a complete Affidavit supporting the property transaction, sworn before a Commissioner of Oaths.`,
     bond_registration: `You are an expert Botswana property conveyancing attorney. Generate a complete Mortgage Bond Registration document for the property.`,
@@ -270,7 +294,7 @@ CRITICAL DATA RULE:
   const instructions = (docInstructions[documentType] || docInstructions.deed_of_sale) + '\n\n' + BOTSWANA_RULES;
 
   const prompt = documentType === 'deed_of_transfer'
-    ? `Generate a complete Deed of Transfer for registration at the Botswana Deeds Registry:\n${transactionBlock}\n\nFollow the standard Botswana Deeds Registry format exactly. Include: cover page, DEED OF TRANSFER body with CERTAIN/SITUATE/MEASURING/AS WILL MORE FULLY APPEAR/WHICH PROPERTY/SUBJECT TO clauses, the 6 standard State Grant conditions, WHEREFORE clause, execution block, POWER OF ATTORNEY TO GIVE TRANSFER, DECLARATION OF PURCHASER, DECLARATION OF SELLER, and AFFIDAVIT OF BIRTH for both parties.`
+    ? `Generate a complete Deed of Transfer for registration at the Botswana Deeds Registry:\n${transactionBlock}\n\nFollow the standard Botswana Deeds Registry format exactly. Start directly with the registry deed content, not a decorative cover page. Include: DEED OF TRANSFER body with CERTAIN/SITUATE/MEASURING/AS WILL MORE FULLY APPEAR/WHICH PROPERTY/SUBJECT TO clauses, the 6 standard State Grant conditions, WHEREFORE clause, execution block, POWER OF ATTORNEY TO GIVE TRANSFER, DECLARATION OF PURCHASER, DECLARATION OF SELLER, and AFFIDAVIT OF BIRTH for both parties. Keep a large blank space above the centered DEED OF TRANSFER NO. heading. Keep SUBJECT TO and "and further subject to the following reservations and conditions namely:-" in one paragraph. Use [[CATCHWORD]] for bottom-right page catchphrases and do not add extra [[PAGE_BREAK]] markers around them. Do not put page breaks between numbered State Grant conditions; point 3 must follow point 2 with the same spacing as the other numbered points.`
     : `Generate a complete ${(docInstructions[documentType] ? documentType : 'deed_of_sale').replace(/_/g, ' ')} for the following Botswana property transaction:\n${transactionBlock}`;
 
   try {
