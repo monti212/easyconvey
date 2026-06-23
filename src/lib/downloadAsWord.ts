@@ -21,11 +21,30 @@ function parseMarkdownLine(line: string): TextRun[] {
   const runs: TextRun[] = [];
   // Split on bold (**text**) markers
   const parts = line.split(/(\*\*[^*]+\*\*)/g);
+  const pushTextWithOrdinalSuperscript = (text: string, bold = false) => {
+    const ordinalPattern = /\b(\d{1,2})(st|nd|rd|th)\b/gi;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = ordinalPattern.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        runs.push(new TextRun({ text: text.slice(lastIndex, match.index), bold }));
+      }
+      runs.push(new TextRun({ text: match[1], bold }));
+      runs.push(new TextRun({ text: match[2], bold, superScript: true }));
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < text.length) {
+      runs.push(new TextRun({ text: text.slice(lastIndex), bold }));
+    }
+  };
+
   for (const part of parts) {
     if (part.startsWith('**') && part.endsWith('**')) {
-      runs.push(new TextRun({ text: part.slice(2, -2), bold: true }));
+      pushTextWithOrdinalSuperscript(part.slice(2, -2), true);
     } else if (part) {
-      runs.push(new TextRun({ text: part }));
+      pushTextWithOrdinalSuperscript(part);
     }
   }
   return runs.length > 0 ? runs : [new TextRun({ text: '' })];
@@ -48,6 +67,7 @@ function normalizeDeedContent(content: string): string {
   return normalizeGeneratedLegalDocument(content)
     .replace(/\[\[PAGE_BREAK\]\][\s\n]*(?=\[\[CATCHWORD\]\])/g, '')
     .replace(/(\[\[CATCHWORD\]\][^\n]*)(?:\n\s*)+\[\[PAGE_BREAK\]\]/g, '$1')
+    .replace(/(\[\[CATCHWORD\]\]\s*.*\/\s*(?:CERTAIN|THE)\b[^\n]*)(?:\n\s*)+/gi, '$1\n')
     .replace(/(\[\[R\]\]\s*[.\s]*\/\s*[A-Z][A-Z\s]+)(?:\n\s*)+\[\[PAGE_BREAK\]\]/g, '$1')
     .replace(/\[\[PAGE_BREAK\]\][\s\n]*(?:\[\[BR\]\][\s\n]*)*\[\[PAGE_BREAK\]\]/g, '[[PAGE_BREAK]]')
     .replace(/\[\[PAGE_BREAK\]\][\s\n]+(?=\[\[PAGE_BREAK\]\])/g, '[[PAGE_BREAK]]')
@@ -73,6 +93,23 @@ function isSignatureOrRegistryLine(text: string): boolean {
   return /^(In my presence|Registered in the Register of|kept at|on the above date\.?)/i.test(text.trim())
     || /^[.\s]{8,}.*Registrar of Deeds Botswana/i.test(text.trim())
     || /^Registrar of Deeds Botswana$/i.test(text.trim());
+}
+
+function requiredCatchwordForLine(text: string): string | null {
+  const trimmed = text.trim();
+  if (/^(?:\[\[C\]\]\s*)?(?:\*\*CERTAIN:\*\*|CERTAIN:)\s+/i.test(trimmed)) return '.... / CERTAIN';
+  if (/\bThe\s+property\s+shall\s+only\s+be\s+used\b/i.test(trimmed)) return '.... / THE';
+  if (/^In\s+my\s+presence\b/i.test(trimmed)) return '.... / IN';
+  if (/^(?:\[\[C\]\]\s*)?(?:#+\s*)?ENDORSEMENTS\b/i.test(trimmed)) return '.... / ENDORSEMENTS';
+  return null;
+}
+
+function catchwordKey(text: string): string {
+  return text.replace(/^.*\/\s*/, '').trim().toUpperCase();
+}
+
+function shouldBreakAfterCatchword(text: string): boolean {
+  return /\/\s*(?:CERTAIN|IN|ENDORSEMENTS)\b/i.test(text);
 }
 
 function createCatchwordParagraph(text: string): Paragraph {
@@ -105,6 +142,7 @@ export async function downloadAsWord(
   const lines = normalizeDeedContent(content).split('\n');
   const children: Paragraph[] = [];
   let previousWasPageBreak = false;
+  const emittedCatchwords = new Set<string>();
 
   const pushParagraph = (paragraph: Paragraph, options: { pageBreak?: boolean } = {}) => {
     children.push(paragraph);
@@ -117,9 +155,28 @@ export async function downloadAsWord(
     }
   };
 
+  const pushRequiredCatchword = (text: string) => {
+    const requiredCatchword = requiredCatchwordForLine(text);
+    if (!requiredCatchword || emittedCatchwords.has(catchwordKey(requiredCatchword))) return;
+    pushParagraph(createCatchwordParagraph(requiredCatchword));
+    emittedCatchwords.add(catchwordKey(requiredCatchword));
+    if (shouldBreakAfterCatchword(requiredCatchword)) {
+      pushParagraph(new Paragraph({ children: [new PageBreak()] }), { pageBreak: true });
+    }
+  };
+
   // Parse markdown content
   for (const line of lines) {
     const trimmed = line.trim();
+
+    if (
+      trimmed
+      && trimmed !== '[[PAGE_BREAK]]'
+      && trimmed !== '[[BR]]'
+      && !trimmed.startsWith('[[CATCHWORD]]')
+    ) {
+      pushRequiredCatchword(trimmed);
+    }
 
     if (trimmed.startsWith('#### ')) {
       pushParagraph(new Paragraph({ text: trimmed.slice(5), heading: HeadingLevel.HEADING_4, alignment: AlignmentType.CENTER, spacing: { before: 120, after: 60 } }));
@@ -139,8 +196,12 @@ export async function downloadAsWord(
     } else if (trimmed.startsWith('[[CATCHWORD]]')) {
       const text = trimmed.replace(/^\[\[CATCHWORD\]\]\s*/, '');
       if (isNumberedClauseCatchword(text)) continue;
+      if (emittedCatchwords.has(catchwordKey(text))) continue;
       pushParagraph(createCatchwordParagraph(text));
-      pushParagraph(new Paragraph({ children: [new PageBreak()] }), { pageBreak: true });
+      emittedCatchwords.add(catchwordKey(text));
+      if (shouldBreakAfterCatchword(text)) {
+        pushParagraph(new Paragraph({ children: [new PageBreak()] }), { pageBreak: true });
+      }
     } else if (trimmed === '[[BR]]') {
       if (!previousWasPageBreak) {
         pushParagraph(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 240 } }));
@@ -168,6 +229,7 @@ export async function downloadAsWord(
         if (isNumberedClauseCatchword(markerMatch[2])) continue;
         if (markerMatch[1] === 'R' && isCatchphrase(markerMatch[2])) {
           pushParagraph(createCatchwordParagraph(markerMatch[2]));
+          emittedCatchwords.add(catchwordKey(markerMatch[2]));
           pushParagraph(new Paragraph({ children: [new PageBreak()] }), { pageBreak: true });
         } else {
           if (markerMatch[1] === 'C' && /^DEED OF TRANSFER NO\.?$/i.test(markerMatch[2].trim())) {

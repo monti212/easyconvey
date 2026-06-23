@@ -244,6 +244,12 @@ const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
                   components={{
                     p: ({ children }) => {
                       const kids = Array.isArray(children) ? [...children] : [children];
+                      const lead = leadingText(kids);
+                      const catchword = lead.match(/^\[\[CATCHWORD\]\]\s*(.*?)(?:\s*\[\[PAGE_BREAK\]\])?\s*$/);
+                      if (catchword) {
+                        return <p style={{ textAlign: 'right', marginTop: '4rem' }}>{catchword[1]}</p>;
+                      }
+                      if (/^\[\[PAGE_BREAK\]\]\s*$/.test(lead)) return null;
                       // Explicit alignment markers emitted by the AI
                       let marker = '';
                       if (typeof kids[0] === 'string') {
@@ -252,7 +258,6 @@ const DocumentStreamViewer: React.FC<DocumentStreamViewerProps> = ({
                       }
                       if (marker === 'C') return <p style={{ textAlign: 'center' }}>{kids}</p>;
                       if (marker === 'R') return <p style={{ textAlign: 'right' }}>{kids}</p>;
-                      const lead = leadingText(kids);
                       const d = clauseDepth(lead);
                       if (d !== null) return <p style={{ textAlign: 'left', paddingLeft: `${d * 1.5}rem` }}>{kids}</p>;
                       // A paragraph that opens with a bold label (e.g. CERTAIN:,

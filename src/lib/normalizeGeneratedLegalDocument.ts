@@ -1,5 +1,20 @@
 const REGISTRAR_LINE = '..................................... Registrar of Deeds Botswana';
 
+function generatedDateText(date = new Date()): string {
+  const day = date.getDate();
+  const suffix = day % 100 >= 11 && day % 100 <= 13
+    ? 'th'
+    : day % 10 === 1
+      ? 'st'
+      : day % 10 === 2
+        ? 'nd'
+        : day % 10 === 3
+          ? 'rd'
+          : 'th';
+  const month = date.toLocaleDateString('en-GB', { month: 'long' });
+  return `${day}${suffix} day of ${month} ${date.getFullYear()}`;
+}
+
 function normalizeRegistryBlock(content: string): string {
   const lines = content.replace(/\r\n/g, '\n').split('\n');
 
@@ -28,6 +43,66 @@ function normalizeRegistryBlock(content: string): string {
   }
 
   return lines.join('\n');
+}
+
+function hasRecentCatchword(lines: string[], index: number, catchword: string): boolean {
+  const previousWindow = lines.slice(Math.max(0, index - 30), index).join('\n');
+  const catchwordLabel = catchword.replace(/^.*\/\s*/, '').trim();
+  return new RegExp(String.raw`\[\[CATCHWORD\]\][^\n]*\/\s*${catchwordLabel}\b`, 'i').test(previousWindow);
+}
+
+function insertCatchwordBeforeLine(
+  lines: string[],
+  matcher: RegExp,
+  catchword: string,
+): string[] {
+  for (let i = 0; i < lines.length; i++) {
+    if (!matcher.test(lines[i].trim())) continue;
+    if (hasRecentCatchword(lines, i, catchword)) continue;
+
+    while (i > 0 && lines[i - 1].trim() === '') {
+      lines.splice(i - 1, 1);
+      i--;
+    }
+    if (i > 0 && lines[i - 1].trim() === '[[PAGE_BREAK]]') {
+      lines.splice(i - 1, 1);
+      i--;
+    }
+
+    lines.splice(i, 0, `[[CATCHWORD]] ${catchword}`);
+    i++;
+  }
+  return lines;
+}
+
+function normalizeDeedTransferContinuations(content: string): string {
+  if (!/DEED\s+OF\s+TRANSFER/i.test(content)) return content;
+
+  let lines = content
+    .replace(/\r\n/g, '\n')
+    .replace(/(\[\[CATCHWORD\]\][^\n]*?)\s*\[\[PAGE_BREAK\]\]/g, '$1\n[[PAGE_BREAK]]')
+    .split('\n');
+  lines = insertCatchwordBeforeLine(lines, /^(?:\[\[C\]\]\s*)?(?:\*\*CERTAIN:\*\*|CERTAIN:)\s+/i, '.... / CERTAIN');
+  lines = insertCatchwordBeforeLine(lines, /\bThe\s+property\s+shall\s+only\s+be\s+used\b/i, '.... / THE');
+  lines = insertCatchwordBeforeLine(lines, /\bIn\s+my\s+presence\b/i, '.... / IN');
+  lines = insertCatchwordBeforeLine(lines, /^(?:\[\[C\]\]\s*)?(?:#+\s*)?ENDORSEMENTS\b/i, '.... / ENDORSEMENTS');
+  return lines.join('\n');
+}
+
+function normalizePowerOfAttorneyDate(content: string): string {
+  return content
+    .replace(
+      /which Power of Attorney is dated the OUTSTANDING\s+—\s+date of Power of Attorney and was signed at/gi,
+      `which Power of Attorney is dated the ${generatedDateText()} and was signed at`,
+    )
+    .replace(
+      /(\backnowledging\s+that\s+the\s+property\s+was\s+sold\s+on\s+(?:the\s+)?)OUTSTANDING\s+[—-]\s+date\s+of\s+sale/gi,
+      `$1${generatedDateText()}`,
+    )
+    .replace(
+      /(\bproperty\s+was\s+sold\s+on\s+(?:the\s+)?)OUTSTANDING\s+[—-]\s+date\s+of\s+sale/gi,
+      `$1${generatedDateText()}`,
+    );
 }
 
 function normalizePowerOfAttorneyPreparedBlock(content: string): string {
@@ -76,7 +151,11 @@ function removePageBreaksBetweenNumberedClauses(content: string): string {
 
 export function normalizeGeneratedLegalDocument(content: string): string {
   return removePageBreaksBetweenNumberedClauses(
-    normalizePowerOfAttorneyPreparedBlock(normalizeRegistryBlock(content))
+    normalizeDeedTransferContinuations(
+      normalizePowerOfAttorneyDate(
+        normalizePowerOfAttorneyPreparedBlock(normalizeRegistryBlock(content)),
+      ),
+    )
       .replace(/^\[\[CATCHWORD\]\]\s*[.\s]*\/\s*\d+[.)]?\s*.*(?:\n)?/gmi, '')
       .replace(/^\[\[R\]\]\s*[.\s]*\/\s*\d+[.)]?\s*.*(?:\n)?/gmi, ''),
   )

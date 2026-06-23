@@ -339,10 +339,28 @@ function isSignatureOrRegistryLine(text: string): boolean {
     || /^Registrar of Deeds Botswana$/i.test(text.trim());
 }
 
+function requiredCatchwordForLine(text: string): string | null {
+  const trimmed = text.trim();
+  if (/^(?:\[\[C\]\]\s*)?(?:\*\*CERTAIN:\*\*|CERTAIN:)\s+/i.test(trimmed)) return '.... / CERTAIN';
+  if (/\bThe\s+property\s+shall\s+only\s+be\s+used\b/i.test(trimmed)) return '.... / THE';
+  if (/^In\s+my\s+presence\b/i.test(trimmed)) return '.... / IN';
+  if (/^(?:\[\[C\]\]\s*)?(?:#+\s*)?ENDORSEMENTS\b/i.test(trimmed)) return '.... / ENDORSEMENTS';
+  return null;
+}
+
+function catchwordKey(text: string): string {
+  return text.replace(/^.*\/\s*/, '').trim().toUpperCase();
+}
+
+function shouldBreakAfterCatchword(text: string): boolean {
+  return /\/\s*(?:CERTAIN|IN|ENDORSEMENTS)\b/i.test(text);
+}
+
 function normalizeGeneratedContent(markdown: string): string {
   return normalizeGeneratedLegalDocument(markdown)
     .replace(/\[\[PAGE_BREAK\]\][\s\n]*(?=\[\[CATCHWORD\]\])/g, '')
     .replace(/(\[\[CATCHWORD\]\][^\n]*)(?:\n\s*)+\[\[PAGE_BREAK\]\]/g, '$1')
+    .replace(/(\[\[CATCHWORD\]\]\s*.*\/\s*(?:CERTAIN|THE)\b[^\n]*)(?:\n\s*)+/gi, '$1\n')
     .replace(/(\[\[R\]\]\s*[.\s]*\/\s*[A-Z][A-Z\s]+)(?:\n\s*)+\[\[PAGE_BREAK\]\]/g, '$1')
     .replace(/\[\[PAGE_BREAK\]\][\s\n]*(?:\[\[BR\]\][\s\n]*)*\[\[PAGE_BREAK\]\]/g, '[[PAGE_BREAK]]')
     .replace(/\[\[PAGE_BREAK\]\][\s\n]+(?=\[\[PAGE_BREAK\]\])/g, '[[PAGE_BREAK]]')
@@ -359,6 +377,7 @@ function normalizeGeneratedContent(markdown: string): string {
 function parseMarkdownToBlocks(markdown: string): ParsedBlock[] {
   const lines = normalizeGeneratedContent(markdown).split('\n');
   const blocks: ParsedBlock[] = [];
+  const emittedCatchwords = new Set<string>();
   let i = 0;
   let paragraphBuffer: string[] = [];
 
@@ -378,6 +397,13 @@ function parseMarkdownToBlocks(markdown: string): ParsedBlock[] {
       flushParagraph();
       i++;
       continue;
+    }
+
+    const requiredCatchword = requiredCatchwordForLine(trimmed);
+    if (requiredCatchword && !emittedCatchwords.has(catchwordKey(requiredCatchword))) {
+      flushParagraph();
+      blocks.push({ type: 'catchword', text: requiredCatchword });
+      emittedCatchwords.add(catchwordKey(requiredCatchword));
     }
 
     // Horizontal rule
@@ -426,6 +452,7 @@ function parseMarkdownToBlocks(markdown: string): ParsedBlock[] {
       }
       if (markerMatch[1] === 'R' && isCatchphrase(markerMatch[2])) {
         blocks.push({ type: 'catchword', text: markerMatch[2] });
+        emittedCatchwords.add(catchwordKey(markerMatch[2]));
       } else {
         blocks.push({ type: 'paragraph', text: markerMatch[2], align: markerMatch[1] === 'C' ? 'center' : 'right' });
       }
@@ -458,7 +485,12 @@ function parseMarkdownToBlocks(markdown: string): ParsedBlock[] {
         i++;
         continue;
       }
+      if (emittedCatchwords.has(catchwordKey(catchwordMatch[1]))) {
+        i++;
+        continue;
+      }
       blocks.push({ type: 'catchword', text: catchwordMatch[1] });
+      emittedCatchwords.add(catchwordKey(catchwordMatch[1]));
       i++;
       continue;
     }
@@ -601,7 +633,7 @@ export default function DeedOfSalePDF(props: DeedOfSaleProps) {
               <Text style={{ position: 'absolute', bottom: 106, right: 106, textAlign: 'right', ...styles.paragraph }}>
                 {renderInlineText(block.text)}
               </Text>
-              <View break />
+              {shouldBreakAfterCatchword(block.text) ? <View break /> : null}
             </React.Fragment>
           );
         default:
