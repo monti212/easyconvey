@@ -75,6 +75,22 @@ function insertCatchwordBeforeLine(
   return lines;
 }
 
+function removeBreakBeforeLine(lines: string[], matcher: RegExp): string[] {
+  for (let i = 0; i < lines.length; i++) {
+    if (!matcher.test(lines[i].trim())) continue;
+
+    while (i > 0 && lines[i - 1].trim() === '') {
+      lines.splice(i - 1, 1);
+      i--;
+    }
+    if (i > 0 && lines[i - 1].trim() === '[[PAGE_BREAK]]') {
+      lines.splice(i - 1, 1);
+      i--;
+    }
+  }
+  return lines;
+}
+
 function normalizeDeedTransferContinuations(content: string): string {
   if (!/DEED\s+OF\s+TRANSFER/i.test(content)) return content;
 
@@ -82,9 +98,8 @@ function normalizeDeedTransferContinuations(content: string): string {
     .replace(/\r\n/g, '\n')
     .replace(/(\[\[CATCHWORD\]\][^\n]*?)\s*\[\[PAGE_BREAK\]\]/g, '$1\n[[PAGE_BREAK]]')
     .split('\n');
-  lines = insertCatchwordBeforeLine(lines, /^(?:\[\[C\]\]\s*)?(?:\*\*CERTAIN:\*\*|CERTAIN:)\s+/i, '.... / CERTAIN');
-  lines = insertCatchwordBeforeLine(lines, /\bThe\s+property\s+shall\s+only\s+be\s+used\b/i, '.... / THE');
-  lines = insertCatchwordBeforeLine(lines, /\bIn\s+my\s+presence\b/i, '.... / IN');
+  lines = removeBreakBeforeLine(lines, /\bThe\s+property\s+shall\s+only\s+be\s+used\b/i);
+  lines = removeBreakBeforeLine(lines, /\bIn\s+my\s+presence\b/i);
   lines = insertCatchwordBeforeLine(lines, /^(?:\[\[C\]\]\s*)?(?:#+\s*)?ENDORSEMENTS\b/i, '.... / ENDORSEMENTS');
   return lines.join('\n');
 }
@@ -156,6 +171,10 @@ export function normalizeGeneratedLegalDocument(content: string): string {
         normalizePowerOfAttorneyPreparedBlock(normalizeRegistryBlock(content)),
       ),
     )
+      .replace(/^\[\[CATCHWORD\]\]\s*[.\s]*\/\s*CERTAIN\b.*(?:\n\s*\[\[PAGE_BREAK\]\])?(?:\n)?/gmi, '')
+      .replace(/^(?:\[\[R\]\]\s*)?[.\s]*\/\s*CERTAIN\b.*(?:\n\s*\[\[PAGE_BREAK\]\])?(?:\n)?/gmi, '')
+      .replace(/^\[\[CATCHWORD\]\]\s*[.\s]*\/\s*(?:THE|IN)\b.*(?:\n\s*\[\[PAGE_BREAK\]\])?(?:\n)?/gmi, '')
+      .replace(/^(?:\[\[R\]\]\s*)?[.\s]*\/\s*(?:THE|IN)\b.*(?:\n\s*\[\[PAGE_BREAK\]\])?(?:\n)?/gmi, '')
       .replace(/^\[\[CATCHWORD\]\]\s*[.\s]*\/\s*\d+[.)]?\s*.*(?:\n)?/gmi, '')
       .replace(/^\[\[R\]\]\s*[.\s]*\/\s*\d+[.)]?\s*.*(?:\n)?/gmi, ''),
   )

@@ -214,13 +214,12 @@ The output MUST be formatted using these specific markdown structures to match t
    **WHICH PROPERTY:** was held under Certificate of Registered State Title No...
    **SUBJECT TO:** the conditions contained in...
 5. Catchphrases MUST be emitted with [[CATCHWORD]] and nothing else on the line. They are anchored by the exporter at the very bottom-right corner of the page, then the next content starts on the next page:
-   [[CATCHWORD]] .... / CERTAIN
-   [[CATCHWORD]] .... / THE
-   [[CATCHWORD]] .... / IN
    [[CATCHWORD]] .... / ENDORSEMENTS
    Do not use [[R]] for catchphrases.
-   Deed of Transfer continuations must include [[CATCHWORD]] .... / CERTAIN before the CERTAIN property description, [[CATCHWORD]] .... / THE before the page starting "The property shall only be used...", [[CATCHWORD]] .... / IN before the page starting "In my presence", and [[CATCHWORD]] .... / ENDORSEMENTS before ENDORSEMENTS.
-   "In my presence" must start on the page after [[CATCHWORD]] .... / IN.
+   Do not emit a catchphrase before the CERTAIN property description; CERTAIN must follow directly after "her Heirs, executors, administrators or assigns, the following property, that is to say:".
+   Deed of Transfer continuations must include [[CATCHWORD]] .... / ENDORSEMENTS before ENDORSEMENTS.
+   Do not emit [[CATCHWORD]] .... / THE or [[CATCHWORD]] .... / IN.
+   Keep the numbered clause starting "The property shall only be used..." in the ordinary document flow immediately after condition g), with no catchphrase or page break before it.
    For the numbered State Grant conditions, keep the conditions in the ordinary document flow exactly as numbered clauses with the same spacing between every point. Never emit [[CATCHWORD]] ..... / 3. The, [[CATCHWORD]] ..... / 4., or any catchword/page break pointing to the next numbered paragraph. Point 3 must follow point 2 with the same spacing as point 2 follows point 1.
 10. Do not create blank pages. Use [[PAGE_BREAK]] only when a new registry section must start on a fresh page. Do not put [[PAGE_BREAK]] immediately before or after [[CATCHWORD]] because [[CATCHWORD]] already advances to the next page in Word export.
 11. Deed of Transfer property description labels must match the registry template using one hanging-indent paragraph per label:

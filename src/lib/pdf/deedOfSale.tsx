@@ -341,9 +341,6 @@ function isSignatureOrRegistryLine(text: string): boolean {
 
 function requiredCatchwordForLine(text: string): string | null {
   const trimmed = text.trim();
-  if (/^(?:\[\[C\]\]\s*)?(?:\*\*CERTAIN:\*\*|CERTAIN:)\s+/i.test(trimmed)) return '.... / CERTAIN';
-  if (/\bThe\s+property\s+shall\s+only\s+be\s+used\b/i.test(trimmed)) return '.... / THE';
-  if (/^In\s+my\s+presence\b/i.test(trimmed)) return '.... / IN';
   if (/^(?:\[\[C\]\]\s*)?(?:#+\s*)?ENDORSEMENTS\b/i.test(trimmed)) return '.... / ENDORSEMENTS';
   return null;
 }
@@ -353,14 +350,13 @@ function catchwordKey(text: string): string {
 }
 
 function shouldBreakAfterCatchword(text: string): boolean {
-  return /\/\s*(?:CERTAIN|IN|ENDORSEMENTS)\b/i.test(text);
+  return /\/\s*ENDORSEMENTS\b/i.test(text);
 }
 
 function normalizeGeneratedContent(markdown: string): string {
   return normalizeGeneratedLegalDocument(markdown)
     .replace(/\[\[PAGE_BREAK\]\][\s\n]*(?=\[\[CATCHWORD\]\])/g, '')
     .replace(/(\[\[CATCHWORD\]\][^\n]*)(?:\n\s*)+\[\[PAGE_BREAK\]\]/g, '$1')
-    .replace(/(\[\[CATCHWORD\]\]\s*.*\/\s*(?:CERTAIN|THE)\b[^\n]*)(?:\n\s*)+/gi, '$1\n')
     .replace(/(\[\[R\]\]\s*[.\s]*\/\s*[A-Z][A-Z\s]+)(?:\n\s*)+\[\[PAGE_BREAK\]\]/g, '$1')
     .replace(/\[\[PAGE_BREAK\]\][\s\n]*(?:\[\[BR\]\][\s\n]*)*\[\[PAGE_BREAK\]\]/g, '[[PAGE_BREAK]]')
     .replace(/\[\[PAGE_BREAK\]\][\s\n]+(?=\[\[PAGE_BREAK\]\])/g, '[[PAGE_BREAK]]')
